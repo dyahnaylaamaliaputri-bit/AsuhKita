@@ -1,0 +1,36 @@
+{
+  "name": "asuhkita-backend",
+  "version": "1.0.0",
+  "description": "Backend REST API untuk aplikasi AsuhKita - Platform Orang Tua Asuh Digital",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "test": "echo \"Belum ada test\" && exit 0"
+  },
+  "keywords": [
+    "asuhkita",
+    "express",
+    "nodejs",
+    "postgresql",
+    "supabase"
+  ],
+  "author": "Tim AsuhKita",
+  "license": "ISC",
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  },
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.8",
+    "express": "^5.3.0",
+    "express-rate-limit": "^8.7.1",
+    "express-validator": "^7.3.2",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "morgan": "^1.12.1",
+    "pg": "^8.23.1",
+    "uuid": "^14.0.3"
+  }
+}

@@ -1,0 +1,16 @@
+# Dependensi Node.js
+node_modules/
+
+# File environment (JANGAN di-push ke GitHub!)
+.env
+
+# Log files
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Upload sementara
+uploads/temp/
