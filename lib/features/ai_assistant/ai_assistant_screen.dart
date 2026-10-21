@@ -172,7 +172,10 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
         actions: [_geminiChip(), const SizedBox(width: 8)],
         bottom: TabBar(
           controller: _tabController,
-          indicatorColor: Colors.white,
+          indicatorColor: Colors.amberAccent,
+          indicatorWeight: 3,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white70,
           isScrollable: true,
           tabs: const [
             Tab(icon: Icon(Icons.edit_note), text: 'Bantu Tulis Surat'),

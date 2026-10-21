@@ -97,34 +97,37 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // Pilihan Peran Akun (FR-06)
+                // Info Peran Akun Donatur (Admin panti didaftarkan langsung di database)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
+                    color: Colors.teal.shade50,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey.shade300),
+                    border: Border.all(color: Colors.teal.shade200),
                   ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: _selectedRole,
-                      isExpanded: true,
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'donatur',
-                          child: Text('Peran: Donatur / Orang Tua Asuh'),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.volunteer_activism, color: Colors.teal, size: 24),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Pendaftaran: Donatur / Orang Tua Asuh',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.teal),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Akun pengurus panti asuhan hanya dapat didaftarkan langsung oleh database administrator.',
+                              style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                            ),
+                          ],
                         ),
-                        DropdownMenuItem(
-                          value: 'admin_panti',
-                          child: Text('Peran: Admin Pengurus Panti'),
-                        ),
-                      ],
-                      onChanged: (val) {
-                        if (val != null) setState(() => _selectedRole = val);
-                      },
-                    ),
+                      ),
+                    ],
                   ),
-                ),
+                );
                 const SizedBox(height: 16),
 
                 // Nama Lengkap

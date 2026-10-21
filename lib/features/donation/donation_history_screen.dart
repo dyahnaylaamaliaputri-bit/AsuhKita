@@ -58,10 +58,10 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
       if (res.statusCode == 200 && res.data is List) {
         _history = List<Map<String, dynamic>>.from(res.data);
       } else {
-        _history = _dummyHistory;
+        _history = []; // Akun baru yang belum transaksi tidak boleh dipaksa menampilkan transaksi akun lain
       }
     } catch (_) {
-      _history = _dummyHistory;
+      _history = []; // Bersih per akun
     }
 
     setState(() => _isLoading = false);
@@ -184,6 +184,29 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
                   ),
                   const SizedBox(height: 12),
 
+                  if (_history.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 20),
+                      alignment: Alignment.center,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.receipt_long_outlined, size: 64, color: Colors.grey.shade400),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Belum Ada Riwayat Donasi',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black54),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Akun Anda belum pernah melakukan transaksi donasi.\nSemua transaksi baru akan tercatat di sini dan terkunci di blockchain ledger.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
                   ListView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),

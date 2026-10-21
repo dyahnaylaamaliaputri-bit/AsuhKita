@@ -62,34 +62,48 @@ class _IotDonationScreenState extends State<IotDonationScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [
-          // Banner Status IoT
+          // Penjelasan Komprehensif Fungsi Kotak Amal IoT
           Card(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             color: Colors.teal.shade50,
             child: Padding(
               padding: const EdgeInsets.all(16.0),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.sensors, color: Colors.teal, size: 36),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Text('Integrasi Hardware ESP32', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                        SizedBox(height: 4),
-                        Text(
-                          'Mendeteksi uang tunai masuk lewat sensor IR, menandatangani data dengan HMAC, dan otomatis menerbitkan blok ledger.',
-                          style: TextStyle(fontSize: 12),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(color: Colors.teal, borderRadius: BorderRadius.circular(10)),
+                        child: const Icon(Icons.sensors, color: Colors.white, size: 28),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'Fungsi Kotak Amal Pintar IoT',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.teal),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Fitur ini BUKAN metode transfer uang digital akun Anda, melainkan antarmuka monitoring Hardware Kotak Amal ESP32 yang ditempatkan secara fisik di panti asuhan mitra.',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black87),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    '• Sensor Inframerah (IR) pada slot mendeteksi saat uang tunai dimasukkan fisik oleh jemaat/pengunjung.\n'
+                    '• Tombol nominal fisik di kotak ditekan untuk mengonfirmasi pecahan uang.\n'
+                    '• Chip ESP32 menghitung hash HMAC-SHA256 lalu mentransmisikan data ke server backend AsuhKita untuk langsung mengunci transaksi ke Ledger Blockchain.\n\n'
+                    '💡 Tombol simulasi di bawah adalah simulator perangkat untuk menguji sistem saat mikrokontroler mendeteksi uang masuk fisik di panti.',
+                    style: TextStyle(fontSize: 12, height: 1.45, color: Colors.black87),
                   ),
                 ],
               ),
             ),
-          ),
-          const SizedBox(height: 16),
+          )const SizedBox(height: 16),
 
           // Tombol Simulasi Fallback (FR-54)
           Card(

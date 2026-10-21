@@ -289,6 +289,7 @@ class _SponsorScreenState extends State<SponsorScreen> {
       body: Column(
         children: [
           // Banner Status Online (Supabase) / Offline (SQLite) (FR-19)
+          if (_forceOfflineMode)
           Container(
             width: double.infinity,
             color: _isOffline ? Colors.amber.shade100 : Colors.teal.shade50,

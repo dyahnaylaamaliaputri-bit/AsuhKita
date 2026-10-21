@@ -113,6 +113,16 @@ class SecureStorageService {
   }
 
   // Hapus HANYA token sesi aktif saat logout, biarkan kredensial biometrik tetap tersimpan di Keystore
+  Future<void> clearBiometricCredentials() async {
+    await _storage.delete(key: AppConstants.keyBiometricAccessToken);
+    await _storage.delete(key: AppConstants.keyBiometricRefreshToken);
+    await _storage.delete(key: AppConstants.keyBiometricUserId);
+    await _storage.delete(key: AppConstants.keyBiometricName);
+    await _storage.delete(key: AppConstants.keyBiometricEmail);
+    await _storage.delete(key: AppConstants.keyBiometricRole);
+    await setBiometricEnabled(false);
+  }
+
   Future<void> clearAuthSession() async {
     await _storage.delete(key: AppConstants.keyAccessToken);
     await _storage.delete(key: AppConstants.keyRefreshToken);

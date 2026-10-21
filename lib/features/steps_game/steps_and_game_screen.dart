@@ -176,7 +176,10 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
         elevation: 0,
         bottom: TabBar(
           controller: _tabController,
-          indicatorColor: Colors.white,
+          indicatorColor: Colors.amberAccent,
+          indicatorWeight: 3,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white70,
           tabs: const [
             Tab(icon: Icon(Icons.directions_walk), text: 'Donasi Langkah'),
             Tab(icon: Icon(Icons.sports_esports), text: 'Mini Game Gyroscope'),

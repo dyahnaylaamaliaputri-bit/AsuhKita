@@ -1,3 +1,4 @@
+import 'package:shared_preferences/shared_preferences.dart';
 // Letak file: mobile/lib/features/profile/profile_screen.dart
 // Fungsi: Layar Profil dengan foto kamera/galeri, edit nama & nomor HP (AES-256), aktivasi biometrik, dan badge kebaikan (PBI-010, PBI-011, FR-11, FR-12, FR-48)
 
@@ -21,7 +22,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final ImagePicker _picker = ImagePicker();
   File? _imageFile;
   bool _isEditing = false;
-  final int _kebaikanPoints = 350; // Poin dari langkah & mini game (FR-48)
+  int _kebaikanPoints = 0;
 
   @override
   void initState() {

@@ -1,3 +1,4 @@
+import 'package:shared_preferences/shared_preferences.dart';
 // Letak file: mobile/lib/features/home/home_screen.dart
 // Fungsi: Layar Beranda utama dengan ringkasan status dan kartu akses ke seluruh fitur aplikasi AsuhKita (PBI-009, Bab 6.7)
 
@@ -13,7 +14,64 @@ import '../admin/admin_panel_screen.dart';
 import '../donation/donation_history_screen.dart';
 import 'iot_donation_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
+  final Function(int)? onNavigateTab;
+
+  const HomeScreen({super.key, this.onNavigateTab});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  bool _isNotificationActive = true;
+  int _sponsoredCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNotificationState();
+  }
+
+  Future<void> _loadNotificationState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (mounted) {
+        setState(() {
+          _isNotificationActive = prefs.getBool('asuhkita_notif_active') ?? true;
+          // Akun baru mulai dari 0 anak asuh, bukan statis 4
+          _sponsoredCount = prefs.getInt('asuhkita_user_sponsored_count') ?? 0;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _toggleNotification() async {
+    final newState = !_isNotificationActive;
+    setState(() => _isNotificationActive = newState);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('asuhkita_notif_active', newState);
+    } catch (_) {}
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            newState
+                ? '🔔 Notifikasi Lokal DIAKTIFKAN: Anda akan menerima pengingat donasi bulanan dan pembaruan anak asuh!'
+                : '🔕 Notifikasi Lokal DINONAKTIFKAN.',
+          ),
+          backgroundColor: newState ? Colors.teal : Colors.grey.shade700,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final onNavigateTab = widget.onNavigateTab;
   final Function(int)? onNavigateTab;
 
   const HomeScreen({super.key, this.onNavigateTab});
@@ -31,16 +89,12 @@ class HomeScreen extends StatelessWidget {
         elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.notifications_none),
-            tooltip: 'Notifikasi',
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Notifikasi Lokal: Pengingat donasi bulanan dan laporan anak asuh baru aktif!'),
-                  backgroundColor: Colors.teal,
-                ),
-              );
-            },
+            icon: Icon(
+              _isNotificationActive ? Icons.notifications_active : Icons.notifications_off_outlined,
+              color: _isNotificationActive ? Colors.amberAccent : Colors.white70,
+            ),
+            tooltip: _isNotificationActive ? 'Notifikasi Aktif' : 'Notifikasi Mati',
+            onPressed: _toggleNotification,
           ),
         ],
       ),
@@ -83,7 +137,7 @@ class HomeScreen extends StatelessWidget {
             // Ringkasan Cepat
             Row(
               children: [
-                _buildMetricCard('Anak Asuh', '4 Anak', Icons.face, Colors.blue),
+                _buildMetricCard('Anak Asuh', '$_sponsoredCount Anak', Icons.face, Colors.blue),
                 const SizedBox(width: 12),
                 _buildMetricCard('Transparansi', '100% SHA-256', Icons.security, Colors.green),
                 const SizedBox(width: 12),

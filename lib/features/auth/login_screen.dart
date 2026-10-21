@@ -16,8 +16,8 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController(text: 'donatur@asuhkita.id');
-  final _passwordController = TextEditingController(text: 'password123');
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   String? _savedBioEmail;
 
@@ -33,7 +33,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (bioEmail != null && bioEmail.isNotEmpty && mounted) {
         setState(() {
           _savedBioEmail = bioEmail;
-          _emailController.text = bioEmail;
+          // Tidak auto-fill text controller agar form tetap bersih sampai user memilih
         });
       }
     } catch (_) {}
