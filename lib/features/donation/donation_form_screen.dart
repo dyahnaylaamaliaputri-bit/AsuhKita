@@ -1,11 +1,13 @@
 // Letak file: mobile/lib/features/donation/donation_form_screen.dart
 // Fungsi: UI Form Donasi Multi-Mata Uang, Konversi Rupiah Otomatis, Konfirmasi Biometrik, dan Antrean Donasi Offline (PBI-027, PBI-028, PBI-030, PBI-057)
+// Upgrade : Kurs real-time via ExchangeRateService (PBI-048, FR-43)
 
 import 'package:flutter/material.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../core/dio_client.dart';
 import '../../data/local_db.dart';
+import '../../services/exchange_rate_service.dart';
 
 class DonationFormScreen extends StatefulWidget {
   final Map<String, dynamic> childData;
@@ -28,15 +30,18 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
   String _selectedCurrency = 'IDR'; // IDR, USD, SGD, EUR, SAR (FR-23)
   String _frequency = 'Bulanan'; // 'Bulanan' atau 'Sekali' (FR-22)
   bool _isProcessing = false;
+  bool _isFetchingRates = false;
 
-  // Nilai kurs cadangan statis terhadap Rupiah (FR-24, PBI-025)
-  final Map<String, double> _exchangeRates = {
+  // Kurs aktif (diperbarui dari ExchangeRateService saat online, FR-43, PBI-048)
+  Map<String, double> _exchangeRates = {
     'IDR': 1.0,
     'USD': 15850.0,
     'SGD': 11800.0,
     'EUR': 17200.0,
     'SAR': 4220.0,
   };
+  bool _isUsingRealtimeRates = false;
+  final ExchangeRateService _rateService = ExchangeRateService();
 
   @override
   void initState() {
@@ -44,6 +49,18 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
     // Default nominal sesuai paket pilihan dalam IDR
     final defaultIdr = widget.packageData['monthly_idr'] ?? 250000;
     _amountController.text = defaultIdr.toString();
+    // Fetch kurs real-time (FR-43, PBI-048)
+    _fetchRealTimeRates();
+  }
+
+  Future<void> _fetchRealTimeRates() async {
+    setState(() => _isFetchingRates = true);
+    final rates = await _rateService.fetchRates();
+    setState(() {
+      _exchangeRates = rates;
+      _isUsingRealtimeRates = _rateService.isUsingRealtime;
+      _isFetchingRates = false;
+    });
   }
 
   @override
@@ -368,21 +385,67 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
                     ),
                     const SizedBox(height: 14),
 
-                    // Info Nilai Kurs Cadangan / Real-time
+                    // Info Nilai Kurs Real-time / Cadangan (FR-43, PBI-048)
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
+                        color: _isUsingRealtimeRates
+                            ? Colors.green.shade50
+                            : Colors.orange.shade50,
                         borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: _isUsingRealtimeRates
+                              ? Colors.green.shade200
+                              : Colors.orange.shade200,
+                        ),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            'Kurs: 1 $_selectedCurrency = ${_formatRupiah(_exchangeRates[_selectedCurrency]!)}',
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                          Expanded(
+                            child: Text(
+                              _isFetchingRates
+                                  ? 'Memuat kurs terkini...'
+                                  : 'Kurs: 1 $_selectedCurrency = ${_formatRupiah(_exchangeRates[_selectedCurrency] ?? 1.0)}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade800,
+                              ),
+                            ),
                           ),
-                          const Icon(Icons.currency_exchange, size: 16, color: Colors.teal),
+                          _isFetchingRates
+                              ? const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2, color: Colors.teal),
+                                )
+                              : Row(
+                                  children: [
+                                    Icon(
+                                      _isUsingRealtimeRates
+                                          ? Icons.wifi
+                                          : Icons.wifi_off,
+                                      size: 14,
+                                      color: _isUsingRealtimeRates
+                                          ? Colors.green
+                                          : Colors.orange,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      _isUsingRealtimeRates
+                                          ? 'Real-time'
+                                          : 'Cadangan',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: _isUsingRealtimeRates
+                                            ? Colors.green.shade700
+                                            : Colors.orange.shade700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                         ],
                       ),
                     ),

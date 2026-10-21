@@ -6,9 +6,14 @@ import 'package:provider/provider.dart';
 import 'features/auth/auth_provider.dart';
 import 'features/auth/login_screen.dart';
 import 'widgets/main_navigation.dart';
+import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Inisialisasi Notifikasi Lokal (PBI-055, FR-40, FR-41)
+  await NotificationService().initialize();
+  // Stub FCM (PBI-056, FR-42)
+  NotificationService().initFcmStub();
   runApp(const AsuhKitaApp());
 }
 

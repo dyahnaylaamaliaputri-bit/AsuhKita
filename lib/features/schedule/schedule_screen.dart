@@ -1,8 +1,10 @@
 // Letak file: mobile/lib/features/schedule/schedule_screen.dart
 // Fungsi: UI Penjadwalan Video Call Donatur & Anak Asuh dengan Konversi 4 Zona Waktu Serentak (WIB, WITA, WIT, London) (PBI-046, FR-38, FR-39)
+// Upgrade : Integrasi NotificationService pengingat Video Call (PBI-055, FR-41)
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../services/notification_service.dart';
 
 class ScheduleScreen extends StatefulWidget {
   const ScheduleScreen({super.key});
@@ -240,14 +242,24 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
             // Tombol Simpan Jadwal
             ElevatedButton.icon(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Jadwal video call berhasil disimpan dan notifikasi lokal disiapkan!'),
-                    backgroundColor: Colors.teal,
-                  ),
+              onPressed: () async {
+                // FR-41 | PBI-055: Jadwalkan notifikasi lokal pengingat video call
+                await NotificationService().scheduleVideoCallReminder(
+                  id: _selectedDateTime.millisecondsSinceEpoch ~/ 1000 % 100000,
+                  childAlias: _childController.text.trim(),
+                  scheduledDateTime: _selectedDateTime,
                 );
-                Navigator.pop(context);
+
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                          'Jadwal video call berhasil disimpan! Notifikasi pengingat 30 menit sebelum disiapkan.'),
+                      backgroundColor: Colors.teal,
+                    ),
+                  );
+                  Navigator.pop(context);
+                }
               },
               icon: const Icon(Icons.check),
               label: const Text('Simpan & Pasang Pengingat'),

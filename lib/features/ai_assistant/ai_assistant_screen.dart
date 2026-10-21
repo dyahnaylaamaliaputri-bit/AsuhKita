@@ -1,8 +1,12 @@
 // Letak file: mobile/lib/features/ai_assistant/ai_assistant_screen.dart
-// Fungsi: UI Sahabat Asuh Berbasis AI/LLM untuk Bantu Tulis Surat, Ringkasan Laporan Anak, dan FAQ (PBI-062, FR-49, FR-50, FR-51)
+// Fungsi: UI Sahabat Asuh Berbasis AI/LLM - Gemini 1.5 Flash
+//         - Bantu Tulis Surat untuk Anak Asuh (PBI-062, FR-49)
+//         - Ringkas Laporan Perkembangan Anak  (PBI-062, FR-50)
+//         - Chatbot FAQ Sahabat Asuh           (PBI-062, FR-51)
 
 import 'package:flutter/material.dart';
-import '../../core/dio_client.dart';
+import 'package:flutter/services.dart';
+import '../../services/gemini_service.dart';
 
 class AiAssistantScreen extends StatefulWidget {
   const AiAssistantScreen({super.key});
@@ -11,32 +15,41 @@ class AiAssistantScreen extends StatefulWidget {
   State<AiAssistantScreen> createState() => _AiAssistantScreenState();
 }
 
-class _AiAssistantScreenState extends State<AiAssistantScreen> with SingleTickerProviderStateMixin {
+class _AiAssistantScreenState extends State<AiAssistantScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final GeminiService _gemini = GeminiService();
 
-  // State Tab 1: Bantu Tulis Surat
+  // -- Tab 1: Bantu Tulis Surat --
   final _letterChildNameController = TextEditingController(text: 'Bintang');
-  final _letterTopicController = TextEditingController(text: 'Memberikan semangat belajar untuk ujian kenaikan kelas dan cita-citanya.');
+  final _letterTopicController = TextEditingController(
+    text: 'Memberikan semangat belajar untuk ujian kenaikan kelas dan cita-citanya.',
+  );
   String _generatedLetter = '';
   bool _isLoadingLetter = false;
 
-  // State Tab 2: Ringkas Laporan
+  // -- Tab 2: Ringkas Laporan --
   final _reportInputController = TextEditingController(
-    text: 'Selama cawu ketiga, Ananda Bintang menunjukkan peningkatan luar biasa pada mata pelajaran matematika dengan nilai rata-rata 88. Di asrama, Bintang selalu tepat waktu mengikuti kegiatan mengaji sore dan terpilih menjadi ketua kelompok kebersihan kamar.',
+    text:
+        'Selama cawu ketiga, Ananda Bintang menunjukkan peningkatan luar biasa pada mata '
+        'pelajaran matematika dengan nilai rata-rata 88. Di asrama, Bintang selalu tepat '
+        'waktu mengikuti kegiatan mengaji sore dan terpilih menjadi ketua kelompok kebersihan kamar.',
   );
   String _summarizedReport = '';
   bool _isLoadingSummary = false;
 
-  // State Tab 3: Tanya FAQ
+  // -- Tab 3: Chatbot FAQ --
   final _faqQuestionController = TextEditingController();
-  final List<Map<String, String>> _faqChat = [
+  final _faqScrollController = ScrollController();
+  bool _isLoadingFaq = false;
+
+  // Format riwayat: {'role': 'user'/'model', 'text': '...'}
+  final List<Map<String, String>> _faqHistory = [
     {
-      'q': 'Apakah donasi saya benar-benar sampai langsung ke anak asuh?',
-      'a': 'Ya! Semua alokasi dana AsuhKita dicatat dalam buku besar hash chain (blockchain sederhana). Panti wajib mengunggah bukti kuitansi yang langsung diverifikasi secara kriptografis.',
-    },
-    {
-      'q': 'Apakah saya bisa menjadwalkan panggilan video dengan anak asuh?',
-      'a': 'Tentu saja. Anda dapat memilih jadwal melalui menu Video Call yang otomatis menyesuaikan 4 zona waktu (WIB, WITA, WIT, London) agar mudah berkoordinasi.',
+      'role': 'model',
+      'text':
+          'Halo! Saya Sahabat Asuh, asisten AI AsuhKita yang siap membantu. '
+          'Tanyakan apapun tentang donasi, anak asuh, atau cara penggunaan aplikasi!',
     },
   ];
 
@@ -53,66 +66,99 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with SingleTicker
     _letterTopicController.dispose();
     _reportInputController.dispose();
     _faqQuestionController.dispose();
+    _faqScrollController.dispose();
     super.dispose();
   }
 
-  // 1. Generate Surat dengan AI (FR-49)
+  // ----------------------------------------------------------
+  // FR-49 | PBI-062 - Generate Surat dengan Gemini
+  // ----------------------------------------------------------
   Future<void> _generateLetter() async {
+    final alias = _letterChildNameController.text.trim();
+    final topic = _letterTopicController.text.trim();
+    if (alias.isEmpty || topic.isEmpty) return;
+
     setState(() => _isLoadingLetter = true);
-    try {
-      final res = await DioClient().dio.post('/ai/letter', data: {
-        'child_alias': _letterChildNameController.text.trim(),
-        'topic': _letterTopicController.text.trim(),
-      });
-      if (res.statusCode == 200 && res.data != null) {
-        _generatedLetter = res.data['letter'] ?? '';
-      }
-    } catch (_) {
-      // Fallback cerdas Sahabat Asuh AI jika API offline
-      await Future.delayed(const Duration(milliseconds: 700));
-      _generatedLetter =
-          'Halo ${_letterChildNameController.text.trim()} tersayang,\n\n'
-          'Semoga harimu selalu ceria dan penuh semangat! Kakak menulis surat ini untuk menyemangati kamu yang sebentar lagi akan menempuh ujian. Ingatlah bahwa setiap usaha dan doa yang kamu lakukan tidak akan sia-sia.\n\n'
-          'Teruslah berani bermimpi dan jangan ragu untuk bertanya pada gurumu saat belajar. Kakak selalu bangga dan mendoakan yang terbaik untuk masa depanmu!\n\n'
-          'Salam hangat dan peluk erat,\nOrang Tua Asuhmu.';
-    }
-    setState(() => _isLoadingLetter = false);
-  }
-
-  // 2. Ringkas Laporan Anak dengan AI (FR-50)
-  Future<void> _summarizeReport() async {
-    setState(() => _isLoadingSummary = true);
-    try {
-      final res = await DioClient().dio.post('/ai/summary', data: {
-        'text': _reportInputController.text.trim(),
-      });
-      if (res.statusCode == 200 && res.data != null) {
-        _summarizedReport = res.data['summary'] ?? '';
-      }
-    } catch (_) {
-      await Future.delayed(const Duration(milliseconds: 600));
-      _summarizedReport =
-          '📌 Ringkasan Perkembangan Sahabat Asuh:\n'
-          '• Akademik: Sangat berprestasi di Matematika (Nilai 88).\n'
-          '• Karakter & Ibadah: Disiplin mengaji sore dan aktif dalam keseharian asrama.\n'
-          '• Kepemimpinan: Terpilih memimpin kelompok kebersihan kamar asrama.';
-    }
-    setState(() => _isLoadingSummary = false);
-  }
-
-  // 3. Tanya Jawaban FAQ AI (FR-51)
-  void _askFaq() {
-    final q = _faqQuestionController.text.trim();
-    if (q.isEmpty) return;
-
+    final result = await _gemini.generateLetter(childAlias: alias, topic: topic);
     setState(() {
-      _faqChat.add({
-        'q': q,
-        'a': 'Pertanyaan Anda sangat baik! Pada sistem AsuhKita, seluruh transparansi terjaga lewat verifikasi hash rantai blok, dan donatur dapat menyumbangkan langkah kaki maupun donasi multi-valuta secara aman.',
-      });
-      _faqQuestionController.clear();
+      _generatedLetter = result;
+      _isLoadingLetter = false;
     });
   }
+
+  // ----------------------------------------------------------
+  // FR-50 | PBI-062 - Ringkas Laporan dengan Gemini
+  // ----------------------------------------------------------
+  Future<void> _summarizeReport() async {
+    final text = _reportInputController.text.trim();
+    if (text.isEmpty) return;
+
+    setState(() => _isLoadingSummary = true);
+    final result = await _gemini.summarizeReport(text);
+    setState(() {
+      _summarizedReport = result;
+      _isLoadingSummary = false;
+    });
+  }
+
+  // ----------------------------------------------------------
+  // FR-51 | PBI-062 - Tanya FAQ dengan Gemini (Chat mode)
+  // ----------------------------------------------------------
+  Future<void> _askFaq() async {
+    final q = _faqQuestionController.text.trim();
+    if (q.isEmpty || _isLoadingFaq) return;
+
+    setState(() {
+      _faqHistory.add({'role': 'user', 'text': q});
+      _faqQuestionController.clear();
+      _isLoadingFaq = true;
+    });
+    _scrollToBottom();
+
+    // Kirim ke Gemini dengan riwayat percakapan sebelumnya
+    final answer = await _gemini.askFaq(q, history: _faqHistory);
+
+    setState(() {
+      _faqHistory.add({'role': 'model', 'text': answer});
+      _isLoadingFaq = false;
+    });
+    _scrollToBottom();
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_faqScrollController.hasClients) {
+        _faqScrollController.animateTo(
+          _faqScrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  // ----------------------------------------------------------
+  // Widget Helpers
+  // ----------------------------------------------------------
+  Widget _geminiChip() => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.blue.shade50,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.blue.shade200),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            Icon(Icons.auto_awesome, color: Colors.blue, size: 14),
+            SizedBox(width: 4),
+            Text(
+              'Powered by Gemini 1.5 Flash',
+              style: TextStyle(fontSize: 11, color: Colors.blue, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -123,6 +169,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with SingleTicker
         backgroundColor: Colors.teal,
         foregroundColor: Colors.white,
         elevation: 0,
+        actions: [_geminiChip(), const SizedBox(width: 8)],
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: Colors.white,
@@ -130,28 +177,43 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with SingleTicker
           tabs: const [
             Tab(icon: Icon(Icons.edit_note), text: 'Bantu Tulis Surat'),
             Tab(icon: Icon(Icons.summarize), text: 'Ringkas Laporan'),
-            Tab(icon: Icon(Icons.question_answer), text: 'Tanya FAQ'),
+            Tab(icon: Icon(Icons.chat_bubble_outline), text: 'Tanya FAQ'),
           ],
         ),
       ),
       body: TabBarView(
         controller: _tabController,
         children: [
-          // ========== TAB 1: BANTU TULIS SURAT ==========
+          // --------------- TAB 1: BANTU TULIS SURAT (FR-49) ---------------
           SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Card(
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  elevation: 2,
                   child: Padding(
-                    padding: const EdgeInsets.all(16.0),
+                    padding: const EdgeInsets.all(16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Kirim Kata-Kata Hangat untuk Anak Asuh', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                        const SizedBox(height: 12),
+                        Row(
+                          children: const [
+                            Icon(Icons.favorite, color: Colors.teal, size: 20),
+                            SizedBox(width: 8),
+                            Text(
+                              'Kirim Kata-Kata Hangat untuk Anak Asuh',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Gemini AI akan membantu menulis surat yang hangat dan personal.',
+                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                        ),
+                        const SizedBox(height: 14),
                         TextField(
                           controller: _letterChildNameController,
                           decoration: InputDecoration(
@@ -174,14 +236,22 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with SingleTicker
                         ElevatedButton.icon(
                           onPressed: _isLoadingLetter ? null : _generateLetter,
                           icon: _isLoadingLetter
-                              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                      color: Colors.white, strokeWidth: 2),
+                                )
                               : const Icon(Icons.auto_awesome),
-                          label: const Text('Buat Draf Surat dengan AI'),
+                          label: Text(_isLoadingLetter
+                              ? 'Gemini sedang menulis...'
+                              : 'Buat Draf Surat dengan Gemini'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.teal,
                             foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            minimumSize: const Size.fromHeight(44),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
                           ),
                         ),
                       ],
@@ -192,38 +262,62 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with SingleTicker
                   const SizedBox(height: 16),
                   Card(
                     color: Colors.teal.shade50,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
                     child: Padding(
-                      padding: const EdgeInsets.all(16.0),
+                      padding: const EdgeInsets.all(16),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: const [
-                              Text('Draf Surat AI (Dapat Diedit)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.teal)),
-                              Icon(Icons.check_circle_outline, color: Colors.teal, size: 20),
+                            children: [
+                              const Text(
+                                'Draf Surat AI (Dapat Diedit)',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold, color: Colors.teal),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.copy, color: Colors.teal, size: 20),
+                                tooltip: 'Salin ke clipboard',
+                                onPressed: () {
+                                  Clipboard.setData(
+                                      ClipboardData(text: _generatedLetter));
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                        content: Text('Surat disalin ke clipboard!')),
+                                  );
+                                },
+                              ),
                             ],
                           ),
-                          const Divider(height: 16),
+                          const Divider(height: 12),
                           TextFormField(
                             initialValue: _generatedLetter,
-                            maxLines: 7,
+                            maxLines: null,
                             decoration: const InputDecoration(border: InputBorder.none),
-                            style: const TextStyle(fontSize: 14, height: 1.5),
+                            style:
+                                const TextStyle(fontSize: 14, height: 1.6),
                           ),
                           const SizedBox(height: 10),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: ElevatedButton.icon(
-                              onPressed: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Surat berhasil dikirim ke panti untuk disampaikan ke anak asuh!'), backgroundColor: Colors.teal),
-                                );
-                              },
-                              icon: const Icon(Icons.send),
-                              label: const Text('Kirim Surat Ini'),
-                              style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                      'Surat berhasil dikirim ke panti untuk disampaikan ke anak asuh!'),
+                                  backgroundColor: Colors.teal,
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.send),
+                            label: const Text('Kirim Surat Ini'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.teal,
+                              foregroundColor: Colors.white,
+                              minimumSize: const Size.fromHeight(44),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10)),
                             ),
                           ),
                         ],
@@ -235,41 +329,67 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with SingleTicker
             ),
           ),
 
-          // ========== TAB 2: RINGKAS LAPORAN ==========
+          // --------------- TAB 2: RINGKAS LAPORAN (FR-50) ---------------
           SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Card(
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  elevation: 2,
                   child: Padding(
-                    padding: const EdgeInsets.all(16.0),
+                    padding: const EdgeInsets.all(16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Ringkas Laporan Perkembangan Anak', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                        const SizedBox(height: 10),
+                        Row(
+                          children: const [
+                            Icon(Icons.summarize, color: Colors.teal, size: 20),
+                            SizedBox(width: 8),
+                            Text(
+                              'Ringkas Laporan Perkembangan Anak',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 15),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Tempel laporan panjang dari pengurus panti, Gemini akan meringkasnya jadi poin singkat.',
+                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                        ),
+                        const SizedBox(height: 14),
                         TextField(
                           controller: _reportInputController,
-                          maxLines: 4,
+                          maxLines: 5,
                           decoration: InputDecoration(
                             labelText: 'Teks Laporan dari Pengurus Panti',
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                            alignLabelWithHint: true,
+                            border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10)),
                           ),
                         ),
                         const SizedBox(height: 14),
                         ElevatedButton.icon(
                           onPressed: _isLoadingSummary ? null : _summarizeReport,
                           icon: _isLoadingSummary
-                              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                      color: Colors.white, strokeWidth: 2),
+                                )
                               : const Icon(Icons.compress),
-                          label: const Text('Ringkas dengan Bahasa Sederhana'),
+                          label: Text(_isLoadingSummary
+                              ? 'Gemini sedang meringkas...'
+                              : 'Ringkas dengan Bahasa Sederhana'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.teal,
                             foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            minimumSize: const Size.fromHeight(44),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
                           ),
                         ),
                       ],
@@ -279,16 +399,32 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with SingleTicker
                 if (_summarizedReport.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   Card(
-                    color: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
-                      side: const BorderSide(color: Colors.teal),
+                      side: BorderSide(color: Colors.teal.shade300),
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Text(
-                        _summarizedReport,
-                        style: const TextStyle(fontSize: 14, height: 1.6, fontWeight: FontWeight.w500),
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: const [
+                              Icon(Icons.check_circle, color: Colors.teal, size: 18),
+                              SizedBox(width: 6),
+                              Text(
+                                'Hasil Ringkasan Gemini',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold, color: Colors.teal),
+                              ),
+                            ],
+                          ),
+                          const Divider(height: 14),
+                          Text(
+                            _summarizedReport,
+                            style: const TextStyle(fontSize: 14, height: 1.7),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -297,53 +433,88 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with SingleTicker
             ),
           ),
 
-          // ========== TAB 3: TANYA FAQ ==========
+          // --------------- TAB 3: CHATBOT FAQ (FR-51) ---------------
           Column(
             children: [
               Expanded(
                 child: ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _faqChat.length,
+                  controller: _faqScrollController,
+                  padding: const EdgeInsets.all(12),
+                  itemCount: _faqHistory.length + (_isLoadingFaq ? 1 : 0),
                   itemBuilder: (context, idx) {
-                    final item = _faqChat[idx];
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // Pertanyaan
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: Container(
-                            margin: const EdgeInsets.only(bottom: 8, left: 40),
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.teal,
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Text(item['q'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 13)),
+                    if (idx == _faqHistory.length) {
+                      // Loading indicator
+                      return const Align(
+                        alignment: Alignment.centerLeft,
+                        child: Padding(
+                          padding: EdgeInsets.only(bottom: 12),
+                          child: SizedBox(
+                            width: 36,
+                            height: 36,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.teal),
                           ),
                         ),
-                        // Jawaban
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: Container(
-                            margin: const EdgeInsets.only(bottom: 16, right: 40),
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: Colors.grey.shade300),
+                      );
+                    }
+                    final item = _faqHistory[idx];
+                    final isUser = item['role'] == 'user';
+                    return Align(
+                      alignment:
+                          isUser ? Alignment.centerRight : Alignment.centerLeft,
+                      child: Container(
+                        margin: EdgeInsets.only(
+                          bottom: 10,
+                          left: isUser ? 40 : 0,
+                          right: isUser ? 0 : 40,
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: isUser
+                              ? Colors.teal
+                              : Colors.white,
+                          borderRadius: BorderRadius.only(
+                            topLeft: const Radius.circular(14),
+                            topRight: const Radius.circular(14),
+                            bottomLeft: Radius.circular(isUser ? 14 : 0),
+                            bottomRight: Radius.circular(isUser ? 0 : 14),
+                          ),
+                          border: isUser
+                              ? null
+                              : Border.all(color: Colors.grey.shade200),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.06),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
                             ),
-                            child: Text(item['a'] ?? '', style: const TextStyle(fontSize: 13, height: 1.4)),
+                          ],
+                        ),
+                        child: Text(
+                          item['text'] ?? '',
+                          style: TextStyle(
+                            fontSize: 13,
+                            height: 1.45,
+                            color: isUser ? Colors.white : Colors.black87,
                           ),
                         ),
-                      ],
+                      ),
                     );
                   },
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                color: Colors.white,
+                padding: const EdgeInsets.fromLTRB(12, 8, 8, 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.08),
+                        blurRadius: 8,
+                        offset: const Offset(0, -2)),
+                  ],
+                ),
                 child: Row(
                   children: [
                     Expanded(
@@ -351,16 +522,32 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> with SingleTicker
                         controller: _faqQuestionController,
                         decoration: InputDecoration(
                           hintText: 'Tanyakan sesuatu tentang AsuhKita...',
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(24)),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 10),
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(24),
+                              borderSide:
+                                  BorderSide(color: Colors.grey.shade300)),
+                          enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(24),
+                              borderSide:
+                                  BorderSide(color: Colors.grey.shade300)),
                         ),
                         onSubmitted: (_) => _askFaq(),
                       ),
                     ),
                     const SizedBox(width: 8),
-                    IconButton(
-                      icon: const Icon(Icons.send, color: Colors.teal),
-                      onPressed: _askFaq,
+                    Material(
+                      color: Colors.teal,
+                      borderRadius: BorderRadius.circular(24),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(24),
+                        onTap: _isLoadingFaq ? null : _askFaq,
+                        child: const Padding(
+                          padding: EdgeInsets.all(10),
+                          child: Icon(Icons.send, color: Colors.white, size: 22),
+                        ),
+                      ),
                     ),
                   ],
                 ),

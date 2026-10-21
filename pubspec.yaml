@@ -50,6 +50,10 @@ dependencies:
   qr_flutter: ^4.1.0
   shared_preferences: ^2.5.6
   crypto: ^3.0.7
+  # AI/LLM: Gemini 1.5 Flash (PBI-062, FR-49, FR-50, FR-51)
+  google_generative_ai: ^0.4.6
+  # Notifikasi Lokal - Pengingat Donasi & Video Call (PBI-055, FR-40, FR-41)
+  flutter_local_notifications: ^22.3.2
 
 dev_dependencies:
   flutter_test:

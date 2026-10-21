@@ -102,25 +102,36 @@ class _IotDonationScreenState extends State<IotDonationScreen> {
                 children: [
                   const Text('Simulasi Sensor IR & Tombol Nominal ESP32 (Fallback Demo)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                   const SizedBox(height: 10),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      ElevatedButton(
-                        onPressed: () => _simulateIotEvent(10000),
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
-                        child: const Text('+ Rp 10.000'),
-                      ),
-                      ElevatedButton(
-                        onPressed: () => _simulateIotEvent(50000),
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
-                        child: const Text('+ Rp 50.000'),
-                      ),
-                      ElevatedButton(
-                        onPressed: () => _simulateIotEvent(100000),
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
-                        child: const Text('+ Rp 100.000'),
-                      ),
-                    ],
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    child: Row(
+                      children: [
+                        ElevatedButton(
+                          onPressed: () => _simulateIotEvent(10000),
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
+                          child: const Text('+ Rp 10.000'),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: () => _simulateIotEvent(20000),
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
+                          child: const Text('+ Rp 20.000'),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: () => _simulateIotEvent(50000),
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
+                          child: const Text('+ Rp 50.000'),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: () => _simulateIotEvent(100000),
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
+                          child: const Text('+ Rp 100.000'),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
