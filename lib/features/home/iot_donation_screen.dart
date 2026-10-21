@@ -81,7 +81,7 @@ class _IotDonationScreenState extends State<IotDonationScreen> {
                       const SizedBox(width: 12),
                       const Expanded(
                         child: Text(
-                          'Fungsi Kotak Amal Pintar IoT',
+                          'Integrasi Hardware ESP32: Fungsi Kotak Amal IoT',
                           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.teal),
                         ),
                       ),
