@@ -178,7 +178,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     backgroundColor: Colors.teal.shade100,
                     backgroundImage: _imageFile != null
                         ? FileImage(_imageFile!)
-                        : const AssetImage('assets/images/default_avatar.png') as ImageProvider,
+                        : null,
                     child: _imageFile == null
                         ? const Icon(Icons.person, size: 60, color: Colors.teal)
                         : null,
