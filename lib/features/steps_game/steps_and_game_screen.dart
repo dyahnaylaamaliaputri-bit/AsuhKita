@@ -258,17 +258,53 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
                   ),
                 ),
                 const SizedBox(height: 20),
-                ElevatedButton.icon(
+                                ElevatedButton.icon(
                   onPressed: () async {
-                    await _persistSteps(_stepCount);
                     final points = (_stepCount / 20).floor();
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Selamat! $_stepCount langkah ($points Poin Kebaikan) berhasil diklaim dan disimpan!'),
-                          backgroundColor: Colors.teal,
-                        ),
-                      );
+                    if (points <= 0) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Ayo jalan minimal 20 langkah dulu untuk mengklaim 1 Poin Kebaikan!'),
+                            backgroundColor: Colors.orange,
+                          ),
+                        );
+                      }
+                      return;
+                    }
+
+                    // Tambahkan ke akumulasi poin kebaikan di SharedPreferences
+                    try {
+                      final prefs = await SharedPreferences.getInstance();
+                      final currentPoin = prefs.getInt('asuhkita_kebaikan_points') ?? 0;
+                      final newTotalPoin = currentPoin + points;
+                      await prefs.setInt('asuhkita_kebaikan_points', newTotalPoin);
+
+                      // Simpan sisa langkah atau reset langkah yang sudah diklaim
+                      final remainingSteps = _stepCount % 20;
+                      setState(() {
+                        _stepCount = remainingSteps;
+                      });
+                      await _persistSteps(remainingSteps);
+
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              '🎉 Selamat! $_stepCount langkah berhasil diklaim menjadi $points Poin Kebaikan! '
+                              'Total Poin Kebaikan Anda sekarang: $newTotalPoin Poin (Cek di menu Profil).',
+                            ),
+                            backgroundColor: Colors.teal,
+                            duration: const Duration(seconds: 3),
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Gagal menyimpan poin: $e')),
+                        );
+                      }
                     }
                   },
                   icon: const Icon(Icons.volunteer_activism),

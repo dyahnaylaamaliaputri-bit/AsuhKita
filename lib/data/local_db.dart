@@ -133,6 +133,27 @@ class LocalDatabase {
     );
   }
 
+  // ==================== OPERASI CACHE RIWAYAT DONASI (PBI-029) ====================
+  Future<void> insertDonation(Map<String, dynamic> donation) async {
+    final db = await database;
+    await db.insert('cached_donations', {
+      'id': donation['id']?.toString() ?? 'don_${DateTime.now().millisecondsSinceEpoch}',
+      'sponsorship_id': donation['sponsorship_id']?.toString() ?? '',
+      'child_alias': donation['child_alias']?.toString() ?? '',
+      'amount_original': donation['amount_original'] is num ? (donation['amount_original'] as num).toDouble() : 0.0,
+      'currency': donation['currency']?.toString() ?? 'IDR',
+      'rate_used': donation['rate_used'] is num ? (donation['rate_used'] as num).toDouble() : 1.0,
+      'amount_idr': donation['amount_idr'] is num ? (donation['amount_idr'] as num).toDouble() : 0.0,
+      'created_at': donation['created_at']?.toString() ?? DateTime.now().toIso8601String(),
+      'status': donation['status']?.toString() ?? 'Terverifikasi di Ledger',
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<List<Map<String, dynamic>>> getCachedDonations() async {
+    final db = await database;
+    return await db.query('cached_donations', orderBy: 'created_at DESC');
+  }
+
   // ==================== OPERASI ANTREAN OFFLINE DONASI (PBI-030) ====================
   Future<int> queueOfflineDonation({
     required String childId,

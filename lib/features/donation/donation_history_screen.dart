@@ -53,15 +53,19 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
     setState(() => _isLoading = true);
     _offlineQueue = await LocalDatabase().getUnsyncedDonations();
 
+    // 1. Baca transaksi tersimpan dari Database Lokal SQLite
+    final localDonations = await LocalDatabase().getCachedDonations();
+
     try {
+      // 2. Coba sinkronkan dengan cloud server jika terhubung
       final res = await DioClient().dio.get('/donations/history');
-      if (res.statusCode == 200 && res.data is List) {
+      if (res.statusCode == 200 && res.data is List && (res.data as List).isNotEmpty) {
         _history = List<Map<String, dynamic>>.from(res.data);
       } else {
-        _history = []; // Akun baru yang belum transaksi tidak boleh dipaksa menampilkan transaksi akun lain
+        _history = localDonations;
       }
     } catch (_) {
-      _history = []; // Bersih per akun
+      _history = localDonations;
     }
 
     setState(() => _isLoading = false);

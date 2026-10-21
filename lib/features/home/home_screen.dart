@@ -1,3 +1,4 @@
+import '../../data/local_db.dart';
 // Letak file: mobile/lib/features/home/home_screen.dart
 // Fungsi: Layar Beranda utama dengan ringkasan status dan kartu akses ke seluruh fitur aplikasi AsuhKita (PBI-009, Bab 6.7)
 
@@ -36,10 +37,16 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadNotificationState() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      final localDonations = await LocalDatabase().getCachedDonations();
+      final count = localDonations.isNotEmpty
+          ? localDonations.length
+          : (prefs.getInt('asuhkita_user_sponsored_count') ?? 0);
+      final notifActive = prefs.getBool('asuhkita_notif_active') ?? true;
+
       if (mounted) {
         setState(() {
-          _isNotificationActive = prefs.getBool('asuhkita_notif_active') ?? true;
-          _sponsoredCount = prefs.getInt('asuhkita_user_sponsored_count') ?? 0;
+          _isNotificationActive = notifActive;
+          _sponsoredCount = count;
         });
       }
     } catch (_) {}

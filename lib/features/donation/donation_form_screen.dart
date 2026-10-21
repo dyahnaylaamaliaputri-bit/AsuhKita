@@ -1,3 +1,4 @@
+import 'package:shared_preferences/shared_preferences.dart';
 // Letak file: mobile/lib/features/donation/donation_form_screen.dart
 // Fungsi: UI Form Donasi Multi-Mata Uang, Konversi Rupiah Otomatis, Konfirmasi Biometrik, dan Antrean Donasi Offline (PBI-027, PBI-028, PBI-030, PBI-057)
 // Upgrade : Kurs real-time via ExchangeRateService (PBI-048, FR-43)
@@ -152,6 +153,26 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
       );
       isOnlineSuccess = false;
     }
+
+    
+    // SIMPAN PERSISTEN KE DATABASE LOKAL SQLITE agar riwayat donasi & beranda realtime
+    await LocalDatabase().insertDonation({
+      'id': 'don_${DateTime.now().millisecondsSinceEpoch}',
+      'sponsorship_id': 'sp_${DateTime.now().millisecondsSinceEpoch}',
+      'child_alias': widget.childData['alias'],
+      'amount_original': amountInput,
+      'currency': _selectedCurrency,
+      'rate_used': _exchangeRates[_selectedCurrency] ?? 1.0,
+      'amount_idr': _calculatedIdr,
+      'created_at': DateTime.now().toString().substring(0, 16),
+      'status': isOnlineSuccess ? 'Terverifikasi di Ledger Cloud' : 'Tersimpan di SQLite (Menunggu Sync)',
+    });
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final currentSponsored = prefs.getInt('asuhkita_user_sponsored_count') ?? 0;
+      await prefs.setInt('asuhkita_user_sponsored_count', currentSponsored + 1);
+    } catch (_) {}
 
     setState(() => _isProcessing = false);
 
