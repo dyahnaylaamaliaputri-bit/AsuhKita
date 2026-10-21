@@ -60,10 +60,34 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
               color: Colors.teal.shade50,
               child: Column(
                 children: [
-                  CircleAvatar(
-                    radius: 50,
-                    backgroundColor: Colors.white,
-                    child: const Icon(Icons.face, size: 64, color: Colors.teal),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: SizedBox(
+                      width: 110,
+                      height: 110,
+                      child: (child['avatar'] != null && child['avatar'].toString().startsWith('http'))
+                          ? Image.network(
+                              child['avatar'].toString(),
+                              fit: BoxFit.cover,
+                              loadingBuilder: (context, childWidget, progress) {
+                                if (progress == null) return childWidget;
+                                return Container(
+                                  color: Colors.white,
+                                  child: const Center(
+                                    child: CircularProgressIndicator(color: Colors.teal),
+                                  ),
+                                );
+                              },
+                              errorBuilder: (context, error, stackTrace) => Container(
+                                color: Colors.white,
+                                child: const Icon(Icons.face, size: 64, color: Colors.teal),
+                              ),
+                            )
+                          : Container(
+                              color: Colors.white,
+                              child: const Icon(Icons.face, size: 64, color: Colors.teal),
+                            ),
+                    ),
                   ),
                   const SizedBox(height: 12),
                   Text(

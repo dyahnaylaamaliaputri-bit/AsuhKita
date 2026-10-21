@@ -34,55 +34,115 @@ class _SponsorScreenState extends State<SponsorScreen> {
     'Perawatan Esensial',
   ];
 
-  // Dummy data awal sesuai SRS (nama samaran, avatar ilustrasi, data dummy NFR-06)
+  // Data anak asuh dari Yayasan Peduli Anak (pedulianak.org)
   final List<Map<String, dynamic>> _dummyChildren = [
     {
       'id': 'c1',
       'orphanage_id': 'o1',
-      'alias': 'Bintang',
-      'age': 9,
+      'alias': 'Arfa',
+      'age': 8,
       'need_category': 'Pendidikan',
-      'story_summary': 'Bintang gemar belajar matematika dan bermimpi menjadi seorang programmer software masa depan.',
-      'avatar': 'https://images.unsplash.com/photo-1543332164-6e82f355badc?w=150',
+      'story_summary': 'Arfa adalah anak yang ceria dan penuh semangat belajar di Pusat Peduli Anak Lombok. Bercita-cita menjadi arsitek dan sangat menyukai matematika.',
+      'avatar': 'https://www.pedulianak.org/wp-content/uploads/2025/08/6-200x300.jpg',
       'status': 'Tersedia',
-      'orphanage_name': 'Panti Asuhan Kasih Ibu',
-      'orphanage_city': 'Yogyakarta',
+      'orphanage_name': 'Peduli Anak Foundation',
+      'orphanage_city': 'Lombok Barat',
     },
     {
       'id': 'c2',
       'orphanage_id': 'o1',
-      'alias': 'Alya',
-      'age': 7,
+      'alias': 'Ayra',
+      'age': 6,
       'need_category': 'Kebutuhan Sehari-hari',
-      'story_summary': 'Alya ceria dan suka menggambar pemandangan alam. Membutuhkan nutrisi dan perlengkapan harian.',
-      'avatar': 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150',
+      'story_summary': 'Ayra adalah anak periang yang suka menggambar pemandangan alam. Membutuhkan dukungan nutrisi, pakaian, dan perlengkapan harian.',
+      'avatar': 'https://www.pedulianak.org/wp-content/uploads/2026/07/Ayra-200x300.jpg',
       'status': 'Tersedia',
-      'orphanage_name': 'Panti Asuhan Kasih Ibu',
-      'orphanage_city': 'Yogyakarta',
+      'orphanage_name': 'Peduli Anak Foundation',
+      'orphanage_city': 'Lombok Barat',
     },
     {
       'id': 'c3',
-      'orphanage_id': 'o2',
-      'alias': 'Fajar',
-      'age': 12,
+      'orphanage_id': 'o1',
+      'alias': 'Azkya',
+      'age': 9,
       'need_category': 'Pendidikan',
-      'story_summary': 'Fajar sangat aktif dalam membaca buku sains dan membutuhkan dukungan seragam serta buku sekolah.',
-      'avatar': 'https://images.unsplash.com/photo-1503919545889-aef636e10ad4?w=150',
+      'story_summary': 'Azkya rajin membaca buku cerita dan bercita-cita menjadi guru SD. Membutuhkan seragam sekolah, tas, dan buku-buku pelajaran.',
+      'avatar': 'https://www.pedulianak.org/wp-content/uploads/2026/07/DSCF6859-200x300.jpg',
       'status': 'Tersedia',
-      'orphanage_name': 'Panti Asuhan Harapan Mulia',
-      'orphanage_city': 'Sleman',
+      'orphanage_name': 'Peduli Anak Foundation',
+      'orphanage_city': 'Lombok Tengah',
     },
     {
       'id': 'c4',
-      'orphanage_id': 'o2',
-      'alias': 'Zahra',
-      'age': 6,
+      'orphanage_id': 'o1',
+      'alias': 'Elsa Saputri',
+      'age': 10,
       'need_category': 'Perawatan Esensial',
-      'story_summary': 'Zahra adalah anak termuda di asrama yang membutuhkan suplemen gizi dan pemeriksaan kesehatan rutin.',
-      'avatar': 'https://images.unsplash.com/photo-1491438590914-bc09fcaaf77a?w=150',
+      'story_summary': 'Elsa anak yang mandiri dan peduli pada teman-temannya di asrama. Membutuhkan dukungan biaya kesehatan berkala dan suplemen vitamin.',
+      'avatar': 'https://www.pedulianak.org/wp-content/uploads/2026/07/DSCF6838-200x300.jpg',
       'status': 'Tersedia',
-      'orphanage_name': 'Panti Asuhan Harapan Mulia',
-      'orphanage_city': 'Sleman',
+      'orphanage_name': 'Peduli Anak Sumbawa',
+      'orphanage_city': 'Sumbawa',
+    },
+    {
+      'id': 'c5',
+      'orphanage_id': 'o1',
+      'alias': 'Rangga',
+      'age': 11,
+      'need_category': 'Pendidikan',
+      'story_summary': 'Rangga gemar berolahraga sepak bola dan sains alam. Sangat antusias mengikuti kegiatan les ekstrakurikuler sains di panti asuhan.',
+      'avatar': 'https://www.pedulianak.org/wp-content/uploads/2026/07/DSCF6843-200x300.jpg',
+      'status': 'Tersedia',
+      'orphanage_name': 'Peduli Anak Foundation',
+      'orphanage_city': 'Lombok Utara',
+    },
+    {
+      'id': 'c6',
+      'orphanage_id': 'o1',
+      'alias': 'Sasmita',
+      'age': 7,
+      'need_category': 'Kebutuhan Sehari-hari',
+      'story_summary': 'Sasmita menyukai kesenian tari tradisional dan menyanyi. Memerlukan bantuan paket makanan bergizi seimbang dan susu pertumbuhan.',
+      'avatar': 'https://www.pedulianak.org/wp-content/uploads/2026/08/DSCF8123-200x300.jpg',
+      'status': 'Tersedia',
+      'orphanage_name': 'Peduli Anak Mataram',
+      'orphanage_city': 'Mataram',
+    },
+    {
+      'id': 'c7',
+      'orphanage_id': 'o1',
+      'alias': 'Seregar',
+      'age': 12,
+      'need_category': 'Pendidikan',
+      'story_summary': 'Seregar adalah siswa berprestasi di sekolah menengah dan memiliki cita-cita menjadi insinyur teknik elektro masa depan.',
+      'avatar': 'https://www.pedulianak.org/wp-content/uploads/2026/08/DSCF7024-200x300.jpg',
+      'status': 'Tersedia',
+      'orphanage_name': 'Peduli Anak Foundation',
+      'orphanage_city': 'Praya',
+    },
+    {
+      'id': 'c8',
+      'orphanage_id': 'o1',
+      'alias': 'Shiddiq',
+      'age': 9,
+      'need_category': 'Kebutuhan Sehari-hari',
+      'story_summary': 'Shiddiq anak yang santun dan suka membantu pengurus panti merawat taman. Membutuhkan perlengkapan sekolah dan pakaian asrama.',
+      'avatar': 'https://www.pedulianak.org/wp-content/uploads/2026/08/DSCF8114-200x300.jpg',
+      'status': 'Tersedia',
+      'orphanage_name': 'Peduli Anak Foundation',
+      'orphanage_city': 'Lombok Barat',
+    },
+    {
+      'id': 'c9',
+      'orphanage_id': 'o1',
+      'alias': 'Hamdi',
+      'age': 13,
+      'need_category': 'Pendidikan',
+      'story_summary': 'Hamdi gemar mempelajari teknologi komputer dan aktif memimpin kegiatan doa bersama adik-adik di panti asuhan.',
+      'avatar': 'https://www.pedulianak.org/wp-content/uploads/2022/10/Hamdi.jpg',
+      'status': 'Tersedia',
+      'orphanage_name': 'Peduli Anak Foundation',
+      'orphanage_city': 'Lombok Barat',
     },
   ];
 
@@ -313,11 +373,39 @@ class _SponsorScreenState extends State<SponsorScreen> {
                                 padding: const EdgeInsets.all(16.0),
                                 child: Row(
                                   children: [
-                                    // Avatar Ilustrasi (FR-17, NFR-06)
-                                    CircleAvatar(
-                                      radius: 36,
-                                      backgroundColor: Colors.teal.shade50,
-                                      child: const Icon(Icons.face, size: 44, color: Colors.teal),
+                                    // Foto Profil Anak dari Peduli Anak (FR-17, NFR-06)
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(16),
+                                      child: SizedBox(
+                                        width: 72,
+                                        height: 72,
+                                        child: (child['avatar'] != null && child['avatar'].toString().startsWith('http'))
+                                            ? Image.network(
+                                                child['avatar'].toString(),
+                                                fit: BoxFit.cover,
+                                                loadingBuilder: (context, childWidget, progress) {
+                                                  if (progress == null) return childWidget;
+                                                  return Container(
+                                                    color: Colors.teal.shade50,
+                                                    child: const Center(
+                                                      child: SizedBox(
+                                                        width: 20,
+                                                        height: 20,
+                                                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.teal),
+                                                      ),
+                                                    ),
+                                                  );
+                                                },
+                                                errorBuilder: (context, error, stackTrace) => Container(
+                                                  color: Colors.teal.shade50,
+                                                  child: const Icon(Icons.face, size: 40, color: Colors.teal),
+                                                ),
+                                              )
+                                            : Container(
+                                                color: Colors.teal.shade50,
+                                                child: const Icon(Icons.face, size: 40, color: Colors.teal),
+                                              ),
+                                      ),
                                     ),
                                     const SizedBox(width: 16),
                                     Expanded(
