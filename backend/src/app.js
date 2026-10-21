@@ -19,6 +19,7 @@ const orphanagesRoutes = require('./routes/orphanages.routes');
 const gameRoutes       = require('./routes/game.routes');
 const iotRoutes        = require('./routes/iot.routes');
 const lettersRoutes    = require('./routes/letters.routes');
+const aiRoutes         = require('./routes/ai.routes');
 const { errorHandler, notFoundHandler } = require('./middlewares/error.middleware');
 
 const app = express();
@@ -117,6 +118,7 @@ app.use('/api/orphanages',  orphanagesRoutes);           // PBI-042, PBI-045 (Sp
 app.use('/api/game',        gameRoutes);                 // PBI-054, PBI-055 (Sprint 5)
 app.use('/api/iot',         iotRoutes);                  // PBI-066, PBI-067 (Sprint 6)
 app.use('/api/letters',     lettersRoutes);              // PBI-061 (Sprint 6 — Surat Donatur)
+app.use('/api/ai',          aiRoutes);                   // PBI-060 (Sprint 6 — AI Sahabat Asuh)
 
 // ============================================================
 // ERROR HANDLERS (harus di paling bawah)
