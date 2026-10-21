@@ -92,6 +92,7 @@ const mockDb = {
   ],
   iot_events: [],
   call_schedules: [],
+  letters: [],
   exchange_rates: [
     { currency: 'USD', rate_to_idr: 16000 },
     { currency: 'SGD', rate_to_idr: 12000 },
@@ -428,6 +429,60 @@ const executeMockQuery = (text, params = []) => {
     const s = { id: generateMockId(), sponsorship_id, scheduled_at_utc, donor_timezone, notes, status: 'scheduled', created_at: new Date().toISOString() };
     mockDb.call_schedules.push(s);
     return { rows: [s], rowCount: 1 };
+  }
+
+  // SELECT FROM letters WHERE user_id (with optional child_id filter)
+  if (sql.includes('FROM LETTERS') && sql.includes('USER_ID =') && !sql.includes('INSERT') && !sql.includes('DELETE')) {
+    const userId = params[0];
+    let rows = mockDb.letters.filter(l => l.user_id === userId);
+    // Filter by child_id jika ada
+    if (params[1]) {
+      rows = rows.filter(l => l.child_id === params[1]);
+    }
+    // Join dengan children untuk alias
+    rows = rows.map(l => {
+      const child = mockDb.children.find(c => c.id === l.child_id);
+      return { ...l, child_alias: child?.alias || 'Unknown' };
+    });
+    rows.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    return { rows, rowCount: rows.length };
+  }
+
+  // SELECT FROM letters WHERE id AND user_id (get by ID)
+  if (sql.includes('FROM LETTERS') && sql.includes('WHERE L.ID =')) {
+    const letterId = params[0]; const userId = params[1];
+    let rows = mockDb.letters.filter(l => l.id === letterId && l.user_id === userId);
+    rows = rows.map(l => {
+      const child = mockDb.children.find(c => c.id === l.child_id);
+      return { ...l, child_alias: child?.alias || 'Unknown' };
+    });
+    return { rows, rowCount: rows.length };
+  }
+
+  // INSERT INTO letters
+  if (sql.includes('INSERT INTO LETTERS')) {
+    const [user_id, child_id, content, ai_generated] = params;
+    const l = { id: generateMockId(), user_id, child_id, content, ai_generated: ai_generated === true, created_at: new Date().toISOString() };
+    mockDb.letters.push(l);
+    return { rows: [l], rowCount: 1 };
+  }
+
+  // DELETE FROM letters WHERE id AND user_id
+  if (sql.includes('DELETE FROM LETTERS')) {
+    const letterId = params[0]; const userId = params[1];
+    const idx = mockDb.letters.findIndex(l => l.id === letterId && l.user_id === userId);
+    if (idx >= 0) {
+      const deleted = mockDb.letters.splice(idx, 1);
+      return { rows: [{ id: deleted[0].id }], rowCount: 1 };
+    }
+    return { rows: [], rowCount: 0 };
+  }
+
+  // SELECT FROM children WHERE id (untuk validasi di letters controller)
+  if (sql.includes('FROM CHILDREN') && sql.includes('WHERE ID =')) {
+    const childId = params[0];
+    const rows = mockDb.children.filter(c => c.id === childId);
+    return { rows, rowCount: rows.length };
   }
 
   // SELECT NOW() — health check database
