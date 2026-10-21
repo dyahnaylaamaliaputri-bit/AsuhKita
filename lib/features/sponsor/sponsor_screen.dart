@@ -415,13 +415,18 @@ class _SponsorScreenState extends State<SponsorScreen> {
                                           Row(
                                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                             children: [
-                                              Text(
-                                                '${child['alias']} (${child['age']} th)',
-                                                style: const TextStyle(
-                                                  fontSize: 16,
-                                                  fontWeight: FontWeight.bold,
+                                              Expanded(
+                                                child: Text(
+                                                  '${child['alias']} (${child['age']} th)',
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: const TextStyle(
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
                                                 ),
                                               ),
+                                              const SizedBox(width: 8),
                                               Container(
                                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                                 decoration: BoxDecoration(
@@ -451,9 +456,13 @@ class _SponsorScreenState extends State<SponsorScreen> {
                                             children: [
                                               Icon(Icons.location_on, size: 14, color: Colors.grey.shade600),
                                               const SizedBox(width: 4),
-                                              Text(
-                                                '${child['orphanage_name']} • ${child['orphanage_city']}',
-                                                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                              Expanded(
+                                                child: Text(
+                                                  '${child['orphanage_name']} • ${child['orphanage_city']}',
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                                ),
                                               ),
                                             ],
                                           ),

@@ -23,6 +23,13 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
   // Riwayat feedback lokal / tersimpan
   final List<Map<String, dynamic>> _feedbackHistory = [
     {
+      'name': 'Primary Putri Ardiva (Ketua Tim & Integrasi)',
+      'rating': 5,
+      'saran': 'Akan sangat menarik bila ke depan modul PAM mengeksplorasi lebih dalam sinkronisasi edge AI dan hardware sensor real-time secara komprehensif.',
+      'kesan': 'Mata kuliah PAM memberikan pengalaman luar biasa dalam memadukan sensor biometrik, sensor gerak giroskop, serta integrasi AI Gemini dan IoT ke dalam ekosistem aplikasi mobile sosial yang nyata dan bermanfaat!',
+      'date': '2026-10-20',
+    },
+    {
       'name': 'Dyah Nayla (Mobile UI)',
       'rating': 5,
       'saran': 'Materi praktikum Flutter dan integrasi sensor mobile sangat seru jika ditambah contoh arsitektur Clean Code di pertemuan awal.',

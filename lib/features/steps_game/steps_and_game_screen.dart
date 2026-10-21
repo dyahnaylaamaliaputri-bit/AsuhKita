@@ -21,14 +21,17 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
   StreamSubscription? _accelerometerSub;
   DateTime _lastStepTime = DateTime.now();
 
-  // ========== STATE SENSOR GYROSCOPE (MINI GAME) ==========
+  // ========== STATE SENSOR GYROSCOPE & ACCELEROMETER TILT (MINI GAME) ==========
   StreamSubscription? _gyroscopeSub;
+  StreamSubscription? _gameTiltSub;
   double _basketX = 150.0; // Posisi horizontal keranjang
   double _starX = 120.0;
   double _starY = 0.0;
   int _gameScore = 0;
   bool _isGameRunning = false;
   Timer? _gameLoopTimer;
+  double _canvasWidth = 320.0;
+  double _canvasHeight = 400.0;
 
   @override
   void initState() {
@@ -42,6 +45,7 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
     _tabController.dispose();
     _accelerometerSub?.cancel();
     _gyroscopeSub?.cancel();
+    _gameTiltSub?.cancel();
     _gameLoopTimer?.cancel();
     super.dispose();
   }
@@ -61,49 +65,61 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
     });
   }
 
-  // 2. Mini Game Gyroscope "Tangkap Bintang Harapan" (PBI-053, FR-46, FR-47)
+  // 2. Mini Game Gyroscope & Kemiringan "Tangkap Bintang Harapan" (PBI-053, FR-46, FR-47)
   void _startGame() {
     setState(() {
       _isGameRunning = true;
       _gameScore = 0;
       _starY = 0.0;
-      _starX = Random().nextDouble() * 250 + 20;
+      _starX = Random().nextDouble() * (_canvasWidth - 80) + 40;
+      _basketX = _canvasWidth / 2;
     });
 
-    // Baca sensor Gyroscope (rotasi sumbu Y untuk memiringkan HP kiri/kanan)
+    // 1. Sensor Gyroscope (Kecepatan Rotasi Sudut HP)
     _gyroscopeSub?.cancel();
     _gyroscopeSub = gyroscopeEventStream().listen((e) {
       if (!_isGameRunning) return;
       setState(() {
-        // Gerakkan keranjang sesuai kecepatan rotasi gyroscope (e.y)
-        _basketX -= e.y * 12.0;
-        if (_basketX < 20) _basketX = 20;
-        if (_basketX > 280) _basketX = 280;
+        _basketX -= e.y * 14.0;
+        if (_basketX < 35) _basketX = 35;
+        if (_basketX > _canvasWidth - 35) _basketX = _canvasWidth - 35;
       });
     });
 
-    // Game loop 60 FPS (tiap 16 ms)
+    // 2. Sensor Accelerometer Tilt (Sudut Kemiringan Statis Gravitasi HP)
+    _gameTiltSub?.cancel();
+    _gameTiltSub = accelerometerEventStream().listen((e) {
+      if (!_isGameRunning) return;
+      setState(() {
+        // e.x bernilai negatif saat HP dimiringkan ke kanan, positif saat ke kiri
+        _basketX -= e.x * 3.5;
+        if (_basketX < 35) _basketX = 35;
+        if (_basketX > _canvasWidth - 35) _basketX = _canvasWidth - 35;
+      });
+    });
+
+    // Game loop 60 FPS (tiap 25 ms)
     _gameLoopTimer?.cancel();
     _gameLoopTimer = Timer.periodic(const Duration(milliseconds: 25), (timer) {
       if (!_isGameRunning) return;
 
       setState(() {
-        _starY += 5.0; // Bintang jatuh ke bawah
+        _starY += 4.5; // Bintang jatuh ke bawah
 
         // Cek tabrakan / tangkapan bintang dengan keranjang
-        if (_starY >= 340 && _starY <= 380) {
-          if ((_starX - _basketX).abs() < 40) {
+        if (_starY >= _canvasHeight - 65 && _starY <= _canvasHeight - 15) {
+          if ((_starX - _basketX).abs() < 55) {
             // Berhasil ditangkap!
             _gameScore += 10;
             _starY = 0.0;
-            _starX = Random().nextDouble() * 250 + 20;
+            _starX = Random().nextDouble() * (_canvasWidth - 80) + 40;
           }
         }
 
         // Bintang jatuh terlewat batas bawah
-        if (_starY > 400) {
+        if (_starY > _canvasHeight) {
           _starY = 0.0;
-          _starX = Random().nextDouble() * 250 + 20;
+          _starX = Random().nextDouble() * (_canvasWidth - 80) + 40;
         }
       });
     });
@@ -112,6 +128,7 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
   void _stopGame() {
     _gameLoopTimer?.cancel();
     _gyroscopeSub?.cancel();
+    _gameTiltSub?.cancel();
     setState(() {
       _isGameRunning = false;
     });
@@ -262,23 +279,49 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
                 ),
                 const SizedBox(height: 12),
 
-                // Area Game Canvas dengan CustomPainter
+                // Area Game Canvas dengan CustomPainter & Touch/Tilt Control
                 Expanded(
-                  child: Container(
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: Colors.indigo.shade900,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.teal.shade300, width: 2),
-                    ),
-                    child: CustomPaint(
-                      painter: GameCanvasPainter(
-                        basketX: _basketX,
-                        starX: _starX,
-                        starY: _starY,
-                        isRunning: _isGameRunning,
-                      ),
-                    ),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      _canvasWidth = constraints.maxWidth;
+                      _canvasHeight = constraints.maxHeight;
+
+                      return Container(
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: Colors.indigo.shade900,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.teal.shade300, width: 2),
+                        ),
+                        child: GestureDetector(
+                          onPanUpdate: (details) {
+                            if (!_isGameRunning) return;
+                            setState(() {
+                              _basketX += details.delta.dx;
+                              if (_basketX < 35) _basketX = 35;
+                              if (_basketX > _canvasWidth - 35) _basketX = _canvasWidth - 35;
+                            });
+                          },
+                          onTapDown: (details) {
+                            if (!_isGameRunning) return;
+                            setState(() {
+                              _basketX = details.localPosition.dx;
+                              if (_basketX < 35) _basketX = 35;
+                              if (_basketX > _canvasWidth - 35) _basketX = _canvasWidth - 35;
+                            });
+                          },
+                          child: CustomPaint(
+                            size: Size(constraints.maxWidth, constraints.maxHeight),
+                            painter: GameCanvasPainter(
+                              basketX: _basketX,
+                              starX: _starX,
+                              starY: _starY,
+                              isRunning: _isGameRunning,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ],

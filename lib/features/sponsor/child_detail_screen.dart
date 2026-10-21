@@ -221,27 +221,34 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                   const SizedBox(height: 20),
 
                   // Tombol Lanjut ke Donasi
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => DonationFormScreen(
-                              childData: child,
-                              packageData: _packages[_selectedPackageIndex],
-                            ),
+                  SafeArea(
+                    top: false,
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 20),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => DonationFormScreen(
+                                  childData: child,
+                                  packageData: _packages[_selectedPackageIndex],
+                                ),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.favorite),
+                          label: const Text('Lanjut ke Form Donasi', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.teal,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            elevation: 2,
                           ),
-                        );
-                      },
-                      icon: const Icon(Icons.favorite),
-                      label: const Text('Lanjut ke Form Donasi'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.teal,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
                       ),
                     ),
                   ),
