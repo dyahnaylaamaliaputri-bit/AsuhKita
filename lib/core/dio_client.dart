@@ -78,20 +78,32 @@ class DioClient {
 
           // Tangani jika terjadi 401 Unauthorized (token kedaluwarsa)
           if (error.response?.statusCode == 401) {
+            final path = error.requestOptions.path;
+            // Jika 401 terjadi saat login atau register, teruskan error ke UI tanpa auto-logout
+            if (path.contains('/auth/login') || path.contains('/auth/register')) {
+              return handler.next(error);
+            }
+
             final refreshToken = await _storage.getRefreshToken();
 
-            if (refreshToken != null && refreshToken.isNotEmpty) {
+            if (refreshToken != null &&
+                refreshToken.isNotEmpty &&
+                !refreshToken.startsWith('refresh_demo_') &&
+                !refreshToken.startsWith('refresh_bio_')) {
               try {
                 // Buat client terpisah agar tidak loop interceptor
-                final refreshDio = Dio(BaseOptions(baseUrl: AppConstants.baseUrl));
+                final refreshDio = Dio(BaseOptions(baseUrl: dio.options.baseUrl));
                 final response = await refreshDio.post(
                   '/auth/refresh',
                   data: {'refreshToken': refreshToken},
                 );
 
                 if (response.statusCode == 200 && response.data != null) {
-                  final newAccessToken = response.data['access'] ?? response.data['accessToken'];
-                  final newRefreshToken = response.data['refresh'] ?? response.data['refreshToken'] ?? refreshToken;
+                  final resData = (response.data is Map && response.data['data'] != null)
+                      ? response.data['data']
+                      : response.data;
+                  final newAccessToken = resData['access'] ?? resData['accessToken'];
+                  final newRefreshToken = resData['refresh'] ?? resData['refreshToken'] ?? refreshToken;
 
                   // Simpan token baru
                   final role = await _storage.getUserRole() ?? 'donatur';
@@ -101,7 +113,7 @@ class DioClient {
                   await _storage.saveAuthSession(
                     accessToken: newAccessToken,
                     refreshToken: newRefreshToken,
-                    userId: response.data['userId'] ?? '',
+                    userId: resData['userId'] ?? '',
                     name: name,
                     email: email,
                     role: role,
@@ -123,16 +135,9 @@ class DioClient {
 
                   return handler.resolve(clonedRequest);
                 }
-              } catch (refreshErr) {
-                // Refresh token gagal atau kedaluwarsa -> Sesi Habis -> Auto-Logout
-                await _storage.clearAuthSession();
-                onSessionExpired?.call();
-                return handler.reject(error);
+              } catch (_) {
+                // Jangan tendang keluar paksa jika masih bisa fallback ke mode offline
               }
-            } else {
-              // Tidak ada refresh token -> Auto-Logout
-              await _storage.clearAuthSession();
-              onSessionExpired?.call();
             }
           }
           return handler.next(error);

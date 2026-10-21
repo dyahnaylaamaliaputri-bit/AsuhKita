@@ -79,14 +79,17 @@ class AuthProvider extends ChangeNotifier {
         });
 
         if (response.statusCode == 200) {
-          final data = response.data;
-          _userId = data['user']?['id']?.toString() ?? 'usr_${DateTime.now().millisecondsSinceEpoch}';
-          _userName = data['user']?['name']?.toString() ?? 'Donatur Asuh';
+          final resData = (response.data is Map && response.data['data'] != null)
+              ? response.data['data']
+              : response.data;
+          final user = (resData is Map && resData['user'] != null) ? resData['user'] : {};
+          _userId = user['id']?.toString() ?? 'usr_${DateTime.now().millisecondsSinceEpoch}';
+          _userName = user['name']?.toString() ?? 'Donatur Asuh';
           _userEmail = email;
-          _userRole = data['user']?['role']?.toString() ?? 'donatur';
+          _userRole = user['role']?.toString() ?? 'donatur';
 
-          final token = data['access'] ?? 'dummy_access_token';
-          final refreshToken = data['refresh'] ?? 'dummy_refresh_token';
+          final token = resData['access'] ?? resData['accessToken'] ?? 'dummy_access_token';
+          final refreshToken = resData['refresh'] ?? resData['refreshToken'] ?? 'dummy_refresh_token';
 
           await _storage.saveAuthSession(
             accessToken: token,
