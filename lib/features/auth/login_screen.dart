@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../core/secure_storage.dart';
 import 'auth_provider.dart';
 import 'register_screen.dart';
 
@@ -18,6 +19,25 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController(text: 'donatur@asuhkita.id');
   final _passwordController = TextEditingController(text: 'password123');
   bool _obscurePassword = true;
+  String? _savedBioEmail;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkSavedBiometric();
+  }
+
+  Future<void> _checkSavedBiometric() async {
+    try {
+      final bioEmail = await SecureStorageService().getLastBiometricEmail();
+      if (bioEmail != null && bioEmail.isNotEmpty && mounted) {
+        setState(() {
+          _savedBioEmail = bioEmail;
+          _emailController.text = bioEmail;
+        });
+      }
+    } catch (_) {}
+  }
 
   @override
   void dispose() {
@@ -194,7 +214,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 16),
 
                   // Opsi Login Biometrik jika sensor tersedia di HP
-                  if (auth.isBiometricAvailable)
+                  if (auth.isBiometricAvailable) ...[
                     OutlinedButton.icon(
                       onPressed: auth.isLoading ? null : _handleBiometricLogin,
                       icon: const Icon(Icons.fingerprint, color: Colors.teal, size: 26),
@@ -210,6 +230,15 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                     ),
+                    if (_savedBioEmail != null) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        'Sidik jari tertaut: $_savedBioEmail',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 12, color: Colors.teal.shade700, fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ],
 
                   const SizedBox(height: 24),
 

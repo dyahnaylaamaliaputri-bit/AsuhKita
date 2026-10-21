@@ -60,6 +60,23 @@ class SecureStorageService {
     return val == 'true';
   }
 
+  Future<void> saveBiometricCredentials({
+    required String accessToken,
+    required String refreshToken,
+    required String userId,
+    required String name,
+    required String email,
+    required String role,
+  }) async {
+    await _storage.write(key: AppConstants.keyBiometricAccessToken, value: accessToken);
+    await _storage.write(key: AppConstants.keyBiometricRefreshToken, value: refreshToken);
+    await _storage.write(key: AppConstants.keyBiometricUserId, value: userId);
+    await _storage.write(key: AppConstants.keyBiometricName, value: name);
+    await _storage.write(key: AppConstants.keyBiometricEmail, value: email);
+    await _storage.write(key: AppConstants.keyBiometricRole, value: role);
+    await setBiometricEnabled(true);
+  }
+
   Future<void> saveLastBiometricUser({
     required String email,
     required String name,
@@ -83,25 +100,25 @@ class SecureStorageService {
     return await _storage.read(key: AppConstants.keyBiometricRole);
   }
 
-  // Hapus token aktif saat logout namun pertahankan kredensial biometrik yang didaftarkan
+  Future<String?> getBiometricUserId() async {
+    return await _storage.read(key: AppConstants.keyBiometricUserId);
+  }
+
+  Future<String?> getBiometricAccessToken() async {
+    return await _storage.read(key: AppConstants.keyBiometricAccessToken);
+  }
+
+  Future<String?> getBiometricRefreshToken() async {
+    return await _storage.read(key: AppConstants.keyBiometricRefreshToken);
+  }
+
+  // Hapus HANYA token sesi aktif saat logout, biarkan kredensial biometrik tetap tersimpan di Keystore
   Future<void> clearAuthSession() async {
-    final bioEmail = await getLastBiometricEmail();
-    final bioName = await getLastBiometricName();
-    final bioRole = await getLastBiometricRole();
-    final bioStatus = await isBiometricEnabled();
-
-    await _storage.deleteAll();
-
-    // Pertahankan kredensial biometrik jika user masih ingin memakai biometrik di HP ini
-    if (bioEmail != null && bioEmail.isNotEmpty) {
-      await saveLastBiometricUser(
-        email: bioEmail,
-        name: bioName ?? 'Donatur Asuh',
-        role: bioRole ?? 'donatur',
-      );
-    }
-    if (bioStatus) {
-      await setBiometricEnabled(true);
-    }
+    await _storage.delete(key: AppConstants.keyAccessToken);
+    await _storage.delete(key: AppConstants.keyRefreshToken);
+    await _storage.delete(key: AppConstants.keyUserId);
+    await _storage.delete(key: AppConstants.keyUserName);
+    await _storage.delete(key: AppConstants.keyUserEmail);
+    await _storage.delete(key: AppConstants.keyUserRole);
   }
 }

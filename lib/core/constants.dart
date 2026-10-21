@@ -21,6 +21,9 @@ class AppConstants {
   static const String keyBiometricEmail = 'asuhkita_bio_email';
   static const String keyBiometricName = 'asuhkita_bio_name';
   static const String keyBiometricRole = 'asuhkita_bio_role';
+  static const String keyBiometricUserId = 'asuhkita_bio_user_id';
+  static const String keyBiometricAccessToken = 'asuhkita_bio_access_token';
+  static const String keyBiometricRefreshToken = 'asuhkita_bio_refresh_token';
 
   // Kunci enkripsi AES-256 (32 karakter string) untuk mengamankan data lokal sensitif (misal nomor HP)
   static const String aesSecretKey = 'AsuhKitaSecureKey2026SuperSafe32';
