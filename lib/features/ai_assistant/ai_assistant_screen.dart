@@ -202,9 +202,11 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
                           children: const [
                             Icon(Icons.favorite, color: Colors.teal, size: 20),
                             SizedBox(width: 8),
-                            Text(
-                              'Kirim Kata-Kata Hangat untuk Anak Asuh',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                            Expanded(
+                              child: Text(
+                                'Kirim Kata-Kata Hangat untuk Anak Asuh',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                              ),
                             ),
                           ],
                         ),
@@ -347,10 +349,12 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
                           children: const [
                             Icon(Icons.summarize, color: Colors.teal, size: 20),
                             SizedBox(width: 8),
-                            Text(
-                              'Ringkas Laporan Perkembangan Anak',
-                              style: TextStyle(
-                                  fontWeight: FontWeight.bold, fontSize: 15),
+                            Expanded(
+                              child: Text(
+                                'Ringkas Laporan Perkembangan Anak',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold, fontSize: 15),
+                              ),
                             ),
                           ],
                         ),

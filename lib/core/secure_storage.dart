@@ -60,11 +60,46 @@ class SecureStorageService {
     return val == 'true';
   }
 
-  // Hapus semua token dan sesi saat logout
+  Future<void> saveLastBiometricUser({
+    required String email,
+    required String name,
+    required String role,
+  }) async {
+    await _storage.write(key: AppConstants.keyBiometricEmail, value: email);
+    await _storage.write(key: AppConstants.keyBiometricName, value: name);
+    await _storage.write(key: AppConstants.keyBiometricRole, value: role);
+    await setBiometricEnabled(true);
+  }
+
+  Future<String?> getLastBiometricEmail() async {
+    return await _storage.read(key: AppConstants.keyBiometricEmail);
+  }
+
+  Future<String?> getLastBiometricName() async {
+    return await _storage.read(key: AppConstants.keyBiometricName);
+  }
+
+  Future<String?> getLastBiometricRole() async {
+    return await _storage.read(key: AppConstants.keyBiometricRole);
+  }
+
+  // Hapus token aktif saat logout namun pertahankan kredensial biometrik yang didaftarkan
   Future<void> clearAuthSession() async {
+    final bioEmail = await getLastBiometricEmail();
+    final bioName = await getLastBiometricName();
+    final bioRole = await getLastBiometricRole();
     final bioStatus = await isBiometricEnabled();
+
     await _storage.deleteAll();
-    // Simpan status biometrik jika user masih ingin memakai biometrik di perangkat ini
+
+    // Pertahankan kredensial biometrik jika user masih ingin memakai biometrik di HP ini
+    if (bioEmail != null && bioEmail.isNotEmpty) {
+      await saveLastBiometricUser(
+        email: bioEmail,
+        name: bioName ?? 'Donatur Asuh',
+        role: bioRole ?? 'donatur',
+      );
+    }
     if (bioStatus) {
       await setBiometricEnabled(true);
     }

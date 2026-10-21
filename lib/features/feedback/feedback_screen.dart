@@ -218,11 +218,15 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                       children: [
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              item['name'] ?? '',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            Expanded(
+                              child: Text(
+                                item['name'] ?? '',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                              ),
                             ),
+                            const SizedBox(width: 8),
                             Text(
                               item['date'] ?? '',
                               style: TextStyle(fontSize: 12, color: Colors.grey.shade600),

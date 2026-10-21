@@ -312,19 +312,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  secondary: const Icon(Icons.fingerprint, color: Colors.teal, size: 28),
-                  title: const Text(
-                    'Login dengan Biometrik',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  subtitle: const Text('Gunakan sidik jari/wajah untuk membuka sesi cepat'),
-                  value: auth.isBiometricEnabled,
-                  activeThumbColor: Colors.teal,
-                  onChanged: (val) {
-                    auth.toggleBiometric(val);
-                  },
+                child: Column(
+                  children: [
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      secondary: const Icon(Icons.fingerprint, color: Colors.teal, size: 28),
+                      title: const Text(
+                        'Login dengan Biometrik',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: const Text('Gunakan sidik jari/wajah untuk membuka sesi cepat'),
+                      value: auth.isBiometricEnabled,
+                      activeThumbColor: Colors.teal,
+                      onChanged: (val) async {
+                        if (val) {
+                          final ok = await auth.registerBiometricPrompt();
+                          if (ok && mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Sidik jari berhasil didaftarkan dan diaktifkan!'),
+                                backgroundColor: Colors.teal,
+                              ),
+                            );
+                          }
+                        } else {
+                          auth.toggleBiometric(false);
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Login biometrik dinonaktifkan.'),
+                              ),
+                            );
+                          }
+                        }
+                      },
+                    ),
+                  ],
                 ),
               ),
             ),

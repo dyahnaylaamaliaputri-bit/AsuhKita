@@ -45,6 +45,37 @@ class DioClient {
           return handler.next(options);
         },
         onError: (DioException error, handler) async {
+          // Coba fallback ke kandidat baseUrl lain jika gagal koneksi/timeout
+          if (error.type == DioExceptionType.connectionError ||
+              error.type == DioExceptionType.connectionTimeout) {
+            for (final candidate in AppConstants.candidateBaseUrls) {
+              if (candidate != dio.options.baseUrl) {
+                try {
+                  final retryOptions = Options(
+                    method: error.requestOptions.method,
+                    headers: error.requestOptions.headers,
+                    responseType: error.requestOptions.responseType,
+                    contentType: error.requestOptions.contentType,
+                  );
+                  final path = error.requestOptions.path;
+                  final newUrl = candidate + (path.startsWith('/') ? path : '/$path');
+                  final fallbackDio = Dio(BaseOptions(
+                    connectTimeout: const Duration(seconds: 3),
+                    receiveTimeout: const Duration(seconds: 3),
+                  ));
+                  final response = await fallbackDio.request(
+                    newUrl,
+                    data: error.requestOptions.data,
+                    queryParameters: error.requestOptions.queryParameters,
+                    options: retryOptions,
+                  );
+                  dio.options.baseUrl = candidate;
+                  return handler.resolve(response);
+                } catch (_) {}
+              }
+            }
+          }
+
           // Tangani jika terjadi 401 Unauthorized (token kedaluwarsa)
           if (error.response?.statusCode == 401) {
             final refreshToken = await _storage.getRefreshToken();

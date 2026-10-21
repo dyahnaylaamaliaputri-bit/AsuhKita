@@ -93,6 +93,12 @@ class AuthProvider extends ChangeNotifier {
             email: _userEmail,
             role: _userRole,
           );
+          await _storage.saveLastBiometricUser(
+            email: _userEmail,
+            name: _userName,
+            role: _userRole,
+          );
+          _isBiometricEnabled = true;
 
           _isAuthenticated = true;
           _isLoading = false;
@@ -115,6 +121,12 @@ class AuthProvider extends ChangeNotifier {
             email: _userEmail,
             role: _userRole,
           );
+          await _storage.saveLastBiometricUser(
+            email: _userEmail,
+            name: _userName,
+            role: _userRole,
+          );
+          _isBiometricEnabled = true;
 
           _isAuthenticated = true;
           _isLoading = false;
@@ -163,12 +175,14 @@ class AuthProvider extends ChangeNotifier {
         });
 
         if (res.statusCode == 201 || res.statusCode == 200) {
+          await _storage.saveLastBiometricUser(email: email, name: name, role: role);
           _isLoading = false;
           notifyListeners();
           return true;
         }
       } catch (err) {
         // Fallback demo registrasi mandiri
+        await _storage.saveLastBiometricUser(email: email, name: name, role: role);
         _isLoading = false;
         notifyListeners();
         return true;
@@ -201,23 +215,42 @@ class AuthProvider extends ChangeNotifier {
       );
 
       if (didAuthenticate) {
-        final savedEmail = await _storage.getUserEmail();
-        final savedName = await _storage.getUserName();
-        final savedRole = await _storage.getUserRole();
+        // Ambil data akun yang tersimpan untuk biometrik
+        var email = await _storage.getLastBiometricEmail();
+        var name = await _storage.getLastBiometricName();
+        var role = await _storage.getLastBiometricRole();
 
-        if (savedEmail != null && savedEmail.isNotEmpty) {
-          _userEmail = savedEmail;
-          _userName = savedName ?? 'Donatur';
-          _userRole = savedRole ?? 'donatur';
-          _isAuthenticated = true;
-          notifyListeners();
-          return true;
-        } else {
-          // Jika belum pernah login sebelumnya, beri tahu pengguna
-          _errorMessage = 'Silakan login biasa terlebih dahulu untuk mengaktifkan biometrik.';
-          notifyListeners();
-          return false;
+        // Jika belum ada akun tersimpan, gunakan akun default donatur
+        if (email == null || email.isEmpty) {
+          email = 'donatur@asuhkita.id';
+          name = 'Donatur Asuh';
+          role = 'donatur';
         }
+
+        _userId = 'usr_bio_${DateTime.now().millisecondsSinceEpoch}';
+        _userEmail = email;
+        _userName = name ?? 'Donatur Asuh';
+        _userRole = role ?? 'donatur';
+
+        await _storage.saveAuthSession(
+          accessToken: 'token_bio_${DateTime.now().millisecondsSinceEpoch}',
+          refreshToken: 'refresh_bio_${DateTime.now().millisecondsSinceEpoch}',
+          userId: _userId,
+          name: _userName,
+          email: _userEmail,
+          role: _userRole,
+        );
+        await _storage.saveLastBiometricUser(
+          email: _userEmail,
+          name: _userName,
+          role: _userRole,
+        );
+
+        _isBiometricEnabled = true;
+        _isAuthenticated = true;
+        _errorMessage = null;
+        notifyListeners();
+        return true;
       }
       return false;
     } catch (e) {
@@ -227,10 +260,40 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  // Daftarkan / Verifikasi Sidik Jari dari Pengaturan Profil (FR-07)
+  Future<bool> registerBiometricPrompt() async {
+    if (!_isBiometricAvailable) return false;
+    try {
+      final didAuth = await _localAuth.authenticate(
+        localizedReason: 'Konfirmasi sidik jari untuk mengaktifkan login cepat',
+        biometricOnly: true,
+      );
+      if (didAuth) {
+        await _storage.saveLastBiometricUser(
+          email: _userEmail.isNotEmpty ? _userEmail : 'donatur@asuhkita.id',
+          name: _userName.isNotEmpty ? _userName : 'Donatur Asuh',
+          role: _userRole.isNotEmpty ? _userRole : 'donatur',
+        );
+        _isBiometricEnabled = true;
+        await _storage.setBiometricEnabled(true);
+        notifyListeners();
+        return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
   // Toggle aktivasi biometrik dari Pengaturan/Profil (FR-07)
   Future<void> toggleBiometric(bool enable) async {
     _isBiometricEnabled = enable;
     await _storage.setBiometricEnabled(enable);
+    if (enable) {
+      await _storage.saveLastBiometricUser(
+        email: _userEmail.isNotEmpty ? _userEmail : 'donatur@asuhkita.id',
+        name: _userName.isNotEmpty ? _userName : 'Donatur Asuh',
+        role: _userRole.isNotEmpty ? _userRole : 'donatur',
+      );
+    }
     notifyListeners();
   }
 

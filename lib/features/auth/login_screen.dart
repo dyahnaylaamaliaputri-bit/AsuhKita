@@ -48,7 +48,14 @@ class _LoginScreenState extends State<LoginScreen> {
   void _handleBiometricLogin() async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final success = await auth.loginWithBiometrics();
-    if (!success && mounted && auth.errorMessage != null) {
+    if (success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Autentikasi biometrik berhasil! Selamat datang, ${auth.userName}.'),
+          backgroundColor: Colors.teal,
+        ),
+      );
+    } else if (!success && mounted && auth.errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(auth.errorMessage!),

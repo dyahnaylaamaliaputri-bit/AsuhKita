@@ -5,6 +5,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:sensors_plus/sensors_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class StepsAndGameScreen extends StatefulWidget {
   const StepsAndGameScreen({super.key});
@@ -17,7 +18,8 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
   late TabController _tabController;
 
   // ========== STATE SENSOR ACCELEROMETER (DETEKSI LANGKAH) ==========
-  int _stepCount = 142; // Langkah awal
+  static const String _stepsStorageKey = 'asuhkita_daily_steps';
+  int _stepCount = 142; // Langkah default
   StreamSubscription? _accelerometerSub;
   DateTime _lastStepTime = DateTime.now();
 
@@ -37,11 +39,32 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _loadSavedSteps();
     _startPedometer();
+  }
+
+  Future<void> _loadSavedSteps() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getInt(_stepsStorageKey);
+      if (saved != null && mounted) {
+        setState(() {
+          _stepCount = saved;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _persistSteps(int steps) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_stepsStorageKey, steps);
+    } catch (_) {}
   }
 
   @override
   void dispose() {
+    _persistSteps(_stepCount);
     _tabController.dispose();
     _accelerometerSub?.cancel();
     _gyroscopeSub?.cancel();
@@ -61,6 +84,7 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
           _stepCount++;
           _lastStepTime = now;
         });
+        _persistSteps(_stepCount);
       }
     });
   }
@@ -232,13 +256,17 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
                 ),
                 const SizedBox(height: 20),
                 ElevatedButton.icon(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Selamat! $_stepCount langkah Anda telah dikonversi menjadi Poin Kebaikan untuk anak asuh!'),
-                        backgroundColor: Colors.teal,
-                      ),
-                    );
+                  onPressed: () async {
+                    await _persistSteps(_stepCount);
+                    final points = (_stepCount / 20).floor();
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Selamat! $_stepCount langkah ($points Poin Kebaikan) berhasil diklaim dan disimpan!'),
+                          backgroundColor: Colors.teal,
+                        ),
+                      );
+                    }
                   },
                   icon: const Icon(Icons.volunteer_activism),
                   label: const Text('Klaim & Sumbangkan Poin Langkah'),
@@ -248,6 +276,25 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
                     padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
+                ),
+                const SizedBox(height: 10),
+                TextButton.icon(
+                  onPressed: () async {
+                    setState(() {
+                      _stepCount = 0;
+                    });
+                    await _persistSteps(0);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Langkah harian di-reset ke 0 untuk hari baru.'),
+                          duration: Duration(seconds: 1),
+                        ),
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.restart_alt, size: 16, color: Colors.grey),
+                  label: const Text('Reset Langkah Hari Baru', style: TextStyle(color: Colors.grey, fontSize: 13)),
                 ),
               ],
             ),

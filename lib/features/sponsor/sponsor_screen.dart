@@ -20,8 +20,10 @@ class _SponsorScreenState extends State<SponsorScreen> {
   final _searchController = TextEditingController();
   String _selectedCategory = 'Semua';
   List<Map<String, dynamic>> _children = [];
+  List<Map<String, dynamic>> _allChildren = [];
   bool _isLoading = true;
   bool _isOffline = false;
+  bool _forceOfflineMode = false;
 
   // Sensor Stream untuk Shake-to-Refresh (PBI-052, FR-45)
   StreamSubscription? _accelerometerSubscription;
@@ -184,33 +186,53 @@ class _SponsorScreenState extends State<SponsorScreen> {
     });
   }
 
-  Future<void> _fetchChildren() async {
+  Future<void> _fetchChildren({bool? forceOffline}) async {
     setState(() => _isLoading = true);
+    if (forceOffline != null) {
+      _forceOfflineMode = forceOffline;
+    }
 
-    try {
-      // 1. Coba ambil dari online API
-      final res = await DioClient().dio.get('/children');
-      if (res.statusCode == 200 && res.data is List) {
-        final List<Map<String, dynamic>> apiData = List<Map<String, dynamic>>.from(res.data);
-        // Simpan ke SQLite cache untuk offline mode (PBI-020, FR-19)
-        await LocalDatabase().cacheChildren(apiData);
-        _children = apiData;
-        _isOffline = false;
-      }
-    } catch (e) {
-      // 2. Jika offline/gagal, baca dari SQLite cache lokal (FR-19, NFR-03)
+    if (_forceOfflineMode) {
+      // Mode offline manual (demonstrasi cache SQLite untuk dosen)
       _isOffline = true;
       final cached = await LocalDatabase().getCachedChildren(
         query: _searchController.text.trim(),
         category: _selectedCategory,
       );
-
       if (cached.isNotEmpty) {
-        _children = cached;
+        _allChildren = cached;
       } else {
-        // Jika DB pertama kali kosong, inisialisasi dummy ke SQLite cache
         await LocalDatabase().cacheChildren(_dummyChildren);
-        _children = await LocalDatabase().getCachedChildren();
+        _allChildren = await LocalDatabase().getCachedChildren();
+      }
+    } else {
+      try {
+        // 1. Coba ambil dari online API Supabase
+        final res = await DioClient().dio.get('/children');
+        if (res.statusCode == 200 && res.data is List && (res.data as List).isNotEmpty) {
+          final List<Map<String, dynamic>> apiData = List<Map<String, dynamic>>.from(res.data);
+          // Simpan ke SQLite cache untuk offline mode (PBI-020, FR-19)
+          await LocalDatabase().cacheChildren(apiData);
+          _allChildren = apiData;
+          _isOffline = false;
+        } else {
+          throw Exception('Data kosong atau gagal');
+        }
+      } catch (e) {
+        // 2. Jika offline/gagal, baca dari SQLite cache lokal (FR-19, NFR-03)
+        _isOffline = true;
+        final cached = await LocalDatabase().getCachedChildren(
+          query: _searchController.text.trim(),
+          category: _selectedCategory,
+        );
+
+        if (cached.isNotEmpty) {
+          _allChildren = cached;
+        } else {
+          // Jika DB pertama kali kosong, inisialisasi dummy ke SQLite cache
+          await LocalDatabase().cacheChildren(_dummyChildren);
+          _allChildren = await LocalDatabase().getCachedChildren();
+        }
       }
     }
 
@@ -222,8 +244,9 @@ class _SponsorScreenState extends State<SponsorScreen> {
 
   void _applyLocalFilter() {
     final query = _searchController.text.toLowerCase().trim();
+    final sourceList = _allChildren.isNotEmpty ? _allChildren : _dummyChildren;
     setState(() {
-      _children = _dummyChildren.where((child) {
+      _children = sourceList.where((child) {
         final matchesQuery = query.isEmpty ||
             child['alias'].toString().toLowerCase().contains(query) ||
             child['orphanage_city'].toString().toLowerCase().contains(query);
@@ -244,33 +267,75 @@ class _SponsorScreenState extends State<SponsorScreen> {
         elevation: 0,
         actions: [
           IconButton(
+            icon: Icon(_isOffline ? Icons.cloud_off : Icons.cloud_done),
+            tooltip: _isOffline ? 'Beralih ke Mode Online (Supabase)' : 'Beralih ke Mode Offline (SQLite)',
+            onPressed: () {
+              _fetchChildren(forceOffline: !_isOffline);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(_isOffline ? 'Beralih ke Mode Online (Supabase)...' : 'Beralih ke Mode Offline (Cache SQLite)...'),
+                  duration: const Duration(seconds: 1),
+                ),
+              );
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Perbarui Data (Bisa juga goyangkan HP)',
-            onPressed: _fetchChildren,
+            onPressed: () => _fetchChildren(forceOffline: false),
           ),
         ],
       ),
       body: Column(
         children: [
-          // Banner Status Offline jika koneksi internet terputus (FR-19)
-          if (_isOffline)
-            Container(
-              width: double.infinity,
-              color: Colors.amber.shade100,
-              padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
-              child: Row(
-                children: [
-                  Icon(Icons.cloud_off, size: 18, color: Colors.amber.shade900),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Mode Offline: Menampilkan data tersimpan di cache SQLite.',
-                      style: TextStyle(fontSize: 12, color: Colors.amber.shade900, fontWeight: FontWeight.w600),
+          // Banner Status Online (Supabase) / Offline (SQLite) (FR-19)
+          Container(
+            width: double.infinity,
+            color: _isOffline ? Colors.amber.shade100 : Colors.teal.shade50,
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+            child: Row(
+              children: [
+                Icon(
+                  _isOffline ? Icons.cloud_off : Icons.cloud_done,
+                  size: 18,
+                  color: _isOffline ? Colors.amber.shade900 : Colors.teal.shade800,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _isOffline
+                        ? 'Mode Offline: Menampilkan data tersimpan di cache SQLite.'
+                        : 'Mode Online: Terhubung ke Cloud Database Supabase.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: _isOffline ? Colors.amber.shade900 : Colors.teal.shade800,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                ],
-              ),
+                ),
+                InkWell(
+                  onTap: () {
+                    _fetchChildren(forceOffline: !_isOffline);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _isOffline ? Colors.amber.shade200 : Colors.teal.shade100,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      _isOffline ? 'Coba Online' : 'Tes Offline',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: _isOffline ? Colors.amber.shade900 : Colors.teal.shade900,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
+          ),
 
           // Header Search Bar (PBI-018, FR-15)
           Container(
