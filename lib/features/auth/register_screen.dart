@@ -18,7 +18,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
-  String _selectedRole = 'donatur'; // 'donatur' atau 'admin_panti'
+  final String _selectedRole = 'donatur'; // Default & wajib donatur untuk publik
   bool _obscurePassword = true;
 
   @override
@@ -92,7 +92,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Daftarkan diri Anda untuk mulai menjadi orang tua asuh atau mengelola panti.',
+                  'Daftarkan diri Anda untuk mulai menjadi orang tua asuh atau berdonasi.',
                   style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
                 ),
                 const SizedBox(height: 24),
@@ -127,7 +127,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                     ],
                   ),
-                );
+                ),
                 const SizedBox(height: 16),
 
                 // Nama Lengkap

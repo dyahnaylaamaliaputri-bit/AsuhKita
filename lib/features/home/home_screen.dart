@@ -1,9 +1,9 @@
-import 'package:shared_preferences/shared_preferences.dart';
 // Letak file: mobile/lib/features/home/home_screen.dart
 // Fungsi: Layar Beranda utama dengan ringkasan status dan kartu akses ke seluruh fitur aplikasi AsuhKita (PBI-009, Bab 6.7)
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../auth/auth_provider.dart';
 import '../ledger/ledger_screen.dart';
 import '../map/map_screen.dart';
@@ -39,7 +39,6 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         setState(() {
           _isNotificationActive = prefs.getBool('asuhkita_notif_active') ?? true;
-          // Akun baru mulai dari 0 anak asuh, bukan statis 4
           _sponsoredCount = prefs.getInt('asuhkita_user_sponsored_count') ?? 0;
         });
       }
@@ -59,7 +58,7 @@ class _HomeScreenState extends State<HomeScreen> {
         SnackBar(
           content: Text(
             newState
-                ? '🔔 Notifikasi Lokal DIAKTIFKAN: Anda akan menerima pengingat donasi bulanan dan pembaruan anak asuh!'
+                ? '🔔 Notifikasi Lokal DIAKTIFKAN: Pengingat donasi & pembaruan anak asuh aktif!'
                 : '🔕 Notifikasi Lokal DINONAKTIFKAN.',
           ),
           backgroundColor: newState ? Colors.teal : Colors.grey.shade700,
@@ -68,13 +67,6 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
   }
-
-  @override
-  Widget build(BuildContext context) {
-    final onNavigateTab = widget.onNavigateTab;
-  final Function(int)? onNavigateTab;
-
-  const HomeScreen({super.key, this.onNavigateTab});
 
   @override
   Widget build(BuildContext context) {
@@ -134,7 +126,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 20),
 
-            // Ringkasan Cepat
+            // Ringkasan Cepat Dinamis
             Row(
               children: [
                 _buildMetricCard('Anak Asuh', '$_sponsoredCount Anak', Icons.face, Colors.blue),
@@ -168,8 +160,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   icon: Icons.volunteer_activism,
                   color: Colors.teal,
                   onTap: () {
-                    if (onNavigateTab != null) {
-                      onNavigateTab!(1); // Pindah ke tab Sponsor
+                    if (widget.onNavigateTab != null) {
+                      widget.onNavigateTab!(1); // Pindah ke tab Sponsor
                     }
                   },
                 ),

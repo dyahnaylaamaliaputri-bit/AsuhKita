@@ -103,7 +103,8 @@ class _IotDonationScreenState extends State<IotDonationScreen> {
                 ],
               ),
             ),
-          )const SizedBox(height: 16),
+          ),
+          const SizedBox(height: 16),
 
           // Tombol Simulasi Fallback (FR-54)
           Card(
