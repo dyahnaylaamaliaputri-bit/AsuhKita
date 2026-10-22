@@ -2,10 +2,12 @@
 // Fungsi: UI Penjadwalan Video Call Donatur & Anak Asuh dengan Konversi 4 Zona Waktu Serentak (WIB, WITA, WIT, London), Opsi Pilihan Anak Asuh Dinamis, & Notifikasi Pop-up (PBI-046, PBI-055, FR-38, FR-39, FR-41)
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../core/app_colors.dart';
 import 'package:intl/intl.dart';
 import '../../data/local_db.dart';
 import '../../services/notification_service.dart';
+import '../auth/auth_provider.dart';
 import '../sponsor/sponsor_screen.dart';
 
 class ScheduleScreen extends StatefulWidget {
@@ -23,6 +25,17 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   String? _selectedChild;
   bool _isLoading = true;
 
+  // Khusus Admin: Kategori & Target Laporan Keuangan
+  String _reportCategory = 'Laporan Kas & Belanja Bulanan';
+  final List<String> _reportCategories = [
+    'Laporan Kas & Belanja Bulanan',
+    'Audit Bukti Belanja & Nota Transparansi',
+    'Rekapitulasi Donasi Kebutuhan Anak',
+    'Laporan Akuntabilitas Global (UK BST & Indonesia)',
+    'Audit Tahunan Lembaga & On-Chain Ledger',
+  ];
+  String _reportTarget = 'Semua Anak Asuh & Operasional Panti';
+
   // Konfigurasi offset jam 4 zona waktu:
   // WIB: UTC+7
   // WITA: UTC+8
@@ -38,7 +51,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   @override
   void initState() {
     super.initState();
-    _loadSponsoredChildren();
+    _loadData();
   }
 
   @override
@@ -47,32 +60,65 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     super.dispose();
   }
 
-  // Ambil daftar nama anak asuh yang didampingi oleh donatur
-  Future<void> _loadSponsoredChildren() async {
+  Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      final localDonations = await LocalDatabase().getCachedDonations();
-      final childSet = <String>{};
-      for (var d in localDonations) {
-        final alias = (d['child_alias'] ?? '').toString().trim();
-        if (alias.isNotEmpty) {
-          // Format Title Case
-          final formatted = alias.length > 1 ? '${alias[0].toUpperCase()}${alias.substring(1)}' : alias;
-          childSet.add(formatted);
-        }
-      }
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+      final isAdmin = auth.userRole == 'admin_panti';
 
-      final list = childSet.toList();
-      if (mounted) {
-        setState(() {
-          _sponsoredChildren = list;
-          if (list.isNotEmpty) {
-            _selectedChild = list.first;
-          } else {
-            _selectedChild = null;
+      if (isAdmin) {
+        // Mode Admin: Ambil daftar semua anak dari katalog untuk target laporan opsional
+        final cachedKids = await LocalDatabase().getCachedChildren();
+        final newKids = await LocalDatabase().getNewChildren();
+        final setNames = <String>{'Semua Anak Asuh & Operasional Panti'};
+        for (var c in [...cachedKids, ...newKids]) {
+          final name = (c['alias'] ?? c['name'] ?? '').toString().trim();
+          if (name.isNotEmpty) {
+            final formatted = name.length > 1 ? '${name[0].toUpperCase()}${name.substring(1)}' : name;
+            setNames.add(formatted);
           }
-          _isLoading = false;
-        });
+        }
+        if (mounted) {
+          setState(() {
+            _sponsoredChildren = setNames.toList();
+            _reportTarget = _sponsoredChildren.first;
+            _isLoading = false;
+          });
+        }
+      } else {
+        // Mode Donatur: Filter HANYA anak asuh yang didampingi oleh donatur yang SEDANG LOGIN
+        final userEmail = auth.userEmail.toLowerCase().trim();
+        final userName = auth.userName.toLowerCase().trim();
+        final localDonations = await LocalDatabase().getCachedDonations();
+        final childSet = <String>{};
+        if (userEmail.isNotEmpty || userName.isNotEmpty) {
+          for (var d in localDonations) {
+            final dEmail = (d['donor_email'] ?? '').toString().toLowerCase().trim();
+            final dName = (d['donor_name'] ?? '').toString().toLowerCase().trim();
+            final isMatch = (userEmail.isNotEmpty && dEmail == userEmail) ||
+                (userName.isNotEmpty && (dName == userName || dName == userEmail));
+            if (isMatch) {
+              final alias = (d['child_alias'] ?? '').toString().trim();
+              if (alias.isNotEmpty) {
+                final formatted = alias.length > 1 ? '${alias[0].toUpperCase()}${alias.substring(1)}' : alias;
+                childSet.add(formatted);
+              }
+            }
+          }
+        }
+
+        final list = childSet.toList();
+        if (mounted) {
+          setState(() {
+            _sponsoredChildren = list;
+            if (list.isNotEmpty) {
+              _selectedChild = list.first;
+            } else {
+              _selectedChild = null;
+            }
+            _isLoading = false;
+          });
+        }
       }
     } catch (_) {
       if (mounted) setState(() => _isLoading = false);
@@ -115,6 +161,128 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   }
 
   void _saveScheduleAndShowPopup() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final isAdmin = auth.userRole == 'admin_panti';
+
+    if (isAdmin) {
+      // ==================== JADWAL PEMBUATAN LAPORAN KEUANGAN (ADMIN) ====================
+      final notes = _topicController.text.trim().isNotEmpty
+          ? _topicController.text.trim()
+          : 'Penyusunan nota belanja seragam, gizi, & rekonsiliasi kas masuk';
+
+      // 1. Kirim notifikasi pengingat
+      await NotificationService().showInstantNotification(
+        id: DateTime.now().millisecondsSinceEpoch ~/ 1000 % 100000,
+        title: '🔔 Tenggat Laporan Keuangan Ditetapkan!',
+        body: 'Agenda: $_reportCategory target $_reportTarget pada ${DateFormat('dd MMM HH:mm').format(_selectedDateTime)} WIB.',
+      );
+
+      // 2. Tampilkan Pop-Up Konfirmasi Laporan Keuangan
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Row(
+              children: const [
+                Icon(Icons.assessment, color: AppColors.primary, size: 28),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text('Jadwal Laporan Keuangan Disetel!', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Tenggat waktu pembuatan dan audit laporan keuangan telah berhasil disinkronkan ke 4 zona waktu.',
+                    style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                  ),
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceLight,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.receipt_long, size: 18, color: AppColors.primary),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text('Jenis: $_reportCategory', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            const Icon(Icons.folder_shared, size: 18, color: AppColors.secondary),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text('Target: $_reportTarget', style: const TextStyle(fontSize: 12)),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            const Icon(Icons.notes, size: 18, color: Colors.indigo),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text('Fokus: $notes', style: const TextStyle(fontSize: 12)),
+                            ),
+                          ],
+                        ),
+                        const Divider(height: 16),
+                        Text('• WIB (Jakarta): ${_formatTimeInZone(7)}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                        Text('• WITA (Makassar): ${_formatTimeInZone(8)}', style: const TextStyle(fontSize: 11)),
+                        Text('• WIT (Jayapura): ${_formatTimeInZone(9)}', style: const TextStyle(fontSize: 11)),
+                        Text('• London (UK BST): ${_formatTimeInZone(1)}', style: const TextStyle(fontSize: 11, color: Colors.indigo)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: const [
+                      Icon(Icons.check_circle_outline, color: Colors.green, size: 16),
+                      SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Pengingat deadline audit akan aktif otomatis menjelang tenggat waktu.',
+                          style: TextStyle(fontSize: 11, color: Colors.black87),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  Navigator.pop(context);
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+                child: const Text('OK, Mengerti'),
+              ),
+            ],
+          ),
+        );
+      }
+      return;
+    }
+
+    // ==================== JADWAL VIDEO CALL (DONATUR) ====================
     if (_sponsoredChildren.isEmpty) {
       showDialog(
         context: context,
@@ -151,7 +319,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       scheduledDateTime: _selectedDateTime,
     );
 
-    // Kirim notifikasi konfirmasi langsung ke status bar (jika aktif)
+    // Kirim notifikasi konfirmasi langsung ke status bar
     await NotificationService().showInstantNotification(
       id: DateTime.now().millisecondsSinceEpoch ~/ 1000 % 100000,
       title: '🔔 Jadwal Video Call Ditetapkan!',
@@ -252,12 +420,14 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final auth = Provider.of<AuthProvider>(context);
+    final bool isAdmin = auth.userRole == 'admin_panti';
     final utcTime = _selectedDateTime.toUtc();
 
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        title: const Text('Jadwal Video Call 4 Zona Waktu'),
+        title: Text(isAdmin ? 'Jadwal Lap. Keuangan 4 Zona' : 'Jadwal Video Call 4 Zona Waktu'),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
@@ -269,7 +439,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Card Pemilih Waktu & Anak Asuh
+                  // Card Pemilih Waktu & Topik (Khusus Admin: Laporan Keuangan | Donatur: Video Call)
                   Card(
                     elevation: 2,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -278,103 +448,155 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Pilih Waktu Video Call Ramah Anak',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.primary),
+                          Text(
+                            isAdmin
+                                ? 'Jadwal Pembuatan & Audit Laporan Keuangan'
+                                : 'Pilih Waktu Video Call Ramah Anak',
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.primary),
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            'Jadwal akan otomatis dikonversi ke 4 zona waktu (WIB, WITA, WIT, London) agar donatur lintas negara dapat berkoordinasi dengan tepat.',
+                            isAdmin
+                                ? 'Sinkronisasi tenggat waktu pembuatan dan audit laporan keuangan panti asuhan secara serentak ke 4 zona waktu (WIB, WITA, WIT, London BST) untuk transparansi donatur global & lokal.'
+                                : 'Jadwal akan otomatis dikonversi ke 4 zona waktu (WIB, WITA, WIT, London) agar donatur lintas negara dapat berkoordinasi dengan tepat.',
                             style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                           ),
                           const Divider(height: 24),
 
-                          // ============================================================
-                          // FIELD PENGISIAN ANAK ASUH (DENGAN LOGIKA OPSI TERSINKRON)
-                          // ============================================================
-                          if (_sponsoredChildren.isEmpty)
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.amber.shade50,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.amber.shade300),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.info_outline, color: Colors.amber),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      'Anda belum memiliki anak asuh. Buka menu Sponsor untuk memilih anak asuh terlebih dahulu.',
-                                      style: TextStyle(fontSize: 12, color: Colors.amber.shade900),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            )
-                          else if (_sponsoredChildren.length >= 2)
-                            // Jika ada >= 2 anak asuh: berikan dropdown opsi pilihan!
+                          if (isAdmin) ...[
+                            // ==================== FORM KHUSUS ADMIN LAPORAN KEUANGAN ====================
                             DropdownButtonFormField<String>(
-                              initialValue: _selectedChild,
+                              initialValue: _reportCategory,
                               decoration: InputDecoration(
-                                labelText: 'Pilih Anak Asuh (${_sponsoredChildren.length} Anak Asuh)',
-                                prefixIcon: const Icon(Icons.face, color: AppColors.primary),
+                                labelText: 'Jenis Laporan Keuangan',
+                                prefixIcon: const Icon(Icons.receipt_long, color: AppColors.primary),
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                                helperText: 'Pilih salah satu anak asuh yang ingin Anda jadwalkan',
+                                helperText: 'Pilih agenda penyusunan laporan keuangan panti',
                               ),
-                              items: _sponsoredChildren.map((name) {
+                              items: _reportCategories.map((cat) {
                                 return DropdownMenuItem<String>(
-                                  value: name,
-                                  child: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                  value: cat,
+                                  child: Text(cat, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                                 );
                               }).toList(),
                               onChanged: (val) {
-                                setState(() => _selectedChild = val);
+                                if (val != null) setState(() => _reportCategory = val);
                               },
-                            )
-                          else
-                            // Jika hanya punya 1 anak asuh: langsung tampilkan nama anak asuh tanpa opsi pilihan!
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                              decoration: BoxDecoration(
-                                color: AppColors.surfaceLight,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                            ),
+                            const SizedBox(height: 16),
+                            DropdownButtonFormField<String>(
+                              initialValue: _reportTarget,
+                              decoration: InputDecoration(
+                                labelText: 'Target Divisi / Anak Asuh',
+                                prefixIcon: const Icon(Icons.people_alt_outlined, color: AppColors.secondary),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                helperText: 'Fokus anak asuh atau umum panti asuhan',
                               ),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.face, color: AppColors.primary),
-                                  const SizedBox(width: 10),
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      const Text('Anak Asuh Terpilih', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                                      Text(
-                                        _selectedChild ?? _sponsoredChildren.first,
-                                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                              items: _sponsoredChildren.map((t) {
+                                return DropdownMenuItem<String>(
+                                  value: t,
+                                  child: Text(t, style: const TextStyle(fontSize: 13)),
+                                );
+                              }).toList(),
+                              onChanged: (val) {
+                                if (val != null) setState(() => _reportTarget = val);
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            TextField(
+                              controller: _topicController,
+                              decoration: InputDecoration(
+                                labelText: 'Catatan / Fokus Audit Laporan',
+                                hintText: 'Contoh: Rekapitulasi nota belanja seragam & audit gizi',
+                                prefixIcon: const Icon(Icons.notes, color: AppColors.primary),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                            ),
+                          ] else ...[
+                            // ==================== FORM KHUSUS DONATUR VIDEO CALL ====================
+                            if (_sponsoredChildren.isEmpty)
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.amber.shade50,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.amber.shade300),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.info_outline, color: Colors.amber),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        'Anda belum memiliki anak asuh. Buka menu Sponsor untuk memilih anak asuh terlebih dahulu.',
+                                        style: TextStyle(fontSize: 12, color: Colors.amber.shade900),
                                       ),
-                                    ],
-                                  ),
-                                  const Spacer(),
-                                  const Chip(
-                                    label: Text('1 Anak Asuh', style: TextStyle(fontSize: 10, color: AppColors.primary)),
-                                    backgroundColor: Colors.white,
-                                  ),
-                                ],
+                                    ),
+                                  ],
+                                ),
+                              )
+                            else if (_sponsoredChildren.length >= 2)
+                              // Jika ada >= 2 anak asuh: berikan dropdown opsi pilihan!
+                              DropdownButtonFormField<String>(
+                                initialValue: _selectedChild,
+                                decoration: InputDecoration(
+                                  labelText: 'Pilih Anak Asuh (${_sponsoredChildren.length} Anak Asuh)',
+                                  prefixIcon: const Icon(Icons.face, color: AppColors.primary),
+                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                  helperText: 'Pilih salah satu anak asuh yang ingin Anda jadwalkan',
+                                ),
+                                items: _sponsoredChildren.map((name) {
+                                  return DropdownMenuItem<String>(
+                                    value: name,
+                                    child: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                  );
+                                }).toList(),
+                                onChanged: (val) {
+                                  setState(() => _selectedChild = val);
+                                },
+                              )
+                            else
+                              // Jika hanya punya 1 anak asuh: langsung tampilkan nama anak asuh tanpa opsi pilihan!
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: AppColors.surfaceLight,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.face, color: AppColors.primary),
+                                    const SizedBox(width: 10),
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text('Anak Asuh Terpilih', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                                        Text(
+                                          _selectedChild ?? _sponsoredChildren.first,
+                                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                                        ),
+                                      ],
+                                    ),
+                                    const Spacer(),
+                                    const Chip(
+                                      label: Text('1 Anak Asuh', style: TextStyle(fontSize: 10, color: AppColors.primary)),
+                                      backgroundColor: Colors.white,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            const SizedBox(height: 16),
+                            TextField(
+                              controller: _topicController,
+                              decoration: InputDecoration(
+                                labelText: 'Topik Panggilan Video',
+                                hintText: 'Contoh: Sesi Belajar & Bincang Inspirasi Masa Depan',
+                                prefixIcon: const Icon(Icons.videocam_outlined, color: AppColors.primary),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                               ),
                             ),
-
-                          const SizedBox(height: 16),
-                          TextField(
-                            controller: _topicController,
-                            decoration: InputDecoration(
-                              labelText: 'Topik Panggilan Video',
-                              hintText: 'Contoh: Sesi Belajar & Bincang Inspirasi Masa Depan',
-                              prefixIcon: const Icon(Icons.videocam_outlined, color: AppColors.primary),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                          ),
+                          ],
                           const SizedBox(height: 16),
 
                           // Tombol Pilih Waktu
@@ -498,8 +720,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                   // Tombol Simpan Jadwal & Pasang Pengingat
                   ElevatedButton.icon(
                     onPressed: _saveScheduleAndShowPopup,
-                    icon: const Icon(Icons.notifications_active),
-                    label: const Text('Simpan & Pasang Pengingat (Pop-up)'),
+                    icon: Icon(isAdmin ? Icons.assignment_turned_in : Icons.notifications_active),
+                    label: Text(isAdmin ? 'Tetapkan Jadwal Laporan Keuangan (Pop-up)' : 'Simpan & Pasang Pengingat (Pop-up)'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,

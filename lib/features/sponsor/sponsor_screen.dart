@@ -23,6 +23,7 @@ class _SponsorScreenState extends State<SponsorScreen> {
   String _selectedCategory = 'Semua';
   List<Map<String, dynamic>> _children = [];
   List<Map<String, dynamic>> _allChildren = [];
+  Map<String, int> _collectedPerChild = {};
   bool _isLoading = true;
   bool _isOffline = false;
   bool _forceOfflineMode = false;
@@ -131,10 +132,45 @@ class _SponsorScreenState extends State<SponsorScreen> {
       }
     } catch (_) {}
 
+    // Hitung total donasi per anak untuk status terpenuhi / belum terpenuhi
+    await _loadDonationStats();
+
     // Filter lokal berdasarkan query pencarian dan kategori
     _applyLocalFilter();
 
     setState(() => _isLoading = false);
+  }
+
+  Future<void> _loadDonationStats() async {
+    try {
+      final localDonations = await LocalDatabase().getCachedDonations();
+      final map = <String, int>{};
+      for (var d in localDonations) {
+        final alias = (d['child_alias'] ?? '').toString().toLowerCase().trim();
+        final amt = (d['amount_idr'] is num) ? (d['amount_idr'] as num).toInt() : 0;
+        map[alias] = (map[alias] ?? 0) + amt;
+      }
+      try {
+        final res = await DioClient().dio.get('/donations');
+        if (res.statusCode == 200) {
+          List<dynamic> apiList = [];
+          if (res.data is List) {
+            apiList = res.data as List;
+          } else if (res.data is Map && res.data['data'] is List) {
+            apiList = res.data['data'] as List;
+          }
+          for (var ad in apiList) {
+            final alias = (ad['child_alias'] ?? '').toString().toLowerCase().trim();
+            final id = ad['id']?.toString() ?? '';
+            if (!localDonations.any((ld) => ld['id']?.toString() == id)) {
+              final amt = (ad['amount_idr'] is num) ? (ad['amount_idr'] as num).toInt() : 0;
+              map[alias] = (map[alias] ?? 0) + amt;
+            }
+          }
+        }
+      } catch (_) {}
+      _collectedPerChild = map;
+    } catch (_) {}
   }
 
   void _applyLocalFilter() {
@@ -144,8 +180,8 @@ class _SponsorScreenState extends State<SponsorScreen> {
         final alias = (child['alias'] ?? child['name'] ?? '').toString().toLowerCase();
         final city = (child['orphanage_city'] ?? child['city'] ?? '').toString().toLowerCase();
         final matchesQuery = query.isEmpty || alias.contains(query) || city.contains(query);
-        final category = child['need_category'] ?? child['urgentNeeds'] ?? '';
-        final matchesCategory = _selectedCategory == 'Semua' || category == _selectedCategory;
+        final categoryStr = (child['need_category'] ?? child['urgentNeeds'] ?? '').toString().toLowerCase();
+        final matchesCategory = _selectedCategory == 'Semua' || categoryStr.contains(_selectedCategory.toLowerCase());
         return matchesQuery && matchesCategory;
       }).toList();
     });
@@ -405,6 +441,54 @@ class _SponsorScreenState extends State<SponsorScreen> {
                                                 ),
                                               ),
                                             ],
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Builder(
+                                            builder: (context) {
+                                              final cAlias = (child['alias'] ?? child['name'] ?? '').toString().toLowerCase().trim();
+                                              final collected = _collectedPerChild[cAlias] ?? 0;
+                                              final target = (child['target'] is num) ? (child['target'] as num).toDouble() : 500000.0;
+                                              final isFulfilled = collected >= target && target > 0;
+
+                                              return Row(
+                                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                children: [
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                                    decoration: BoxDecoration(
+                                                      color: isFulfilled ? Colors.green.shade50 : Colors.amber.shade50,
+                                                      borderRadius: BorderRadius.circular(6),
+                                                      border: Border.all(
+                                                        color: isFulfilled ? Colors.green.shade300 : Colors.amber.shade400,
+                                                      ),
+                                                    ),
+                                                    child: Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: [
+                                                        Icon(
+                                                          isFulfilled ? Icons.check_circle : Icons.hourglass_top,
+                                                          size: 11,
+                                                          color: isFulfilled ? Colors.green.shade800 : Colors.amber.shade900,
+                                                        ),
+                                                        const SizedBox(width: 4),
+                                                        Text(
+                                                          isFulfilled ? 'Sudah Terpenuhi' : 'Belum Terpenuhi',
+                                                          style: TextStyle(
+                                                            fontSize: 10,
+                                                            fontWeight: FontWeight.bold,
+                                                            color: isFulfilled ? Colors.green.shade800 : Colors.amber.shade900,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                  Text(
+                                                    'Target: Rp ${(target / 1000).toStringAsFixed(0)}rb',
+                                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary),
+                                                  ),
+                                                ],
+                                              );
+                                            },
                                           ),
                                         ],
                                       ),

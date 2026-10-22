@@ -40,18 +40,22 @@ class GeminiService {
   }
 
   // -----------------------------------------------------------------
-  // FR-49 | PBI-062 - Generate Draf Surat untuk Anak Asuh
+  // FR-49 | PBI-062 - Generate Draf Surat untuk Donatur (dari Anak Asuh/Panti)
   // -----------------------------------------------------------------
   Future<String> generateLetter({
     required String childAlias,
     required String topic,
+    String donorName = 'Bapak/Ibu Donatur',
   }) async {
     final model = _gemini;
     if (model != null) {
       try {
         final prompt =
-            'Buatkan surat pendek hangat (3-4 paragraf) dari donatur/orang tua asuh kepada anak asuh bernama "$childAlias" '
-            'dengan topik/harapan: "$topic". Akhiri dengan: "Salam hangat dan doa terbaik, Orang Tua Asuhmu."';
+            'Tuliskan draf surat pendek yang sangat hangat, tulus, penuh rasa syukur, dan empati (3-4 paragraf) '
+            'dari anak asuh bernama "$childAlias" (dan pengurus panti asuhan) yang ditujukan KEPADA DONATUR / ORANG TUA ASUH bernama "$donorName". '
+            'Isi surat tentang ucapan terima kasih atas kebaikan/bantuan donatur serta kabar perkembangan anak: "$topic". '
+            'Bahasa harus ramah, santun, menyentuh hati, mendoakan keberkahan donatur, dan mencerminkan semangat anak asuh dalam belajar dan berprestasi. '
+            'Akhiri surat dengan: "Dengan penuh rasa terima kasih dan doa tulus,\n$childAlias & Keluarga Besar Panti Asuhan."';
         final response = await model.generateContent([Content.text(prompt)]);
         final text = response.text?.trim() ?? '';
         if (text.isNotEmpty) return text;
@@ -59,17 +63,16 @@ class GeminiService {
         debugPrint('Gemini Letter API error: $e');
       }
     }
-    return _generateDynamicLetter(childAlias, topic);
+    return _generateDynamicLetter(childAlias, topic, donorName: donorName);
   }
 
-  String _generateDynamicLetter(String alias, String topic) {
-    return 'Halo $alias tersayang,\n\n'
-        'Semoga harimu selalu ceria, sehat, dan penuh semangat! Kakak menulis surat ini khusus untukmu '
-        'untuk menyampaikan rasa bangga dan dukungan penuh atas $topic.\n\n'
-        'Teruslah berani bermimpi setinggi langit dan jangan pernah ragu untuk belajar hal-hal baru di sekolah maupun di panti. '
-        'Setiap usaha kecil yang kamu lakukan hari ini adalah langkah besar menuju cita-citamu yang cemerlang.\n\n'
-        'Ingatlah bahwa kamu tidak pernah sendiri; ada banyak doa dan kasih sayang yang selalu menyertaimu di sini. Tetaplah menjadi anak yang santun dan riang ya!\n\n'
-        'Salam hangat dan peluk erat,\nOrang Tua Asuhmu.';
+  String _generateDynamicLetter(String alias, String topic, {String donorName = 'Bapak/Ibu Donatur'}) {
+    return 'Kepada $donorName yang terkasih,\n\n'
+        'Salam hangat dan doa terbaik dari kami di panti asuhan. Semoga Kakak/Bapak/Ibu senantiasa dalam keadaan sehat walafiat, bahagia, dan selalu dilimpahkan keberkahan rezeki.\n\n'
+        'Saya menulis surat ini dari lubuk hati yang terdalam untuk mengucapkan terima kasih yang sebesar-besarnya atas $topic. Bantuan, doa, dan kasih sayang yang telah diberikan sangatlah berarti bagi kehidupan serta kelanjutan pendidikan saya di sini.\n\n'
+        'Berkat kebaikan hati para donatur dan orang tua asuh, saya selalu termotivasi untuk rajin belajar, meraih prestasi di sekolah, dan pantang menyerah dalam menggapai cita-cita. Semoga Allah/Tuhan membalas segala ketulusan Kakak/Bapak/Ibu dengan berlipat ganda berkah dan kebahagiaan.\n\n'
+        'Dengan penuh rasa terima kasih dan doa tulus,\n'
+        '$alias & Keluarga Besar Panti Asuhan.';
   }
 
   // -----------------------------------------------------------------

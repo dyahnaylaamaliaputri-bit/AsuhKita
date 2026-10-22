@@ -21,8 +21,9 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
   late TabController _tabController;
   final GeminiService _gemini = GeminiService();
 
-  // -- Tab 1: Bantu Tulis Surat --
+  // -- Tab 1: Bantu Tulis Surat untuk Donatur --
   final _letterChildNameController = TextEditingController();
+  final _letterDonorNameController = TextEditingController(text: 'Kakak Donatur');
   final _letterTopicController = TextEditingController();
   String _generatedLetter = '';
   bool _isLoadingLetter = false;
@@ -58,6 +59,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
   void dispose() {
     _tabController.dispose();
     _letterChildNameController.dispose();
+    _letterDonorNameController.dispose();
     _letterTopicController.dispose();
     _reportInputController.dispose();
     _faqQuestionController.dispose();
@@ -66,20 +68,27 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
   }
 
   // ----------------------------------------------------------
-  // FR-49 | PBI-062 - Generate Surat dengan Gemini
+  // FR-49 | PBI-062 - Generate Surat untuk Donatur dengan Gemini
   // ----------------------------------------------------------
   Future<void> _generateLetter() async {
     final alias = _letterChildNameController.text.trim();
+    final donorName = _letterDonorNameController.text.trim().isNotEmpty
+        ? _letterDonorNameController.text.trim()
+        : 'Kakak Donatur';
     final topic = _letterTopicController.text.trim();
     if (alias.isEmpty || topic.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Mohon isi nama anak dan topik terlebih dahulu.')),
+        const SnackBar(content: Text('Mohon isi nama anak dan topik/kabar terlebih dahulu.')),
       );
       return;
     }
 
     setState(() => _isLoadingLetter = true);
-    final result = await _gemini.generateLetter(childAlias: alias, topic: topic);
+    final result = await _gemini.generateLetter(
+      childAlias: alias,
+      topic: topic,
+      donorName: donorName,
+    );
     setState(() {
       _generatedLetter = result;
       _isLoadingLetter = false;
@@ -209,11 +218,11 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
                       children: [
                         const Row(
                           children: [
-                            Icon(Icons.favorite, color: AppColors.secondary, size: 20),
+                            Icon(Icons.volunteer_activism, color: AppColors.secondary, size: 20),
                             SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                'Kirim Kata-Kata Hangat untuk Anak Asuh',
+                                'Bantu Tulis Surat Syukur & Kabar untuk Donatur',
                                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.textPrimary),
                               ),
                             ),
@@ -221,15 +230,27 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
                         ),
                         const SizedBox(height: 4),
                         const Text(
-                          'Gemini AI akan membantu menulis surat yang hangat dan personal.',
+                          'Gemini AI menyusun surat apresiasi dan kabar perkembangan hangat dari anak asuh/panti untuk para donatur dan orang tua asuh.',
                           style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                         ),
                         const SizedBox(height: 14),
                         TextField(
                           controller: _letterChildNameController,
                           decoration: InputDecoration(
-                            labelText: 'Nama Samaran Anak',
+                            labelText: 'Nama Anak / Pengirim di Panti',
+                            hintText: 'Contoh: Budi atau Adik-Adik Panti',
                             prefixIcon: const Icon(Icons.face, color: AppColors.primary),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _letterDonorNameController,
+                          decoration: InputDecoration(
+                            labelText: 'Nama Donatur / Orang Tua Asuh yang Dituju',
+                            hintText: 'Contoh: Kak Sarah / Bapak/Ibu Donatur',
+                            prefixIcon: const Icon(Icons.favorite_border, color: AppColors.secondary),
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                             focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
                           ),
@@ -239,7 +260,8 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
                           controller: _letterTopicController,
                           maxLines: 2,
                           decoration: InputDecoration(
-                            labelText: 'Topik atau Harapan Anda',
+                            labelText: 'Kabar Perkembangan / Ungkapan Terima Kasih',
+                            hintText: 'Contoh: Terima kasih atas bantuan perlengkapan sekolah, alhamdulillah semester ini dapat nilai 100.',
                             prefixIcon: const Icon(Icons.lightbulb_outline, color: AppColors.primary),
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                             focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
@@ -251,7 +273,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
                           icon: _isLoadingLetter
                               ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                               : const Icon(Icons.auto_awesome),
-                          label: Text(_isLoadingLetter ? 'Gemini sedang menulis...' : 'Buat Draf Surat dengan Gemini'),
+                          label: Text(_isLoadingLetter ? 'Gemini sedang menyusun surat...' : 'Buat Draf Surat untuk Donatur dengan Gemini'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,
                             foregroundColor: Colors.white,

@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/secure_storage.dart';
 import '../../core/dio_client.dart';
 import '../../data/local_db.dart';
@@ -149,7 +150,7 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // Register Akun Baru (PBI-005, FR-01)
+  // Register Akun Baru (PBI-005, FR-01) - Bersih dari 0 untuk akun baru
   Future<bool> register({
     required String name,
     required String email,
@@ -162,6 +163,18 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // Bersihkan semua data cache untuk email ini agar akun baru benar-benar mulai dari 0
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final emailKey = email.toLowerCase().trim();
+        await prefs.remove('asuhkita_kebaikan_points_$emailKey');
+        await prefs.remove('asuhkita_game_score_$emailKey');
+        await prefs.remove('asuhkita_daily_steps_$emailKey');
+        await prefs.remove('asuhkita_steps_date_$emailKey');
+        await prefs.remove('profile_photo_base64_$emailKey');
+        await prefs.remove('asuhkita_user_sponsored_count_$emailKey');
+      } catch (_) {}
+
       try {
         final res = await _dioClient.dio.post('/auth/register', data: {
           'name': name,

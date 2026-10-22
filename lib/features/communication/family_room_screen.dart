@@ -9,9 +9,11 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 import '../../core/app_colors.dart';
 import '../../core/dio_client.dart';
 import '../../data/local_db.dart';
+import '../auth/auth_provider.dart';
 import '../sponsor/sponsor_screen.dart';
 
 class FamilyRoomScreen extends StatefulWidget {
@@ -57,13 +59,25 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // 1. Ambil data anak asuh yang didampingi donatur dari riwayat donasi/sponsorship lokal
+      // 1. Ambil data anak asuh yang didampingi donatur yang SEDANG LOGIN
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+      final userEmail = auth.userEmail.toLowerCase().trim();
+      final userName = auth.userName.toLowerCase().trim();
+
       final localDonations = await LocalDatabase().getCachedDonations();
       final sponsoredAliases = <String>{};
-      for (var d in localDonations) {
-        final alias = (d['child_alias'] ?? '').toString().trim();
-        if (alias.isNotEmpty) {
-          sponsoredAliases.add(alias.toLowerCase());
+      if (userEmail.isNotEmpty || userName.isNotEmpty) {
+        for (var d in localDonations) {
+          final dEmail = (d['donor_email'] ?? '').toString().toLowerCase().trim();
+          final dName = (d['donor_name'] ?? '').toString().toLowerCase().trim();
+          final isMatch = (userEmail.isNotEmpty && dEmail == userEmail) ||
+              (userName.isNotEmpty && (dName == userName || dName == userEmail));
+          if (isMatch) {
+            final alias = (d['child_alias'] ?? '').toString().trim();
+            if (alias.isNotEmpty) {
+              sponsoredAliases.add(alias.toLowerCase());
+            }
+          }
         }
       }
 

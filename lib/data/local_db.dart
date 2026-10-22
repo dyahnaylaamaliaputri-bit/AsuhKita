@@ -151,6 +151,9 @@ class LocalDatabase {
     try {
       await db.execute('ALTER TABLE cached_donations ADD COLUMN need_category TEXT');
     } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE cached_donations ADD COLUMN donor_email TEXT');
+    } catch (_) {}
 
     // Tabel Riwayat Chat Ruang Kasih (Pesan tersimpan permanen per anak asuh)
     await db.execute('''
@@ -201,8 +204,8 @@ class LocalDatabase {
 
     if (category.isNotEmpty && category != 'Semua') {
       if (whereClause.isNotEmpty) whereClause += ' AND ';
-      whereClause += 'need_category = ?';
-      whereArgs.add(category);
+      whereClause += 'need_category LIKE ?';
+      whereArgs.add('%$category%');
     }
 
     return await db.query(
@@ -218,19 +221,72 @@ class LocalDatabase {
     final db = await database;
     await db.insert('new_children', {
       'id': child['id']?.toString() ?? 'child_${DateTime.now().millisecondsSinceEpoch}',
-      'name': child['name']?.toString() ?? '',
+      'name': child['name']?.toString() ?? child['alias']?.toString() ?? '',
       'age': child['age'] is int ? child['age'] : int.tryParse(child['age']?.toString() ?? '0') ?? 0,
       'gender': child['gender']?.toString() ?? 'Laki-laki',
-      'city': child['city']?.toString() ?? 'PeduliAnak Lombok',
-      'urgent_needs': child['urgentNeeds']?.toString() ?? child['urgent_needs']?.toString() ?? 'Pendidikan',
-      'story': child['story']?.toString() ?? '',
-      'photo': child['photo']?.toString() ?? '',
+      'city': child['city']?.toString() ?? child['orphanage_city']?.toString() ?? 'PeduliAnak Lombok',
+      'urgent_needs': child['urgentNeeds']?.toString() ?? child['urgent_needs']?.toString() ?? child['need_category']?.toString() ?? 'Pendidikan',
+      'story': child['story']?.toString() ?? child['story_summary']?.toString() ?? '',
+      'photo': child['photo']?.toString() ?? child['avatar']?.toString() ?? '',
       'target': child['target'] is num ? (child['target'] as num).toDouble() : 500000.0,
       'dream': child['dream']?.toString() ?? '',
       'hobby': child['hobby']?.toString() ?? '',
       'created_at': child['createdAt']?.toString() ?? DateTime.now().toIso8601String(),
       'category_budgets': child['category_budgets']?.toString() ?? child['categoryBudgets']?.toString() ?? '',
     }, conflictAlgorithm: ConflictAlgorithm.replace);
+
+    // Sinkronkan juga langsung ke cached_children supaya langsung muncul di semua tampilan
+    try {
+      await db.insert('cached_children', {
+        'id': child['id']?.toString() ?? 'child_${DateTime.now().millisecondsSinceEpoch}',
+        'orphanage_id': 'panti_peduli_anak',
+        'alias': child['name']?.toString() ?? child['alias']?.toString() ?? '',
+        'age': child['age'] is int ? child['age'] : int.tryParse(child['age']?.toString() ?? '0') ?? 0,
+        'need_category': child['urgentNeeds']?.toString() ?? child['urgent_needs']?.toString() ?? child['need_category']?.toString() ?? 'Pendidikan',
+        'story_summary': child['story']?.toString() ?? child['story_summary']?.toString() ?? '',
+        'avatar': child['photo']?.toString() ?? child['avatar']?.toString() ?? '',
+        'status': 'Tersedia',
+        'orphanage_name': 'Peduli Anak Foundation',
+        'orphanage_city': child['city']?.toString() ?? child['orphanage_city']?.toString() ?? 'PeduliAnak Lombok',
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    } catch (_) {}
+  }
+
+  Future<void> updateChild(Map<String, dynamic> child) async {
+    final db = await database;
+    final childId = child['id']?.toString() ?? '';
+    final name = child['name']?.toString() ?? child['alias']?.toString() ?? '';
+
+    await db.update('new_children', {
+      'name': name,
+      'age': child['age'] is int ? child['age'] : int.tryParse(child['age']?.toString() ?? '0') ?? 0,
+      'gender': child['gender']?.toString() ?? 'Laki-laki',
+      'city': child['city']?.toString() ?? child['orphanage_city']?.toString() ?? 'PeduliAnak Lombok',
+      'urgent_needs': child['urgentNeeds']?.toString() ?? child['urgent_needs']?.toString() ?? child['need_category']?.toString() ?? 'Pendidikan',
+      'story': child['story']?.toString() ?? child['story_summary']?.toString() ?? '',
+      'photo': child['photo']?.toString() ?? child['avatar']?.toString() ?? '',
+      'target': child['target'] is num ? (child['target'] as num).toDouble() : 500000.0,
+      'dream': child['dream']?.toString() ?? '',
+      'hobby': child['hobby']?.toString() ?? '',
+      'category_budgets': child['category_budgets']?.toString() ?? child['categoryBudgets']?.toString() ?? '',
+    }, where: 'id = ? OR name = ?', whereArgs: [childId, name]);
+
+    // juga update di cached_children
+    await db.update('cached_children', {
+      'alias': name,
+      'age': child['age'] is int ? child['age'] : int.tryParse(child['age']?.toString() ?? '0') ?? 0,
+      'need_category': child['urgentNeeds']?.toString() ?? child['urgent_needs']?.toString() ?? child['need_category']?.toString() ?? 'Pendidikan',
+      'story_summary': child['story']?.toString() ?? child['story_summary']?.toString() ?? '',
+      'avatar': child['photo']?.toString() ?? child['avatar']?.toString() ?? '',
+      'orphanage_city': child['city']?.toString() ?? child['orphanage_city']?.toString() ?? 'PeduliAnak Lombok',
+    }, where: 'id = ? OR alias = ?', whereArgs: [childId, name]);
+  }
+
+  Future<void> deleteChild(String childId, [String? childName]) async {
+    final db = await database;
+    final name = childName ?? childId;
+    await db.delete('new_children', where: 'id = ? OR name = ?', whereArgs: [childId, name]);
+    await db.delete('cached_children', where: 'id = ? OR alias = ?', whereArgs: [childId, name]);
   }
 
   Future<List<Map<String, dynamic>>> getNewChildren() async {
@@ -273,6 +329,7 @@ class LocalDatabase {
       'created_at': donation['created_at']?.toString() ?? DateTime.now().toIso8601String(),
       'status': donation['status']?.toString() ?? 'Terverifikasi di Ledger',
       'donor_name': donation['donor_name']?.toString() ?? '',
+      'donor_email': donation['donor_email']?.toString() ?? '',
       'need_category': donation['need_category']?.toString() ?? '',
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }

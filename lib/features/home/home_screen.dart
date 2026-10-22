@@ -147,12 +147,28 @@ class _HomeScreenState extends State<HomeScreen> {
 
       final totalDonors = donorSet.isNotEmpty ? donorSet.length : (localDonations.isNotEmpty ? 1 : 0);
 
-      // Hitung anak asuh yang didampingi oleh donatur ini (dari riwayat donasi/sponsorship)
+      // Hitung anak asuh yang didampingi oleh donatur yang SEDANG LOGIN (dari riwayat donasi/sponsorship)
+      String userEmail = '';
+      String userName = '';
+      try {
+        final auth = Provider.of<AuthProvider>(context, listen: false);
+        userEmail = auth.userEmail.toLowerCase().trim();
+        userName = auth.userName.toLowerCase().trim();
+      } catch (_) {}
+
       final sponsoredKidSet = <String>{};
-      for (var d in localDonations) {
-        final alias = (d['child_alias'] ?? '').toString().trim();
-        if (alias.isNotEmpty) {
-          sponsoredKidSet.add(alias.toLowerCase());
+      if (userEmail.isNotEmpty || userName.isNotEmpty) {
+        for (var d in localDonations) {
+          final dEmail = (d['donor_email'] ?? '').toString().toLowerCase().trim();
+          final dName = (d['donor_name'] ?? '').toString().toLowerCase().trim();
+          final isMatch = (userEmail.isNotEmpty && dEmail == userEmail) ||
+              (userName.isNotEmpty && (dName == userName || dName == userEmail));
+          if (isMatch) {
+            final alias = (d['child_alias'] ?? '').toString().trim();
+            if (alias.isNotEmpty) {
+              sponsoredKidSet.add(alias.toLowerCase());
+            }
+          }
         }
       }
 
@@ -370,8 +386,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   _buildFeatureCard(
                     context,
-                    title: 'Jadwal 4 Zona',
-                    subtitle: 'WIB, WITA, WIT, London',
+                    title: 'Jadwal Lap. Keuangan',
+                    subtitle: 'Audit 4 zona waktu',
                     icon: Icons.schedule,
                     color: AppColors.accent1,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ScheduleScreen())),

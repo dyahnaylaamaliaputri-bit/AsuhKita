@@ -10,7 +10,9 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../auth/auth_provider.dart';
 import '../../core/app_colors.dart';
+import '../../core/dio_client.dart';
 import '../../data/local_db.dart';
+import '../admin/admin_panel_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -65,9 +67,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
       }
 
-      // 2. Ambil akumulasi poin kebaikan dari SharedPreferences
-      final claimedPoin = prefs.getInt('asuhkita_kebaikan_points') ?? 0;
-      final gameScore = prefs.getInt('asuhkita_game_score') ?? 0;
+      // 2. Ambil akumulasi poin kebaikan dari SharedPreferences (Scoped per user email)
+      final claimedPoin = prefs.getInt('asuhkita_kebaikan_points_$emailKey') ?? 0;
+      final gameScore = prefs.getInt('asuhkita_game_score_$emailKey') ?? 0;
       final totalPoin = claimedPoin > 0 ? claimedPoin : (gameScore > 0 ? gameScore : 0);
 
       if (mounted) {
@@ -196,6 +198,393 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       );
     }
+  }
+
+  // ==================== KHUSUS ADMIN: TAMBAH DATA ANAK ASUH DARI PROFIL ====================
+  void _showAdminAddChildModal(BuildContext context) {
+    final nameCtrl = TextEditingController();
+    final ageCtrl = TextEditingController(text: '8');
+    final cityCtrl = TextEditingController(text: 'Peduli Anak Lombok');
+    final dreamCtrl = TextEditingController();
+    final hobbyCtrl = TextEditingController();
+    final storyCtrl = TextEditingController();
+    String selectedGender = 'Laki-laki';
+    String? base64Image;
+
+    final availableCategories = AppColors.needCategories.where((c) => c != 'Semua').toList();
+    final List<String> selectedNeeds = ['Pendidikan'];
+    final Map<String, TextEditingController> budgetControllers = {
+      'Pendidikan': TextEditingController(text: '1000000'),
+    };
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) {
+          double totalBudgetCalculated = 0;
+          for (var cat in selectedNeeds) {
+            final ctrl = budgetControllers[cat];
+            final val = double.tryParse(ctrl?.text.replaceAll('.', '').replaceAll(',', '') ?? '0') ?? 0.0;
+            totalBudgetCalculated += val;
+          }
+
+          return Container(
+            height: MediaQuery.of(ctx).size.height * 0.90,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            padding: EdgeInsets.only(
+              top: 20,
+              left: 20,
+              right: 20,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 48,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Row(
+                    children: [
+                      Icon(Icons.person_add, color: AppColors.primary, size: 22),
+                      SizedBox(width: 8),
+                      Text(
+                        'Tambah Anak Asuh Baru (Admin)',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                      ),
+                    ],
+                  ),
+                  const Text(
+                    'Data tersimpan ke SQLite & Supabase Cloud secara realtime untuk donatur.',
+                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  ),
+                  const SizedBox(height: 16),
+                  Center(
+                    child: GestureDetector(
+                      onTap: () async {
+                        final XFile? photo = await _picker.pickImage(source: ImageSource.gallery, maxWidth: 600);
+                        if (photo != null) {
+                          final bytes = await photo.readAsBytes();
+                          setModalState(() {
+                            base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+                          });
+                        }
+                      },
+                      child: Container(
+                        width: 90,
+                        height: 90,
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceLight,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppColors.primary, width: 2),
+                        ),
+                        child: base64Image != null
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(14),
+                                child: Image.memory(
+                                  base64Decode(base64Image!.split(',').last),
+                                  fit: BoxFit.cover,
+                                ),
+                              )
+                            : Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: const [
+                                  Icon(Icons.add_a_photo, color: AppColors.primary, size: 28),
+                                  SizedBox(height: 4),
+                                  Text('Foto Anak', style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+                                ],
+                              ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: nameCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Nama Lengkap Anak',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: ageCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            labelText: 'Usia (Tahun)',
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          initialValue: selectedGender,
+                          items: ['Laki-laki', 'Perempuan']
+                              .map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 13))))
+                              .toList(),
+                          onChanged: (v) => setModalState(() => selectedGender = v ?? 'Laki-laki'),
+                          decoration: InputDecoration(
+                            labelText: 'Jenis Kelamin',
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Kategori kebutuhan multi-chip
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Kategori Kebutuhan (Bisa Pilih > 1):',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '${selectedNeeds.length} Dipilih',
+                          style: const TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: availableCategories.map((cat) {
+                      final isSelected = selectedNeeds.contains(cat);
+                      return FilterChip(
+                        selected: isSelected,
+                        label: Text(
+                          cat,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            color: isSelected ? Colors.white : AppColors.textPrimary,
+                          ),
+                        ),
+                        selectedColor: AppColors.primary,
+                        checkmarkColor: Colors.white,
+                        backgroundColor: AppColors.surfaceLight,
+                        onSelected: (bool selected) {
+                          setModalState(() {
+                            if (selected) {
+                              selectedNeeds.add(cat);
+                              budgetControllers.putIfAbsent(cat, () => TextEditingController(text: '1000000'));
+                            } else {
+                              if (selectedNeeds.length > 1) {
+                                selectedNeeds.remove(cat);
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Paling sedikit 1 kategori kebutuhan harus dipilih')),
+                                );
+                              }
+                            }
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Dynamic Budget Per Kategori
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceLight,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: const [
+                            Icon(Icons.payments_outlined, color: AppColors.primary, size: 18),
+                            SizedBox(width: 6),
+                            Text(
+                              'Target Budget Per Kategori:',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primaryDark),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        ...selectedNeeds.map((cat) {
+                          final ctrl = budgetControllers.putIfAbsent(cat, () => TextEditingController(text: '1000000'));
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: TextField(
+                              controller: ctrl,
+                              keyboardType: TextInputType.number,
+                              onChanged: (_) => setModalState(() {}),
+                              decoration: InputDecoration(
+                                prefixText: 'Rp ',
+                                labelText: 'Budget: $cat',
+                                filled: true,
+                                fillColor: Colors.white,
+                                isDense: true,
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                            ),
+                          );
+                        }),
+                        const Divider(),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Total Target Seluruh Kebutuhan:',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                            ),
+                            Text(
+                              'Rp ${totalBudgetCalculated.toInt()}',
+                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.primary),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  TextField(
+                    controller: cityCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Asal Panti / Kota',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: dreamCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Cita-Cita',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: hobbyCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Hobi & Minat',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: storyCtrl,
+                    maxLines: 3,
+                    decoration: InputDecoration(
+                      labelText: 'Kisah / Latar Belakang Anak',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () async {
+                        if (nameCtrl.text.trim().isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Nama anak wajib diisi')),
+                          );
+                          return;
+                        }
+
+                        final Map<String, double> catBudgetsMap = {};
+                        for (var cat in selectedNeeds) {
+                          final ctrl = budgetControllers[cat];
+                          final val = double.tryParse(ctrl?.text.replaceAll('.', '').replaceAll(',', '') ?? '0') ?? 500000.0;
+                          catBudgetsMap[cat] = val;
+                        }
+                        final totalTarget = catBudgetsMap.values.fold<double>(0.0, (sum, val) => sum + val);
+
+                        final newKid = {
+                          'id': 'child_${DateTime.now().millisecondsSinceEpoch}',
+                          'name': nameCtrl.text.trim(),
+                          'age': int.tryParse(ageCtrl.text) ?? 8,
+                          'gender': selectedGender,
+                          'city': cityCtrl.text.trim().isEmpty ? 'Peduli Anak Lombok' : cityCtrl.text.trim(),
+                          'urgentNeeds': selectedNeeds.join(', '),
+                          'category_budgets': jsonEncode(catBudgetsMap),
+                          'story': storyCtrl.text.isEmpty ? 'Anak asuh bersemangat untuk menempuh masa depan.' : storyCtrl.text,
+                          'photo': base64Image ?? '',
+                          'target': totalTarget > 0 ? totalTarget : 500000.0,
+                          'dream': dreamCtrl.text,
+                          'hobby': hobbyCtrl.text,
+                          'createdAt': DateTime.now().toIso8601String(),
+                        };
+
+                        // Simpan ke SQLite lokal
+                        await LocalDatabase().insertChild(newKid);
+
+                        // Sync ke Supabase Cloud
+                        try {
+                          await DioClient().dio.post('/children', data: {
+                            'alias': newKid['name'],
+                            'age': newKid['age'],
+                            'gender': newKid['gender'],
+                            'need_category': newKid['urgentNeeds'],
+                            'story_summary': newKid['story'],
+                            'avatar': newKid['photo'],
+                            'orphanage_city': newKid['city'],
+                            'target': newKid['target'],
+                            'dream': newKid['dream'],
+                            'hobby': newKid['hobby'],
+                            'category_budgets': newKid['category_budgets'],
+                          });
+                        } catch (_) {}
+
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        if (!mounted || !context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Anak asuh "${nameCtrl.text}" berhasil disimpan ke Supabase & SQLite secara realtime!'),
+                            backgroundColor: AppColors.primary,
+                          ),
+                        );
+                      },
+                      child: const Text('Simpan & Sinkronkan Anak ke Donatur', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 
   @override
@@ -406,6 +795,74 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
               const SizedBox(height: 20),
+
+              // Kelola Data Anak Khusus Admin Panti
+              if (auth.userRole == 'admin_panti') ...[
+                Card(
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  color: Colors.white,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: const [
+                            Icon(Icons.admin_panel_settings, color: AppColors.primary),
+                            SizedBox(width: 8),
+                            Text(
+                              'Kelola Data Anak Panti',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Tambahkan data anak asuh baru langsung dari sini atau kelola lengkap di Panel Admin.',
+                          style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                        ),
+                        const SizedBox(height: 14),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            icon: const Icon(Icons.person_add),
+                            label: const Text('Tambah Data Anak Baru', style: TextStyle(fontWeight: FontWeight.bold)),
+                            onPressed: () => _showAdminAddChildModal(context),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.primaryDark,
+                              side: const BorderSide(color: AppColors.primary),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                            icon: const Icon(Icons.dashboard_customize_outlined),
+                            label: const Text('Buka Panel Admin & Kelola Anak'),
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const AdminPanelScreen()),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
 
               // Pengaturan Keamanan & Biometrik (FR-07, FR-08)
               Card(

@@ -4,9 +4,11 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../core/app_colors.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../auth/auth_provider.dart';
 
 class StepsAndGameScreen extends StatefulWidget {
   const StepsAndGameScreen({super.key});
@@ -17,6 +19,16 @@ class StepsAndGameScreen extends StatefulWidget {
 
 class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+
+  String _getUserEmailKey() {
+    try {
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+      if (auth.userEmail.isNotEmpty) {
+        return auth.userEmail.toLowerCase().trim();
+      }
+    } catch (_) {}
+    return 'default';
+  }
 
   // ========== STATE SENSOR ACCELEROMETER (DETEKSI LANGKAH) ==========
   static const String _stepsStorageKey = 'asuhkita_daily_steps';
@@ -44,25 +56,26 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
     _startPedometer();
   }
 
-  // Muat perhitungan langkah: jika hari baru, otomatis reset ke 0
+  // Muat perhitungan langkah: jika hari baru atau akun baru, otomatis dari 0
   Future<void> _loadSavedSteps() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final today = DateTime.now().toIso8601String().substring(0, 10); // 'YYYY-MM-DD'
-      final lastDate = prefs.getString('asuhkita_steps_date');
+      final emailKey = _getUserEmailKey();
+      final lastDate = prefs.getString('asuhkita_steps_date_$emailKey');
 
       if (lastDate != today) {
-        // Hari baru atau pertama kali membuka fitur: RESET KE 0!
-        await prefs.setString('asuhkita_steps_date', today);
-        await prefs.setInt(_stepsStorageKey, 0);
+        // Hari baru atau pertama kali membuka fitur untuk akun ini: RESET KE 0!
+        await prefs.setString('asuhkita_steps_date_$emailKey', today);
+        await prefs.setInt('${_stepsStorageKey}_$emailKey', 0);
         if (mounted) {
           setState(() {
             _stepCount = 0;
           });
         }
       } else {
-        // Masih di hari yang sama: muat langkah tersimpan
-        final saved = prefs.getInt(_stepsStorageKey) ?? 0;
+        // Masih di hari yang sama: muat langkah tersimpan untuk akun ini
+        final saved = prefs.getInt('${_stepsStorageKey}_$emailKey') ?? 0;
         if (mounted) {
           setState(() {
             _stepCount = saved;
@@ -78,8 +91,9 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
     try {
       final prefs = await SharedPreferences.getInstance();
       final today = DateTime.now().toIso8601String().substring(0, 10);
-      await prefs.setString('asuhkita_steps_date', today);
-      await prefs.setInt(_stepsStorageKey, steps);
+      final emailKey = _getUserEmailKey();
+      await prefs.setString('asuhkita_steps_date_$emailKey', today);
+      await prefs.setInt('${_stepsStorageKey}_$emailKey', steps);
     } catch (_) {}
   }
 
@@ -183,8 +197,12 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
     if (earnedScore > 0) {
       try {
         final prefs = await SharedPreferences.getInstance();
-        final currentPoin = prefs.getInt('asuhkita_kebaikan_points') ?? 0;
+        final emailKey = _getUserEmailKey();
+        final currentPoin = prefs.getInt('asuhkita_kebaikan_points_$emailKey') ?? 0;
         final newTotal = currentPoin + earnedScore;
+        await prefs.setInt('asuhkita_kebaikan_points_$emailKey', newTotal);
+        await prefs.setInt('asuhkita_game_score_$emailKey', newTotal);
+        // Fallback backward compatibility
         await prefs.setInt('asuhkita_kebaikan_points', newTotal);
         await prefs.setInt('asuhkita_game_score', newTotal);
       } catch (_) {}
@@ -351,8 +369,10 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
 
                     try {
                       final prefs = await SharedPreferences.getInstance();
-                      final currentPoin = prefs.getInt('asuhkita_kebaikan_points') ?? 0;
+                      final emailKey = _getUserEmailKey();
+                      final currentPoin = prefs.getInt('asuhkita_kebaikan_points_$emailKey') ?? 0;
                       final newTotalPoin = currentPoin + points;
+                      await prefs.setInt('asuhkita_kebaikan_points_$emailKey', newTotalPoin);
                       await prefs.setInt('asuhkita_kebaikan_points', newTotalPoin);
 
                       setState(() {

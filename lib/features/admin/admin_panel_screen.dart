@@ -334,7 +334,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: DropdownButtonFormField<String>(
-                          value: selectedGender,
+                          initialValue: selectedGender,
                           items: ['Laki-laki', 'Perempuan']
                               .map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 13))))
                               .toList(),
@@ -597,6 +597,449 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
         },
       ),
     );
+  }
+
+  // ==================== EDIT DATA ANAK ASUH (CRUD - EDIT) ====================
+  void _showEditChildDialog(Map<String, dynamic> child) {
+    final nameCtrl = TextEditingController(text: (child['name'] ?? child['alias'] ?? '').toString());
+    final ageCtrl = TextEditingController(text: (child['age'] ?? 8).toString());
+    final cityCtrl = TextEditingController(text: (child['city'] ?? child['orphanage_city'] ?? 'PeduliAnak Lombok').toString());
+    final dreamCtrl = TextEditingController(text: (child['dream'] ?? '').toString());
+    final hobbyCtrl = TextEditingController(text: (child['hobby'] ?? '').toString());
+    final storyCtrl = TextEditingController(text: (child['story'] ?? child['story_summary'] ?? '').toString());
+    String selectedGender = child['gender']?.toString() ?? 'Laki-laki';
+    String? base64Image = child['photo'] ?? child['photo_url'] ?? child['avatar'];
+
+    final availableCategories = AppColors.needCategories.where((c) => c != 'Semua').toList();
+    final rawNeeds = (child['urgentNeeds'] ?? child['need_category'] ?? 'Pendidikan').toString();
+    final List<String> selectedNeeds = rawNeeds.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    if (selectedNeeds.isEmpty) selectedNeeds.add('Pendidikan');
+
+    final Map<String, TextEditingController> budgetControllers = {};
+    final catBudgetsMap = (child['categoryBudgetsMap'] as Map<String, double>?) ?? {};
+    for (var cat in selectedNeeds) {
+      final b = catBudgetsMap[cat] ?? (child['target'] is num ? (child['target'] as num).toDouble() : 1000000.0);
+      budgetControllers[cat] = TextEditingController(text: b.toInt().toString());
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) {
+          double totalBudgetCalculated = 0;
+          for (var cat in selectedNeeds) {
+            final ctrl = budgetControllers[cat];
+            final val = double.tryParse(ctrl?.text.replaceAll('.', '').replaceAll(',', '') ?? '0') ?? 0.0;
+            totalBudgetCalculated += val;
+          }
+
+          return Container(
+            height: MediaQuery.of(ctx).size.height * 0.90,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            padding: EdgeInsets.only(
+              top: 20,
+              left: 20,
+              right: 20,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 48,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Row(
+                    children: [
+                      Icon(Icons.edit, color: AppColors.primary, size: 22),
+                      SizedBox(width: 8),
+                      Text(
+                        'Edit Data Anak Asuh',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                      ),
+                    ],
+                  ),
+                  const Text(
+                    'Perbarui profil anak, kategori kebutuhan, dan alokasi target donasi.',
+                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  ),
+                  const SizedBox(height: 16),
+                  Center(
+                    child: GestureDetector(
+                      onTap: () async {
+                        final XFile? photo = await _picker.pickImage(source: ImageSource.gallery, maxWidth: 600);
+                        if (photo != null) {
+                          final bytes = await photo.readAsBytes();
+                          setModalState(() {
+                            base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+                          });
+                        }
+                      },
+                      child: Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceLight,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppColors.primary, width: 2),
+                        ),
+                        child: base64Image != null && base64Image!.isNotEmpty
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(14),
+                                child: _buildChildImage(base64Image!, 100, 100),
+                              )
+                            : Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: const [
+                                  Icon(Icons.add_a_photo, color: AppColors.primary, size: 30),
+                                  SizedBox(height: 4),
+                                  Text('Ganti Foto', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                                ],
+                              ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: nameCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Nama Lengkap Anak',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: ageCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            labelText: 'Usia (Tahun)',
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          initialValue: selectedGender,
+                          items: ['Laki-laki', 'Perempuan']
+                              .map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 13))))
+                              .toList(),
+                          onChanged: (v) => setModalState(() => selectedGender = v ?? 'Laki-laki'),
+                          decoration: InputDecoration(
+                            labelText: 'Jenis Kelamin',
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Kategori kebutuhan multi-chip
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Kategori Kebutuhan (Bisa Pilih > 1):',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '${selectedNeeds.length} Dipilih',
+                          style: const TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: availableCategories.map((cat) {
+                      final isSelected = selectedNeeds.contains(cat);
+                      return FilterChip(
+                        selected: isSelected,
+                        label: Text(
+                          cat,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            color: isSelected ? Colors.white : AppColors.textPrimary,
+                          ),
+                        ),
+                        selectedColor: AppColors.primary,
+                        checkmarkColor: Colors.white,
+                        backgroundColor: AppColors.surfaceLight,
+                        onSelected: (bool selected) {
+                          setModalState(() {
+                            if (selected) {
+                              selectedNeeds.add(cat);
+                              budgetControllers.putIfAbsent(cat, () => TextEditingController(text: '1000000'));
+                            } else {
+                              if (selectedNeeds.length > 1) {
+                                selectedNeeds.remove(cat);
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Paling sedikit 1 kategori kebutuhan harus dipilih')),
+                                );
+                              }
+                            }
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Dynamic Budget Per Kategori
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceLight,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: const [
+                            Icon(Icons.payments_outlined, color: AppColors.primary, size: 18),
+                            SizedBox(width: 6),
+                            Text(
+                              'Target Budget Per Kategori:',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primaryDark),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        ...selectedNeeds.map((cat) {
+                          final ctrl = budgetControllers.putIfAbsent(cat, () => TextEditingController(text: '1000000'));
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: TextField(
+                              controller: ctrl,
+                              keyboardType: TextInputType.number,
+                              onChanged: (_) => setModalState(() {}),
+                              decoration: InputDecoration(
+                                prefixText: 'Rp ',
+                                labelText: 'Budget: $cat',
+                                filled: true,
+                                fillColor: Colors.white,
+                                isDense: true,
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                            ),
+                          );
+                        }),
+                        const Divider(),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Total Target Seluruh Kebutuhan:',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                            ),
+                            Text(
+                              _formatRupiah(totalBudgetCalculated),
+                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.primary),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  TextField(
+                    controller: cityCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Asal Panti / Kota',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: dreamCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Cita-Cita',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: hobbyCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Hobi & Minat',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: storyCtrl,
+                    maxLines: 3,
+                    decoration: InputDecoration(
+                      labelText: 'Kisah / Latar Belakang Anak',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () async {
+                        if (nameCtrl.text.trim().isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Nama anak wajib diisi')),
+                          );
+                          return;
+                        }
+
+                        final Map<String, double> updatedBudgetsMap = {};
+                        for (var cat in selectedNeeds) {
+                          final ctrl = budgetControllers[cat];
+                          final val = double.tryParse(ctrl?.text.replaceAll('.', '').replaceAll(',', '') ?? '0') ?? 500000.0;
+                          updatedBudgetsMap[cat] = val;
+                        }
+                        final totalTarget = updatedBudgetsMap.values.fold<double>(0.0, (sum, val) => sum + val);
+
+                        final updatedKid = {
+                          'id': child['id']?.toString() ?? 'child_${DateTime.now().millisecondsSinceEpoch}',
+                          'name': nameCtrl.text.trim(),
+                          'age': int.tryParse(ageCtrl.text) ?? 8,
+                          'gender': selectedGender,
+                          'city': cityCtrl.text.trim().isEmpty ? 'Peduli Anak Lombok' : cityCtrl.text.trim(),
+                          'urgentNeeds': selectedNeeds.join(', '),
+                          'category_budgets': jsonEncode(updatedBudgetsMap),
+                          'story': storyCtrl.text,
+                          'photo': base64Image ?? '',
+                          'target': totalTarget > 0 ? totalTarget : 500000.0,
+                          'dream': dreamCtrl.text,
+                          'hobby': hobbyCtrl.text,
+                        };
+
+                        await _localDb.updateChild(updatedKid);
+
+                        // Coba sync update ke Supabase
+                        try {
+                          await DioClient().dio.put('/children/${updatedKid['id']}', data: {
+                            'alias': updatedKid['name'],
+                            'age': updatedKid['age'],
+                            'gender': updatedKid['gender'],
+                            'need_category': updatedKid['urgentNeeds'],
+                            'story_summary': updatedKid['story'],
+                            'avatar': updatedKid['photo'],
+                            'orphanage_city': updatedKid['city'],
+                            'target': updatedKid['target'],
+                            'dream': updatedKid['dream'],
+                            'hobby': updatedKid['hobby'],
+                            'category_budgets': updatedKid['category_budgets'],
+                          });
+                        } catch (_) {}
+
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        _loadChildren();
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Data anak "${nameCtrl.text}" berhasil diperbarui & disinkronkan!'),
+                              backgroundColor: AppColors.primary,
+                            ),
+                          );
+                        }
+                      },
+                      child: const Text('Simpan Perubahan Data Anak', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // ==================== HAPUS DATA ANAK ASUH (CRUD - DELETE) ====================
+  Future<void> _confirmDeleteChild(Map<String, dynamic> child) async {
+    final cName = (child['name'] ?? child['alias'] ?? 'Anak Asuh').toString();
+    final childId = child['id']?.toString() ?? '';
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: const [
+            Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+            SizedBox(width: 8),
+            Expanded(child: Text('Hapus Data Anak Asuh?')),
+          ],
+        ),
+        content: Text(
+          'Apakah Anda yakin ingin menghapus data "$cName"? '
+          'Data anak akan dihapus dari sistem SQLite dan Supabase, serta tidak lagi ditampilkan ke donatur.',
+          style: const TextStyle(fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Ya, Hapus Data'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await _localDb.deleteChild(childId, cName);
+      try {
+        await DioClient().dio.delete('/children/$childId');
+      } catch (_) {}
+      _loadChildren();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Data anak "$cName" berhasil dihapus dari sistem.'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    }
   }
 
   void _showChildDetailAndReceiptDialog(Map<String, dynamic> child) {
@@ -1198,7 +1641,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
         width: width,
         height: height,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => Container(
+        errorBuilder: (context, error, stackTrace) => Container(
           width: width,
           height: height,
           color: AppColors.surfaceLight,
@@ -1352,6 +1795,41 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                               style: const TextStyle(fontSize: 10, color: AppColors.primaryDark, fontWeight: FontWeight.bold),
                                             ),
                                           ),
+                                          // Status Terpenuhi / Belum Terpenuhi
+                                          Builder(
+                                            builder: (_) {
+                                              final totalDonations = (child['totalDonations'] as int?) ?? 0;
+                                              final target = ((child['target'] is num) ? (child['target'] as num).toDouble() : 500000.0);
+                                              final isFulfilled = totalDonations >= target && target > 0;
+                                              return Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: isFulfilled ? Colors.green.shade50 : Colors.amber.shade50,
+                                                  borderRadius: BorderRadius.circular(6),
+                                                  border: Border.all(color: isFulfilled ? Colors.green.shade400 : Colors.amber.shade400),
+                                                ),
+                                                child: Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Icon(
+                                                      isFulfilled ? Icons.check_circle : Icons.hourglass_top,
+                                                      size: 10,
+                                                      color: isFulfilled ? Colors.green.shade800 : Colors.amber.shade900,
+                                                    ),
+                                                    const SizedBox(width: 3),
+                                                    Text(
+                                                      isFulfilled ? 'Sudah Terpenuhi' : 'Belum Terpenuhi',
+                                                      style: TextStyle(
+                                                        fontSize: 10,
+                                                        fontWeight: FontWeight.bold,
+                                                        color: isFulfilled ? Colors.green.shade800 : Colors.amber.shade900,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              );
+                                            },
+                                          ),
                                           Container(
                                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                             decoration: BoxDecoration(
@@ -1382,7 +1860,30 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                     ],
                                   ),
                                 ),
-                                const Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.textHint),
+                                const SizedBox(width: 6),
+                                // Aksi CRUD Admin: Edit & Hapus
+                                Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                      icon: const Icon(Icons.edit_outlined, size: 20, color: AppColors.primary),
+                                      tooltip: 'Edit Data Anak',
+                                      onPressed: () => _showEditChildDialog(child),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    IconButton(
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                      icon: const Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                                      tooltip: 'Hapus Data Anak',
+                                      onPressed: () => _confirmDeleteChild(child),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    const Icon(Icons.arrow_forward_ios, size: 12, color: AppColors.textHint),
+                                  ],
+                                ),
                               ],
                             ),
                           ),
