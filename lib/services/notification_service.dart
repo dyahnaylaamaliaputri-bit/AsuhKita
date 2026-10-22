@@ -6,6 +6,7 @@
 //         - initFcmStub              : Stub penerimaan Push Notification FCM (PBI-056, FR-42)
 
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
@@ -26,6 +27,12 @@ class NotificationService {
   // -----------------------------------------------------------------
   Future<void> initialize() async {
     if (_initialized) return;
+
+    if (kIsWeb) {
+      _initialized = true;
+      debugPrint('[NotificationService] Web environment detected - skipping local notification setup.');
+      return;
+    }
 
     // Inisialisasi timezone
     tz_data.initializeTimeZones();
@@ -96,6 +103,10 @@ class NotificationService {
     required String body,
     String? payload,
   }) async {
+    if (kIsWeb) {
+      debugPrint('[NotificationService] (Web stub) Notif: $title - $body');
+      return;
+    }
     await _flutterLocalNotificationsPlugin.show(
       id: id,
       title: title,
@@ -115,6 +126,7 @@ class NotificationService {
     required String childAlias,
     required DateTime scheduledDateTime,
   }) async {
+    if (kIsWeb) return;
     final tz.TZDateTime scheduledTz = tz.TZDateTime.from(
       scheduledDateTime.subtract(const Duration(minutes: 30)),
       tz.local,
@@ -145,6 +157,7 @@ class NotificationService {
   Future<void> scheduleMonthlyDonationReminder({
     required String donatorName,
   }) async {
+    if (kIsWeb) return;
     const int notifId = 1001;
 
     // Hitung tanggal 1 bulan depan pukul 08:00
@@ -171,24 +184,21 @@ class NotificationService {
   // Pada produksi: integrasikan firebase_messaging + backend trigger
   // -----------------------------------------------------------------
   void initFcmStub() {
-    // Stub: Simulasi menerima push dari server backend AsuhKita
-    // Di produksi ganti dengan:
-    //   FirebaseMessaging.onMessage.listen((RemoteMessage msg) { ... });
-    //   FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage msg) { ... });
-    debugPrint('[NotificationService] FCM Stub initialized. '
-        'Integrasikan firebase_messaging untuk push nyata (PBI-056, FR-42).');
+    debugPrint('[NotificationService] FCM Stub initialized.');
   }
 
   // -----------------------------------------------------------------
   // Batalkan semua notifikasi yang dijadwalkan
   // -----------------------------------------------------------------
   Future<void> cancelAll() async {
+    if (kIsWeb) return;
     await _flutterLocalNotificationsPlugin.cancelAll();
     debugPrint('[NotificationService] All notifications cancelled.');
   }
 
   // Batalkan notifikasi berdasarkan ID
   Future<void> cancel(int id) async {
+    if (kIsWeb) return;
     await _flutterLocalNotificationsPlugin.cancel(id: id);
   }
 }
