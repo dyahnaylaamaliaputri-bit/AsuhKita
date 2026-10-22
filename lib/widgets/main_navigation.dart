@@ -18,9 +18,13 @@ class MainNavigation extends StatefulWidget {
 
 class _MainNavigationState extends State<MainNavigation> {
   int _currentIndex = 0;
+  int _profileKeyCounter = 0; // Kunci pemicu refresh dinamis saat tab profil dibuka
 
   void _navigateToTab(int index) {
     setState(() {
+      if (index == 2) {
+        _profileKeyCounter++; // Refresh profil saat dibuka
+      }
       _currentIndex = index;
     });
   }
@@ -65,19 +69,17 @@ class _MainNavigationState extends State<MainNavigation> {
 
   @override
   Widget build(BuildContext context) {
+    // Bangun halaman secara dinamis agar data (poin kebaikan, profil, sponsorship) selalu segar
     final List<Widget> pages = [
       HomeScreen(onNavigateTab: _navigateToTab),
       const SponsorScreen(),
-      const ProfileScreen(),
+      ProfileScreen(key: ValueKey('profile_$_profileKeyCounter')),
       const FeedbackScreen(),
       const SizedBox.shrink(), // Placeholder untuk tab logout
     ];
 
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: pages,
-      ),
+      body: pages[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         type: BottomNavigationBarType.fixed,
@@ -91,6 +93,9 @@ class _MainNavigationState extends State<MainNavigation> {
             _showLogoutDialog();
           } else {
             setState(() {
+              if (index == 2) {
+                _profileKeyCounter++; // Trigger reload data profil
+              }
               _currentIndex = index;
             });
           }

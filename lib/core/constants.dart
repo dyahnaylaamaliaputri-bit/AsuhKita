@@ -6,7 +6,8 @@ class AppConstants {
   static const String baseUrl = 'http://127.0.0.1:3000/api';
   static const List<String> candidateBaseUrls = [
     'http://127.0.0.1:3000/api', // USB via adb reverse
-    'http://172.16.97.193:3000/api', // Wi-Fi LAN HP & Laptop
+    'http://10.200.64.122:3000/api', // Wi-Fi LAN HP Infinix & Laptop
+    'http://172.16.97.193:3000/api',
     'http://10.0.2.2:3000/api', // Android Emulator
   ];
 

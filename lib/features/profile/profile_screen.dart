@@ -1,12 +1,13 @@
-import 'dart:convert';
-import 'dart:typed_data';
 // Letak file: mobile/lib/features/profile/profile_screen.dart
-// Fungsi: Layar Profil dengan foto kamera/galeri, edit nama & nomor HP (AES-256), aktivasi biometrik, dan badge kebaikan (PBI-010, PBI-011, FR-11, FR-12, FR-48)
+// Fungsi: Layar Profil dengan foto kamera/galeri permanen (Base64 + File Cache), edit nama & nomor HP (AES-256), aktivasi biometrik, dan badge kebaikan dinamis (PBI-010, PBI-011, FR-11, FR-12, FR-48)
 
+import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../auth/auth_provider.dart';
 import '../../data/local_db.dart';
 
@@ -24,7 +25,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   File? _imageFile;
   Uint8List? _imageBytes;
   bool _isEditing = false;
-  int _kebaikanPoints = 0;
+  int _kebaikanPoints = 0; // Poin akumulasi dari langkah harian & mini game
 
   @override
   void initState() {
@@ -34,25 +35,59 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _loadProfileData() async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
-    _nameController.text = auth.userName;
+    _nameController.text = auth.userName.isNotEmpty ? auth.userName : 'Donatur Peduli';
 
-    // Ambil data profil lokal yang terenkripsi AES-256
-    final profile = await LocalDatabase().getUserProfile(auth.userId.isNotEmpty ? auth.userId : 'usr_me');
-    if (profile != null) {
-      if (profile['name']!.isNotEmpty) _nameController.text = profile['name']!;
-      _phoneController.text = profile['phone'] ?? '';
-      if (profile['photo_url'] != null && profile['photo_url']!.isNotEmpty) {
-        final f = File(profile['photo_url']!);
-        if (await f.exists()) {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final emailKey = auth.userEmail.isNotEmpty ? auth.userEmail.toLowerCase().trim() : 'donatur_default';
+
+      // 1. Ambil foto profil dari Base64 string (tahan banting: tidak terhapus saat logout/restart)
+      final photoBase64 = prefs.getString('profile_photo_base64_$emailKey') ??
+          prefs.getString('profile_photo_base64_active');
+      if (photoBase64 != null && photoBase64.isNotEmpty) {
+        final decoded = base64Decode(photoBase64);
+        if (mounted) {
           setState(() {
-            _imageFile = f;
+            _imageBytes = decoded;
           });
         }
+      } else {
+        // Cek file permanen
+        final savedPath = prefs.getString('profile_photo_$emailKey');
+        if (savedPath != null && savedPath.isNotEmpty) {
+          final f = File(savedPath);
+          if (await f.exists() && mounted) {
+            setState(() {
+              _imageFile = f;
+            });
+          }
+        }
       }
-    } else {
-      _phoneController.text = '081234567890';
-    }
-    setState(() {});
+
+      // 2. Ambil akumulasi poin kebaikan dari SharedPreferences
+      final claimedPoin = prefs.getInt('asuhkita_kebaikan_points') ?? 0;
+      final gameScore = prefs.getInt('asuhkita_game_score') ?? 0;
+      final totalPoin = claimedPoin > 0 ? claimedPoin : (gameScore > 0 ? gameScore : 0);
+
+      if (mounted) {
+        setState(() {
+          _kebaikanPoints = totalPoin;
+        });
+      }
+    } catch (_) {}
+
+    // Ambil data profil lokal yang terenkripsi AES-256
+    try {
+      final profile = await LocalDatabase().getUserProfile(auth.userId.isNotEmpty ? auth.userId : 'usr_me');
+      if (profile != null) {
+        if (profile['name']!.isNotEmpty && mounted) _nameController.text = profile['name']!;
+        if (mounted) _phoneController.text = profile['phone'] ?? '';
+      } else {
+        if (mounted) _phoneController.text = '081234567890';
+      }
+    } catch (_) {}
+
+    if (mounted) setState(() {});
   }
 
   // Pilih foto dari Kamera atau Galeri (PBI-011, FR-12)
@@ -60,24 +95,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       final pickedFile = await _picker.pickImage(source: source, maxWidth: 600, imageQuality: 85);
       if (pickedFile != null) {
-        setState(() {
-          _imageFile = File(pickedFile.path);
-        });
+        final bytes = await pickedFile.readAsBytes();
+        final base64String = base64Encode(bytes);
+
+        final permanentPath = pickedFile.path;
+        if (mounted) {
+          setState(() {
+            _imageBytes = bytes;
+            _imageFile = File(permanentPath);
+          });
+        }
 
         if (!mounted) return;
         final auth = Provider.of<AuthProvider>(context, listen: false);
+        final emailKey = auth.userEmail.isNotEmpty ? auth.userEmail.toLowerCase().trim() : 'donatur_default';
+
+        // Simpan Base64 & Path permanen di SharedPreferences
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('profile_photo_base64_$emailKey', base64String);
+          await prefs.setString('profile_photo_base64_active', base64String);
+          await prefs.setString('profile_photo_$emailKey', permanentPath);
+        } catch (_) {}
+
+        // Simpan ke SQLite terenkripsi AES-256
         await LocalDatabase().saveUserProfile(
           id: auth.userId.isNotEmpty ? auth.userId : 'usr_me',
           name: _nameController.text,
           plainPhone: _phoneController.text,
           email: auth.userEmail,
-          photoUrl: pickedFile.path,
+          photoUrl: permanentPath,
         );
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Foto profil berhasil diperbarui & disimpan di cache!'),
+              content: Text('Foto profil berhasil disimpan permanen! Tidak akan hilang saat logout.'),
               backgroundColor: Colors.teal,
             ),
           );
@@ -158,6 +211,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         actions: [
           IconButton(
             icon: Icon(_isEditing ? Icons.check : Icons.edit),
+            tooltip: _isEditing ? 'Simpan' : 'Edit Profil',
             onPressed: () {
               if (_isEditing) {
                 _saveProfile();
@@ -168,193 +222,202 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          children: [
-            // Bagian Foto Profil (PBI-011)
-            Center(
-              child: Stack(
-                children: [
-                  CircleAvatar(
-                    radius: 55,
-                    backgroundColor: Colors.teal.shade100,
-                    backgroundImage: _imageFile != null
-                        ? FileImage(_imageFile!)
-                        : null,
-                    child: _imageFile == null
-                        ? const Icon(Icons.person, size: 60, color: Colors.teal)
-                        : null,
-                  ),
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: GestureDetector(
-                      onTap: _showImageSourceDialog,
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
+      body: RefreshIndicator(
+        onRefresh: _loadProfileData,
+        color: Colors.teal,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            children: [
+              // Bagian Foto Profil (PBI-011)
+              Center(
+                child: Stack(
+                  children: [
+                    CircleAvatar(
+                      radius: 55,
+                      backgroundColor: Colors.teal.shade100,
+                      backgroundImage: _imageBytes != null
+                          ? MemoryImage(_imageBytes!)
+                          : (_imageFile != null ? FileImage(_imageFile!) : null),
+                      child: (_imageBytes == null && _imageFile == null)
+                          ? const Icon(Icons.person, size: 60, color: Colors.teal)
+                          : null,
+                    ),
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: GestureDetector(
+                        onTap: _showImageSourceDialog,
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: const BoxDecoration(
+                            color: Colors.teal,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                auth.userName.isNotEmpty ? auth.userName : 'Donatur Asuh',
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              Text(
+                'Peran: ${auth.userRole == 'admin_panti' ? 'Pengurus Panti' : 'Orang Tua Asuh'}',
+                style: TextStyle(fontSize: 14, color: Colors.teal.shade700, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 20),
+
+              // Card Badge & Poin Kebaikan Dinamis (FR-48)
+              Card(
+                elevation: 2,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                color: Colors.teal.shade50,
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
                         decoration: const BoxDecoration(
-                          color: Colors.teal,
+                          color: Colors.amber,
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
+                        child: const Icon(Icons.stars, color: Colors.white, size: 28),
                       ),
-                    ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _kebaikanPoints >= 500
+                                  ? 'Badge: Sahabat Teladan 🌟'
+                                  : _kebaikanPoints >= 100
+                                      ? 'Badge: Sahabat Mulia ⭐'
+                                      : 'Badge: Sahabat Peduli 🌱',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.teal),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '$_kebaikanPoints Poin Kebaikan dikumpulkan (dari Langkah Pedometer & Mini Game)',
+                              style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              auth.userName.isNotEmpty ? auth.userName : 'Donatur Asuh',
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            Text(
-              'Peran: ${auth.userRole == 'admin_panti' ? 'Pengurus Panti' : 'Orang Tua Asuh'}',
-              style: TextStyle(fontSize: 14, color: Colors.teal.shade700, fontWeight: FontWeight.w500),
-            ),
-            const SizedBox(height: 20),
-
-            // Card Badge & Poin Kebaikan (FR-48)
-            Card(
-              elevation: 2,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              color: Colors.teal.shade50,
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: const BoxDecoration(
-                        color: Colors.amber,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.stars, color: Colors.white, size: 28),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Badge: Sahabat Mulia',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '$_kebaikanPoints Poin Kebaikan (dari Donasi Langkah & Mini Game)',
-                            style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
                 ),
               ),
-            ),
-            const SizedBox(height: 20),
+              const SizedBox(height: 20),
 
-            // Form Detail Profil
-            Card(
-              elevation: 1,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Informasi Akun',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
-                    const Divider(height: 24),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.email_outlined, color: Colors.teal),
-                      title: const Text('Email', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                      subtitle: Text(
-                        auth.userEmail.isNotEmpty ? auth.userEmail : 'donatur@asuhkita.id',
-                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+              // Form Detail Profil
+              Card(
+                elevation: 1,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Informasi Akun',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _nameController,
-                      enabled: _isEditing,
-                      decoration: InputDecoration(
-                        labelText: 'Nama Lengkap',
-                        prefixIcon: const Icon(Icons.person_outline, color: Colors.teal),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        filled: !_isEditing,
-                        fillColor: _isEditing ? Colors.white : Colors.grey.shade100,
+                      const Divider(height: 24),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.email_outlined, color: Colors.teal),
+                        title: const Text('Email', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                        subtitle: Text(
+                          auth.userEmail.isNotEmpty ? auth.userEmail : 'donatur@asuhkita.id',
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _phoneController,
-                      enabled: _isEditing,
-                      decoration: InputDecoration(
-                        labelText: 'Nomor WhatsApp / HP (Enkripsi AES-256)',
-                        prefixIcon: const Icon(Icons.phone_outlined, color: Colors.teal),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        filled: !_isEditing,
-                        fillColor: _isEditing ? Colors.white : Colors.grey.shade100,
-                        helperText: 'Tersimpan aman dengan enkripsi AES-256 di database lokal',
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _nameController,
+                        enabled: _isEditing,
+                        decoration: InputDecoration(
+                          labelText: 'Nama Lengkap',
+                          prefixIcon: const Icon(Icons.person_outline, color: Colors.teal),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          filled: !_isEditing,
+                          fillColor: _isEditing ? Colors.white : Colors.grey.shade100,
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _phoneController,
+                        enabled: _isEditing,
+                        decoration: InputDecoration(
+                          labelText: 'Nomor WhatsApp / HP (Enkripsi AES-256)',
+                          prefixIcon: const Icon(Icons.phone_outlined, color: Colors.teal),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          filled: !_isEditing,
+                          fillColor: _isEditing ? Colors.white : Colors.grey.shade100,
+                          helperText: 'Tersimpan aman dengan enkripsi AES-256 di database lokal',
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 20),
+              const SizedBox(height: 20),
 
-            // Pengaturan Keamanan & Biometrik (FR-07, FR-08)
-            Card(
-              elevation: 1,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Column(
-                  children: [
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      secondary: const Icon(Icons.fingerprint, color: Colors.teal, size: 28),
-                      title: const Text(
-                        'Login dengan Biometrik',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      subtitle: const Text('Gunakan sidik jari/wajah untuk membuka sesi cepat'),
-                      value: auth.isBiometricEnabled,
-                      activeThumbColor: Colors.teal,
-                      onChanged: (val) async {
-                        if (val) {
-                          final ok = await auth.registerBiometricPrompt();
-                          if (ok && mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Sidik jari berhasil didaftarkan dan diaktifkan!'),
-                                backgroundColor: Colors.teal,
-                              ),
-                            );
+              // Pengaturan Keamanan & Biometrik (FR-07, FR-08)
+              Card(
+                elevation: 1,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Column(
+                    children: [
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        secondary: const Icon(Icons.fingerprint, color: Colors.teal, size: 28),
+                        title: const Text(
+                          'Login dengan Biometrik',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: const Text('Gunakan sidik jari/wajah untuk membuka sesi cepat'),
+                        value: auth.isBiometricEnabled,
+                        activeThumbColor: Colors.teal,
+                        onChanged: (val) async {
+                          if (val) {
+                            final ok = await auth.registerBiometricPrompt();
+                            if (ok && mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Sidik jari berhasil didaftarkan dan diaktifkan!'),
+                                  backgroundColor: Colors.teal,
+                                ),
+                              );
+                            }
+                          } else {
+                            auth.toggleBiometric(false);
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Login biometrik dinonaktifkan.'),
+                                ),
+                              );
+                            }
                           }
-                        } else {
-                          auth.toggleBiometric(false);
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Login biometrik dinonaktifkan.'),
-                              ),
-                            );
-                          }
-                        }
-                      },
-                    ),
-                  ],
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

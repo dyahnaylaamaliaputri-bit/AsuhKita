@@ -265,7 +265,7 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Ayo jalan minimal 20 langkah dulu untuk mengklaim 1 Poin Kebaikan!'),
+                            content: Text('Ayo berjalan minimal 20 langkah dulu untuk mengklaim 1 Poin Kebaikan!'),
                             backgroundColor: Colors.orange,
                           ),
                         );
@@ -273,15 +273,15 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
                       return;
                     }
 
-                    // Tambahkan ke akumulasi poin kebaikan di SharedPreferences
+                    final claimedSteps = points * 20;
+                    final remainingSteps = _stepCount - claimedSteps;
+
                     try {
                       final prefs = await SharedPreferences.getInstance();
                       final currentPoin = prefs.getInt('asuhkita_kebaikan_points') ?? 0;
                       final newTotalPoin = currentPoin + points;
                       await prefs.setInt('asuhkita_kebaikan_points', newTotalPoin);
 
-                      // Simpan sisa langkah atau reset langkah yang sudah diklaim
-                      final remainingSteps = _stepCount % 20;
                       setState(() {
                         _stepCount = remainingSteps;
                       });
@@ -291,11 +291,10 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
-                              '🎉 Selamat! $_stepCount langkah berhasil diklaim menjadi $points Poin Kebaikan! '
-                              'Total Poin Kebaikan Anda sekarang: $newTotalPoin Poin (Cek di menu Profil).',
+                              '🎉 Sukses! ${claimedSteps} langkah berhasil diklaim menjadi ${points} Poin Kebaikan! Total Poin Anda: ${newTotalPoin} Poin (Cek tab Profil).',
                             ),
                             backgroundColor: Colors.teal,
-                            duration: const Duration(seconds: 3),
+                            duration: const Duration(seconds: 4),
                           ),
                         );
                       }
@@ -316,24 +315,48 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
-                const SizedBox(height: 10),
-                TextButton.icon(
-                  onPressed: () async {
-                    setState(() {
-                      _stepCount = 0;
-                    });
-                    await _persistSteps(0);
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Langkah harian di-reset ke 0 untuk hari baru.'),
-                          duration: Duration(seconds: 1),
-                        ),
-                      );
-                    }
-                  },
-                  icon: const Icon(Icons.restart_alt, size: 16, color: Colors.grey),
-                  label: const Text('Reset Langkah Hari Baru', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        setState(() {
+                          _stepCount += 100;
+                        });
+                        await _persistSteps(_stepCount);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('+100 langkah simulasi berhasil ditambahkan. Silakan klik Klaim!'),
+                              duration: Duration(seconds: 1),
+                            ),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.add, size: 16, color: Colors.teal),
+                      label: const Text('+100 Langkah (Demo)', style: TextStyle(color: Colors.teal, fontSize: 12)),
+                    ),
+                    const SizedBox(width: 8),
+                    TextButton.icon(
+                      onPressed: () async {
+                        setState(() {
+                          _stepCount = 0;
+                        });
+                        await _persistSteps(0);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Langkah harian di-reset ke 0 untuk hari baru.'),
+                              duration: Duration(seconds: 1),
+                            ),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.restart_alt, size: 16, color: Colors.grey),
+                      label: const Text('Reset', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                    ),
+                  ],
                 ),
               ],
             ),
