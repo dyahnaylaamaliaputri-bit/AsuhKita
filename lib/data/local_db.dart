@@ -62,7 +62,9 @@ class LocalDatabase {
         rate_used REAL,
         amount_idr REAL,
         created_at TEXT,
-        status TEXT
+        status TEXT,
+        donor_name TEXT,
+        need_category TEXT
       )
     ''');
 
@@ -120,7 +122,7 @@ class LocalDatabase {
       )
     ''');
 
-    // Tabel Anak Baru yang Diinputkan Admin
+    // Tabel Anak Baru yang Diinputkan Admin (Dengan Dukungan Multi-Kategori & Budget)
     await db.execute('''
       CREATE TABLE IF NOT EXISTS new_children (
         id TEXT PRIMARY KEY,
@@ -134,9 +136,21 @@ class LocalDatabase {
         target REAL,
         dream TEXT,
         hobby TEXT,
-        created_at TEXT
+        created_at TEXT,
+        category_budgets TEXT
       )
     ''');
+
+    // Safe column migrations untuk database yang sudah ada sebelumnya
+    try {
+      await db.execute('ALTER TABLE new_children ADD COLUMN category_budgets TEXT');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE cached_donations ADD COLUMN donor_name TEXT');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE cached_donations ADD COLUMN need_category TEXT');
+    } catch (_) {}
 
     // Tabel Riwayat Chat Ruang Kasih (Pesan tersimpan permanen per anak asuh)
     await db.execute('''
@@ -215,6 +229,7 @@ class LocalDatabase {
       'dream': child['dream']?.toString() ?? '',
       'hobby': child['hobby']?.toString() ?? '',
       'created_at': child['createdAt']?.toString() ?? DateTime.now().toIso8601String(),
+      'category_budgets': child['category_budgets']?.toString() ?? child['categoryBudgets']?.toString() ?? '',
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
@@ -239,6 +254,8 @@ class LocalDatabase {
       'target': r['target'],
       'dream': r['dream'],
       'hobby': r['hobby'],
+      'category_budgets': r['category_budgets'],
+      'categoryBudgets': r['category_budgets'],
     }).toList();
   }
 
@@ -255,6 +272,8 @@ class LocalDatabase {
       'amount_idr': donation['amount_idr'] is num ? (donation['amount_idr'] as num).toDouble() : 0.0,
       'created_at': donation['created_at']?.toString() ?? DateTime.now().toIso8601String(),
       'status': donation['status']?.toString() ?? 'Terverifikasi di Ledger',
+      'donor_name': donation['donor_name']?.toString() ?? '',
+      'need_category': donation['need_category']?.toString() ?? '',
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 

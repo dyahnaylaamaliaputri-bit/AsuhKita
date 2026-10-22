@@ -1,8 +1,9 @@
 // Letak file: mobile/lib/features/admin/donation_tracking_screen.dart
-// Fungsi: Layar Tracking Donasi Donatur untuk Admin Panti Asuhan (Melacak donatur, anak yang didonasi, nominal, dan jenis paket)
+// Fungsi: Layar Riwayat & Tracking Donasi Donatur untuk Admin Panti Asuhan (Hanya menampilkan donasi riil yang dilakukan oleh donatur, PBI-039)
 
 import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
+import '../../core/dio_client.dart';
 import '../../data/local_db.dart';
 
 class DonationTrackingScreen extends StatefulWidget {
@@ -17,61 +18,6 @@ class _DonationTrackingScreenState extends State<DonationTrackingScreen> {
   String _searchQuery = '';
   List<Map<String, dynamic>> _donations = [];
 
-  final List<Map<String, dynamic>> _dummyTrackingData = [
-    {
-      'id': 'don_trk_01',
-      'donor_name': 'Hendra Wijaya',
-      'donor_email': 'hendra@gmail.com',
-      'child_alias': 'Arfa',
-      'child_age': 8,
-      'package_name': 'Paket Pendidikan Cemerlang',
-      'amount_idr': 250000,
-      'frequency': 'Bulanan',
-      'date': '2026-10-21 14:30',
-      'block_hash': '00008f1b4a92c019d3e',
-      'status': 'Terverifikasi Ledger',
-    },
-    {
-      'id': 'don_trk_02',
-      'donor_name': 'Siti Rahmawati',
-      'donor_email': 'siti.rahma@yahoo.com',
-      'child_alias': 'Ayra',
-      'child_age': 6,
-      'package_name': 'Paket Nutrisi & Harian',
-      'amount_idr': 150000,
-      'frequency': 'Bulanan',
-      'date': '2026-10-20 09:15',
-      'block_hash': '0000a294d710bf39a12',
-      'status': 'Terverifikasi Ledger',
-    },
-    {
-      'id': 'don_trk_03',
-      'donor_name': 'Budi Santoso',
-      'donor_email': 'budi.s@corporate.id',
-      'child_alias': 'Rangga',
-      'child_age': 11,
-      'package_name': 'Paket Asuh Komprehensif',
-      'amount_idr': 400000,
-      'frequency': 'Bulanan',
-      'date': '2026-10-19 18:45',
-      'block_hash': '0000e572091cba38210',
-      'status': 'Terverifikasi Ledger',
-    },
-    {
-      'id': 'don_trk_04',
-      'donor_name': 'Michael Tan (Singapura)',
-      'donor_email': 'm.tan@sgp.com',
-      'child_alias': 'Elsa Saputri',
-      'child_age': 10,
-      'package_name': 'Paket Pendidikan Cemerlang (Valuta SGD)',
-      'amount_idr': 590000,
-      'frequency': 'Sekali',
-      'date': '2026-10-18 11:20',
-      'block_hash': '00003b87f910a234cde',
-      'status': 'Terverifikasi Ledger',
-    },
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -80,35 +26,86 @@ class _DonationTrackingScreenState extends State<DonationTrackingScreen> {
 
   Future<void> _loadTrackingData() async {
     setState(() => _isLoading = true);
-
-    // Ambil donasi lokal dari SQLite
-    final localDonations = await LocalDatabase().getCachedDonations();
     final combined = <Map<String, dynamic>>[];
 
-    // Masukkan donasi lokal yang dibuat donatur di platform
-    for (var d in localDonations) {
-      combined.add({
-        'id': d['id'] ?? 'don_${DateTime.now().millisecondsSinceEpoch}',
-        'donor_name': 'Donatur Asuh (Platform)',
-        'donor_email': 'donatur@asuhkita.id',
-        'child_alias': d['child_alias'] ?? 'Anak Asuh',
-        'child_age': 9,
-        'package_name': 'Paket Sponsorship (${d['currency'] ?? 'IDR'})',
-        'amount_idr': (d['amount_idr'] is num) ? (d['amount_idr'] as num).toInt() : 250000,
-        'frequency': d['frequency'] ?? 'Bulanan',
-        'date': d['created_at']?.toString().substring(0, 16) ?? '2026-10-22 10:00',
-        'block_hash': '0000${d['id'].hashCode.abs()}',
-        'status': d['status'] ?? 'Terverifikasi Ledger',
-      });
+    try {
+      // 1. Ambil donasi riil dari SQLite lokal
+      final localDonations = await LocalDatabase().getCachedDonations();
+      for (var d in localDonations) {
+        combined.add({
+          'id': d['id'] ?? 'don_${DateTime.now().millisecondsSinceEpoch}',
+          'donor_name': (d['donor_name'] != null && d['donor_name'].toString().isNotEmpty)
+              ? d['donor_name'].toString()
+              : 'Donatur Peduli (Platform)',
+          'donor_email': (d['donor_email'] != null && d['donor_email'].toString().isNotEmpty)
+              ? d['donor_email'].toString()
+              : 'donatur@asuhkita.id',
+          'child_alias': (d['child_alias'] != null && d['child_alias'].toString().isNotEmpty)
+              ? d['child_alias'].toString()
+              : 'Anak Asuh',
+          'child_age': d['child_age'] ?? 8,
+          'package_name': (d['need_category'] != null && d['need_category'].toString().isNotEmpty)
+              ? 'Kategori: ${d['need_category']}'
+              : (d['package_id'] != null ? 'Paket: ${d['package_id']}' : 'Paket Pendanaan (${d['currency'] ?? 'IDR'})'),
+          'amount_idr': (d['amount_idr'] is num) ? (d['amount_idr'] as num).toInt() : 0,
+          'frequency': d['frequency'] ?? 'Bulanan',
+          'date': (d['created_at'] != null && d['created_at'].toString().length >= 16)
+              ? d['created_at'].toString().substring(0, 16)
+              : (d['created_at']?.toString() ?? '-'),
+          'block_hash': '0000${(d['id'] ?? '').hashCode.abs().toRadixString(16)}',
+          'status': d['status'] ?? 'Terverifikasi Ledger',
+        });
+      }
+
+      // 2. Coba sinkronisasi dari Supabase API (hanya donasi nyata di cloud)
+      try {
+        final res = await DioClient().dio.get('/donations');
+        if (res.statusCode == 200) {
+          List<dynamic> apiList = [];
+          if (res.data is List) {
+            apiList = res.data as List;
+          } else if (res.data is Map && res.data['data'] is List) {
+            apiList = res.data['data'] as List;
+          }
+
+          for (var ad in apiList) {
+            final id = ad['id']?.toString() ?? '';
+            // Jangan duplikat jika sudah ada di lokal
+            if (!combined.any((c) => c['id'] == id)) {
+              combined.add({
+                'id': id,
+                'donor_name': (ad['donor_name'] ?? ad['donor_email'] ?? 'Donatur Supabase').toString(),
+                'donor_email': (ad['donor_email'] ?? 'donatur@asuhkita.id').toString(),
+                'child_alias': (ad['child_alias'] ?? ad['child_name'] ?? 'Anak Asuh').toString(),
+                'child_age': ad['child_age'] ?? 8,
+                'package_name': (ad['need_category'] ?? ad['package_name'] ?? 'Paket Donasi').toString(),
+                'amount_idr': (ad['amount_idr'] is num) ? (ad['amount_idr'] as num).toInt() : 0,
+                'frequency': ad['frequency'] ?? 'Sekali',
+                'date': (ad['created_at'] != null && ad['created_at'].toString().length >= 16)
+                    ? ad['created_at'].toString().substring(0, 16)
+                    : (ad['created_at']?.toString() ?? '-'),
+                'block_hash': ad['block_hash'] ?? '0000${id.hashCode.abs().toRadixString(16)}',
+                'status': ad['status'] ?? 'Terverifikasi Ledger Cloud',
+              });
+            }
+          }
+        }
+      } catch (_) {}
+
+      // Urutkan donasi terbaru di atas
+      combined.sort((a, b) => b['date'].toString().compareTo(a['date'].toString()));
+
+      if (mounted) {
+        setState(() {
+          _donations = combined;
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
-
-    // Gabungkan dengan data donatur terdaftar di panti
-    combined.addAll(_dummyTrackingData);
-
-    setState(() {
-      _donations = combined;
-      _isLoading = false;
-    });
   }
 
   String _formatRupiah(int val) {
@@ -125,19 +122,26 @@ class _DonationTrackingScreenState extends State<DonationTrackingScreen> {
       return donor.contains(q) || child.contains(q) || pkg.contains(q);
     }).toList();
 
-    final totalTersalurkan = _donations.fold<int>(0, (sum, item) => sum + ((item['amount_idr'] as int?) ?? 0));
+    final totalDonasiNyata = _donations.fold<int>(0, (sum, item) => sum + ((item['amount_idr'] as int?) ?? 0));
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Tracking Donasi Donatur'),
+        title: const Text('Riwayat Donasi Donatur', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh Riwayat',
+            onPressed: _loadTrackingData,
+          ),
+        ],
       ),
       body: Column(
         children: [
-          // Banner Ringkasan Tracking
+          // Banner Ringkasan Donasi Riil
           Container(
             padding: const EdgeInsets.all(16),
             color: AppColors.surfaceLight,
@@ -147,10 +151,10 @@ class _DonationTrackingScreenState extends State<DonationTrackingScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Total Donasi Masuk', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                      const Text('Total Donasi Masuk (Riil)', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                       const SizedBox(height: 2),
                       Text(
-                        _formatRupiah(totalTersalurkan),
+                        _formatRupiah(totalDonasiNyata),
                         style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary),
                       ),
                     ],
@@ -160,7 +164,7 @@ class _DonationTrackingScreenState extends State<DonationTrackingScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(20)),
                   child: Text(
-                    '${_donations.length} Transaksi Donasi',
+                    '${_donations.length} Donasi Donatur',
                     style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -170,28 +174,51 @@ class _DonationTrackingScreenState extends State<DonationTrackingScreen> {
 
           // Search Bar
           Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.all(14.0),
             child: TextField(
               onChanged: (val) => setState(() => _searchQuery = val),
               decoration: InputDecoration(
-                hintText: 'Cari nama donatur, anak asuh, atau paket...',
+                hintText: 'Cari donatur, anak asuh, atau kebutuhan...',
+                hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13),
                 prefixIcon: const Icon(Icons.search, color: AppColors.primary),
                 filled: true,
                 fillColor: Colors.white,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
               ),
             ),
           ),
 
-          // List Data Tracking
+          // List Data Tracking Donasi Donatur
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
                 : filtered.isEmpty
-                    ? const Center(child: Text('Tidak ada data donasi yang cocok.'))
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24.0),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.volunteer_activism_outlined, size: 64, color: AppColors.primary.withValues(alpha: 0.3)),
+                              const SizedBox(height: 16),
+                              const Text(
+                                'Belum Ada Riwayat Donasi',
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                              ),
+                              const SizedBox(height: 8),
+                              const Text(
+                                'Riwayat donasi yang dilakukan oleh donatur untuk anak asuh akan otomatis tercatat dan dapat dipantau di sini secara real-time.',
+                                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
                     : ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
                         itemCount: filtered.length,
                         itemBuilder: (context, idx) {
                           final item = filtered[idx];
@@ -200,7 +227,7 @@ class _DonationTrackingScreenState extends State<DonationTrackingScreen> {
                             margin: const EdgeInsets.only(bottom: 12),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                             child: Padding(
-                              padding: const EdgeInsets.all(16.0),
+                              padding: const EdgeInsets.all(14.0),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -210,7 +237,7 @@ class _DonationTrackingScreenState extends State<DonationTrackingScreen> {
                                       Row(
                                         children: [
                                           CircleAvatar(
-                                            backgroundColor: AppColors.primary.withValues(alpha: 0.2),
+                                            backgroundColor: AppColors.primary.withValues(alpha: 0.15),
                                             radius: 18,
                                             child: const Icon(Icons.person, color: AppColors.primary, size: 20),
                                           ),
@@ -220,21 +247,60 @@ class _DonationTrackingScreenState extends State<DonationTrackingScreen> {
                                             children: [
                                               Text(
                                                 item['donor_name'],
-                                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textPrimary),
                                               ),
                                               Text(
                                                 item['donor_email'],
-                                                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                                                style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
                                               ),
                                             ],
                                           ),
                                         ],
                                       ),
+                                      Text(
+                                        _formatRupiah(item['amount_idr']),
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.green),
+                                      ),
+                                    ],
+                                  ),
+                                  const Divider(height: 20),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.favorite, size: 16, color: Colors.redAccent),
+                                      const SizedBox(width: 6),
+                                      Expanded(
+                                        child: Text(
+                                          'Untuk: ${item['child_alias']}',
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
+                                        ),
+                                      ),
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.surfaceLight,
+                                          borderRadius: BorderRadius.circular(6),
+                                          border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                                        ),
+                                        child: Text(
+                                          item['package_name'],
+                                          style: const TextStyle(fontSize: 10, color: AppColors.primaryDark, fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        'Waktu: ${item['date']}',
+                                        style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                         decoration: BoxDecoration(
                                           color: Colors.green.shade50,
-                                          borderRadius: BorderRadius.circular(8),
+                                          borderRadius: BorderRadius.circular(4),
                                         ),
                                         child: Text(
                                           item['status'],
@@ -243,51 +309,27 @@ class _DonationTrackingScreenState extends State<DonationTrackingScreen> {
                                       ),
                                     ],
                                   ),
-                                  const Divider(height: 20),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          const Text('Mendonasi Anak:', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                                          Text(
-                                            '${item['child_alias']} (${item['child_age']} th)',
-                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.primary),
-                                          ),
-                                        ],
-                                      ),
-                                      Column(
-                                        crossAxisAlignment: CrossAxisAlignment.end,
-                                        children: [
-                                          const Text('Total Donasi:', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                                          Text(
-                                            _formatRupiah(item['amount_idr']),
-                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black87),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
                                   const SizedBox(height: 8),
                                   Container(
-                                    padding: const EdgeInsets.all(8),
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                     decoration: BoxDecoration(
                                       color: Colors.grey.shade100,
-                                      borderRadius: BorderRadius.circular(8),
+                                      borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
-                                        Text('Jenis: ${item['package_name']}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500)),
-                                        Text(item['date'], style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
+                                        const Icon(Icons.tag, size: 14, color: AppColors.textSecondary),
+                                        const SizedBox(width: 4),
+                                        Expanded(
+                                          child: Text(
+                                            'Hash: ${item['block_hash']}',
+                                            style: const TextStyle(fontSize: 10, fontFamily: 'monospace', color: AppColors.textSecondary),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
                                       ],
                                     ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    'Hash Ledger: ${item['block_hash']}',
-                                    style: TextStyle(fontSize: 10, fontFamily: 'monospace', color: Colors.grey.shade600),
                                   ),
                                 ],
                               ),

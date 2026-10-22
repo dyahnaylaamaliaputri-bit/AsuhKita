@@ -27,6 +27,10 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     _loadChildren();
   }
 
+  String _formatRupiah(num val) {
+    return 'Rp ${val.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}';
+  }
+
   Future<void> _loadChildren() async {
     setState(() => _isLoading = true);
     try {
@@ -47,6 +51,30 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       // 2. Ambil anak yang diinput admin secara lokal
       final newKids = await _localDb.getNewChildren();
 
+      // 3. Ambil riwayat donasi untuk hitung dana terkumpul & donatur per anak
+      final localDonations = await _localDb.getCachedDonations();
+      final allDonations = List<Map<String, dynamic>>.from(localDonations);
+      try {
+        final donRes = await DioClient().dio.get('/donations');
+        if (donRes.statusCode == 200) {
+          List<dynamic> apiDonations = [];
+          if (donRes.data is List) {
+            apiDonations = donRes.data as List;
+          } else if (donRes.data is Map && donRes.data['data'] is List) {
+            apiDonations = donRes.data['data'] as List;
+          }
+          for (var ad in apiDonations) {
+            final id = ad['id']?.toString() ?? '';
+            if (!allDonations.any((d) => d['id']?.toString() == id)) {
+              allDonations.add(Map<String, dynamic>.from(ad));
+            }
+          }
+        }
+      } catch (_) {}
+
+      // 4. Ambil receipts pengeluaran
+      final receipts = await _localDb.getReceipts();
+
       // Gabungkan: API + lokal baru (deduplikasi by name)
       final Map<String, Map<String, dynamic>> map = {};
 
@@ -65,6 +93,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
             'target': (k['target'] is num) ? (k['target'] as num).toDouble() : 500000.0,
             'dream': k['dream'] ?? '',
             'hobby': k['hobby'] ?? '',
+            'category_budgets': k['category_budgets'] ?? k['categoryBudgets'] ?? '',
           };
         }
       }
@@ -74,6 +103,70 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
         if (name.isNotEmpty) {
           map[name.toLowerCase()] = Map<String, dynamic>.from(k);
         }
+      }
+
+      // Hitung agregasi per anak (tanpa dobel nama)
+      for (var key in map.keys) {
+        final child = map[key]!;
+        final cName = (child['name'] ?? child['alias'] ?? '').toString().toLowerCase();
+
+        // Donasi masuk untuk anak ini
+        final childDonations = allDonations.where((d) {
+          final alias = (d['child_alias'] ?? '').toString().toLowerCase();
+          return alias == cName;
+        }).toList();
+
+        int totalCollected = 0;
+        final donorsSet = <String>{};
+        for (var cd in childDonations) {
+          final amt = (cd['amount_idr'] is num) ? (cd['amount_idr'] as num).toInt() : 0;
+          totalCollected += amt;
+          final dName = (cd['donor_name'] ?? cd['donor_email'] ?? cd['sponsorship_id'] ?? '').toString().trim();
+          if (dName.isNotEmpty) {
+            donorsSet.add(dName.toLowerCase());
+          }
+        }
+
+        // Pengeluaran nota untuk anak ini
+        final childReceipts = receipts.where((r) {
+          final rName = (r['childName'] ?? r['child_name'] ?? '').toString().toLowerCase();
+          return rName == cName;
+        }).toList();
+
+        int totalSpent = 0;
+        for (var cr in childReceipts) {
+          final amt = (cr['amount'] is num) ? (cr['amount'] as num).toInt() : 0;
+          totalSpent += amt;
+        }
+
+        // Parse category budgets map
+        Map<String, double> catBudgets = {};
+        final rawCatBudgets = child['category_budgets'] ?? child['categoryBudgets'];
+        if (rawCatBudgets != null && rawCatBudgets.toString().isNotEmpty) {
+          try {
+            final decoded = jsonDecode(rawCatBudgets.toString());
+            if (decoded is Map) {
+              decoded.forEach((k, v) {
+                catBudgets[k.toString()] = (v is num) ? v.toDouble() : double.tryParse(v.toString()) ?? 0.0;
+              });
+            }
+          } catch (_) {}
+        }
+        if (catBudgets.isEmpty) {
+          final needsStr = (child['urgentNeeds'] ?? child['need_category'] ?? 'Pendidikan').toString();
+          final parts = needsStr.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+          final targetTotal = (child['target'] is num) ? (child['target'] as num).toDouble() : 500000.0;
+          final perCat = parts.isNotEmpty ? (targetTotal / parts.length) : targetTotal;
+          for (var p in parts) {
+            catBudgets[p] = perCat;
+          }
+        }
+
+        child['totalDonations'] = totalCollected;
+        child['donorCount'] = donorsSet.isNotEmpty ? donorsSet.length : (childDonations.isNotEmpty ? 1 : 0);
+        child['totalSpent'] = totalSpent;
+        child['categoryBudgetsMap'] = catBudgets;
+        child['childDonationsList'] = childDonations;
       }
 
       if (mounted) {
@@ -109,274 +202,419 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     final hobbyCtrl = TextEditingController();
     final storyCtrl = TextEditingController();
     final cityCtrl = TextEditingController(text: 'Peduli Anak Lombok');
-    final targetCtrl = TextEditingController(text: '500000');
-    String selectedNeed = 'Pendidikan';
     String selectedGender = 'Laki-laki';
     String? base64Image;
+
+    // Multi-Kategori Kebutuhan & Input Budget per masing-masing kategori (Butir 4)
+    final availableCategories = [
+      'Pendidikan',
+      'Nutrisi & Makanan',
+      'Kesehatan',
+      'Pakaian & Tempat Tinggal',
+      'Perlengkapan Ibadah',
+      'Pengembangan Bakat',
+    ];
+    final Set<String> selectedNeeds = {'Pendidikan'};
+    final Map<String, TextEditingController> budgetControllers = {
+      'Pendidikan': TextEditingController(text: '1500000'),
+    };
 
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModalState) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          padding: EdgeInsets.only(
-            top: 20,
-            left: 20,
-            right: 20,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Center(
-                  child: Container(
-                    width: 48,
-                    height: 5,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Tambah Data Anak Asuh Baru',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-                ),
-                const Text(
-                  'Data akan langsung tersimpan & muncul di halaman donatur.',
-                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                ),
-                const SizedBox(height: 16),
-                Center(
-                  child: GestureDetector(
-                    onTap: () async {
-                      final XFile? photo = await _picker.pickImage(source: ImageSource.gallery, maxWidth: 600);
-                      if (photo != null) {
-                        final bytes = await photo.readAsBytes();
-                        setModalState(() {
-                          base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
-                        });
-                      }
-                    },
-                    child: Container(
-                      width: 100,
-                      height: 100,
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceLight,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppColors.primary, width: 2),
-                      ),
-                      child: base64Image != null
-                          ? ClipRRect(
-                              borderRadius: BorderRadius.circular(14),
-                              child: Image.memory(
-                                base64Decode(base64Image!.split(',').last),
-                                fit: BoxFit.cover,
-                              ),
-                            )
-                          : Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.add_a_photo, color: AppColors.primary, size: 30),
-                                const SizedBox(height: 4),
-                                const Text('Foto Anak', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
-                              ],
-                            ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: nameCtrl,
-                  decoration: InputDecoration(
-                    labelText: 'Nama Lengkap Anak',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: ageCtrl,
-                        keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
-                          labelText: 'Usia (Tahun)',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: selectedGender,
-                        items: ['Laki-laki', 'Perempuan']
-                            .map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 13))))
-                            .toList(),
-                        onChanged: (v) => setModalState(() => selectedGender = v ?? 'Laki-laki'),
-                        decoration: InputDecoration(
-                          labelText: 'Jenis Kelamin',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  value: selectedNeed,
-                  items: AppColors.needCategoriesInput
-                      .map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 13))))
-                      .toList(),
-                  onChanged: (v) => setModalState(() => selectedNeed = v ?? 'Pendidikan'),
-                  decoration: InputDecoration(
-                    labelText: 'Kategori Kebutuhan',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: cityCtrl,
-                  decoration: InputDecoration(
-                    labelText: 'Asal Panti / Kota',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: dreamCtrl,
-                  decoration: InputDecoration(
-                    labelText: 'Cita-Cita',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: hobbyCtrl,
-                  decoration: InputDecoration(
-                    labelText: 'Hobi & Minat',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: targetCtrl,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: 'Target Donasi Bulanan (Rp)',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: storyCtrl,
-                  maxLines: 3,
-                  decoration: InputDecoration(
-                    labelText: 'Kisah / Latar Belakang Anak',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    onPressed: () async {
-                      if (nameCtrl.text.trim().isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Nama anak wajib diisi')),
-                        );
-                        return;
-                      }
+        builder: (ctx, setModalState) {
+          // Hitung total target budget secara dinamis dari seluruh kategori yang dipilih
+          double totalBudgetCalculated = 0;
+          for (var cat in selectedNeeds) {
+            final ctrl = budgetControllers[cat];
+            if (ctrl != null) {
+              totalBudgetCalculated += double.tryParse(ctrl.text.replaceAll('.', '').replaceAll(',', '')) ?? 0.0;
+            }
+          }
 
-                      final newKid = {
-                        'id': 'child_${DateTime.now().millisecondsSinceEpoch}',
-                        'name': nameCtrl.text.trim(),
-                        'age': int.tryParse(ageCtrl.text) ?? 8,
-                        'gender': selectedGender,
-                        'city': cityCtrl.text.trim().isEmpty ? 'Peduli Anak Lombok' : cityCtrl.text.trim(),
-                        'urgentNeeds': selectedNeed,
-                        'story': storyCtrl.text.isEmpty ? 'Anak asuh bersemangat untuk menempuh pendidikan.' : storyCtrl.text,
-                        'photo': base64Image ?? '',
-                        'target': double.tryParse(targetCtrl.text) ?? 500000.0,
-                        'dream': dreamCtrl.text.isEmpty ? '' : dreamCtrl.text,
-                        'hobby': hobbyCtrl.text.isEmpty ? '' : hobbyCtrl.text,
-                        'createdAt': DateTime.now().toIso8601String(),
-                      };
-
-                      // Simpan ke lokal DB
-                      await _localDb.insertChild(newKid);
-
-                      // Coba simpan ke Supabase via API
-                      try {
-                        await DioClient().dio.post('/children', data: {
-                          'alias': newKid['name'],
-                          'age': newKid['age'],
-                          'gender': newKid['gender'],
-                          'need_category': newKid['urgentNeeds'],
-                          'story_summary': newKid['story'],
-                          'avatar': newKid['photo'],
-                          'orphanage_city': newKid['city'],
-                          'target': newKid['target'],
-                          'dream': newKid['dream'],
-                          'hobby': newKid['hobby'],
-                        });
-                      } catch (_) {
-                        // Offline: sudah tersimpan lokal
-                      }
-
-                      if (ctx.mounted) {
-                        Navigator.pop(ctx);
-                      }
-                      _loadChildren();
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Anak asuh "${nameCtrl.text}" berhasil ditambahkan!'),
-                            backgroundColor: AppColors.primary,
-                          ),
-                        );
-                      }
-                    },
-                    child: const Text('Simpan & Promosikan Anak', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                  ),
-                ),
-              ],
+          return Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
             ),
-          ),
-        ),
+            padding: EdgeInsets.only(
+              top: 20,
+              left: 20,
+              right: 20,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 48,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Tambah Data Anak Asuh Baru',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                  ),
+                  const Text(
+                    'Kategori kebutuhan bisa lebih dari satu dan dapat diinput budget per kategori.',
+                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  ),
+                  const SizedBox(height: 16),
+                  Center(
+                    child: GestureDetector(
+                      onTap: () async {
+                        final XFile? photo = await _picker.pickImage(source: ImageSource.gallery, maxWidth: 600);
+                        if (photo != null) {
+                          final bytes = await photo.readAsBytes();
+                          setModalState(() {
+                            base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+                          });
+                        }
+                      },
+                      child: Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceLight,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppColors.primary, width: 2),
+                        ),
+                        child: base64Image != null
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(14),
+                                child: Image.memory(
+                                  base64Decode(base64Image!.split(',').last),
+                                  fit: BoxFit.cover,
+                                ),
+                              )
+                            : Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: const [
+                                  Icon(Icons.add_a_photo, color: AppColors.primary, size: 30),
+                                  SizedBox(height: 4),
+                                  Text('Foto Anak', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                                ],
+                              ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: nameCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Nama Lengkap Anak',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: ageCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            labelText: 'Usia (Tahun)',
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: selectedGender,
+                          items: ['Laki-laki', 'Perempuan']
+                              .map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 13))))
+                              .toList(),
+                          onChanged: (v) => setModalState(() => selectedGender = v ?? 'Laki-laki'),
+                          decoration: InputDecoration(
+                            labelText: 'Jenis Kelamin',
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  // ==================== PILIHAN MULTI KATEGORI KEBUTUHAN ====================
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Kategori Kebutuhan (Bisa Pilih > 1):',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '${selectedNeeds.length} Dipilih',
+                          style: const TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: availableCategories.map((cat) {
+                      final isSelected = selectedNeeds.contains(cat);
+                      return FilterChip(
+                        selected: isSelected,
+                        label: Text(
+                          cat,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            color: isSelected ? Colors.white : AppColors.textPrimary,
+                          ),
+                        ),
+                        selectedColor: AppColors.primary,
+                        checkmarkColor: Colors.white,
+                        backgroundColor: AppColors.surfaceLight,
+                        onSelected: (bool selected) {
+                          setModalState(() {
+                            if (selected) {
+                              selectedNeeds.add(cat);
+                              budgetControllers.putIfAbsent(cat, () => TextEditingController(text: '1000000'));
+                            } else {
+                              if (selectedNeeds.length > 1) {
+                                selectedNeeds.remove(cat);
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Paling sedikit 1 kategori kebutuhan harus dipilih')),
+                                );
+                              }
+                            }
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // ==================== DYNAMIC FIELD INPUT BUDGET PER KATEGORI ====================
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceLight,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: const [
+                            Icon(Icons.payments_outlined, color: AppColors.primary, size: 18),
+                            SizedBox(width: 6),
+                            Text(
+                              'Input Target Budget Per Masing-Masing Kategori:',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primaryDark),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        ...selectedNeeds.map((cat) {
+                          final ctrl = budgetControllers.putIfAbsent(cat, () => TextEditingController(text: '1000000'));
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: TextField(
+                              controller: ctrl,
+                              keyboardType: TextInputType.number,
+                              onChanged: (_) => setModalState(() {}),
+                              decoration: InputDecoration(
+                                prefixText: 'Rp ',
+                                labelText: 'Budget Kebutuhan: $cat',
+                                hintText: 'Contoh: 2000000',
+                                filled: true,
+                                fillColor: Colors.white,
+                                isDense: true,
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  borderSide: const BorderSide(color: AppColors.primary, width: 2),
+                                ),
+                              ),
+                            ),
+                          );
+                        }),
+                        const Divider(),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Total Target Seluruh Kebutuhan:',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                            ),
+                            Text(
+                              _formatRupiah(totalBudgetCalculated),
+                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.primary),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  TextField(
+                    controller: cityCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Asal Panti / Kota',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: dreamCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Cita-Cita',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: hobbyCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Hobi & Minat',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: storyCtrl,
+                    maxLines: 3,
+                    decoration: InputDecoration(
+                      labelText: 'Kisah / Latar Belakang Anak',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () async {
+                        if (nameCtrl.text.trim().isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Nama anak wajib diisi')),
+                          );
+                          return;
+                        }
+
+                        // Buat map category_budgets
+                        final Map<String, double> catBudgetsMap = {};
+                        for (var cat in selectedNeeds) {
+                          final ctrl = budgetControllers[cat];
+                          final val = double.tryParse(ctrl?.text.replaceAll('.', '').replaceAll(',', '') ?? '0') ?? 500000.0;
+                          catBudgetsMap[cat] = val;
+                        }
+                        final totalTarget = catBudgetsMap.values.fold<double>(0.0, (sum, val) => sum + val);
+
+                        final newKid = {
+                          'id': 'child_${DateTime.now().millisecondsSinceEpoch}',
+                          'name': nameCtrl.text.trim(),
+                          'age': int.tryParse(ageCtrl.text) ?? 8,
+                          'gender': selectedGender,
+                          'city': cityCtrl.text.trim().isEmpty ? 'Peduli Anak Lombok' : cityCtrl.text.trim(),
+                          'urgentNeeds': selectedNeeds.join(', '),
+                          'category_budgets': jsonEncode(catBudgetsMap),
+                          'story': storyCtrl.text.isEmpty ? 'Anak asuh bersemangat untuk menempuh masa depan.' : storyCtrl.text,
+                          'photo': base64Image ?? '',
+                          'target': totalTarget > 0 ? totalTarget : 500000.0,
+                          'dream': dreamCtrl.text.isEmpty ? '' : dreamCtrl.text,
+                          'hobby': hobbyCtrl.text.isEmpty ? '' : hobbyCtrl.text,
+                          'createdAt': DateTime.now().toIso8601String(),
+                        };
+
+                        // Simpan ke SQLite lokal
+                        await _localDb.insertChild(newKid);
+
+                        // Coba sync ke Supabase
+                        try {
+                          await DioClient().dio.post('/children', data: {
+                            'alias': newKid['name'],
+                            'age': newKid['age'],
+                            'gender': newKid['gender'],
+                            'need_category': newKid['urgentNeeds'],
+                            'story_summary': newKid['story'],
+                            'avatar': newKid['photo'],
+                            'orphanage_city': newKid['city'],
+                            'target': newKid['target'],
+                            'dream': newKid['dream'],
+                            'hobby': newKid['hobby'],
+                            'category_budgets': newKid['category_budgets'],
+                          });
+                        } catch (_) {}
+
+                        if (ctx.mounted) {
+                          Navigator.pop(ctx);
+                        }
+                        _loadChildren();
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Anak asuh "${nameCtrl.text}" berhasil disimpan dengan ${selectedNeeds.length} kategori kebutuhan!'),
+                              backgroundColor: AppColors.primary,
+                            ),
+                          );
+                        }
+                      },
+                      child: const Text('Simpan & Promosikan Anak', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
 
   void _showChildDetailAndReceiptDialog(Map<String, dynamic> child) {
+    final childName = (child['name'] ?? child['alias'] ?? 'Anak Asuh').toString();
+    final catBudgetsMap = (child['categoryBudgetsMap'] as Map<String, double>?) ?? {};
+    final totalDonations = (child['totalDonations'] as int?) ?? 0;
+    final totalTarget = ((child['target'] is num) ? (child['target'] as num).toDouble() : 500000.0);
+    final donorCount = (child['donorCount'] as int?) ?? 0;
+    final childDonations = (child['childDonationsList'] as List<dynamic>?) ?? [];
+    final percentOverall = (totalTarget > 0 ? (totalDonations / totalTarget * 100) : 0.0).clamp(0.0, 100.0);
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
         return Container(
-          height: MediaQuery.of(ctx).size.height * 0.85,
+          height: MediaQuery.of(ctx).size.height * 0.90,
           decoration: const BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -411,7 +649,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  child['name'] ?? child['alias'] ?? 'Anak Asuh',
+                                  childName,
                                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                                 ),
                                 const SizedBox(height: 4),
@@ -437,7 +675,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 14),
                       Text(
                         'Cita-cita: ${child['dream'] ?? '-'} | Hobi: ${child['hobby'] ?? '-'}',
                         style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.textPrimary),
@@ -447,9 +685,247 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                         child['story'] ?? child['story_summary'] ?? 'Belum ada kisah latar belakang.',
                         style: const TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.4),
                       ),
-                      const Divider(height: 32),
-                      
-                      // Transparency Section
+                      const Divider(height: 28),
+
+                      // ==================== KARTU STATUS BUDGET & MULTI-DONATUR ====================
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [AppColors.primaryDark, AppColors.primary],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'Status Pendanaan Anak',
+                                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    '👥 $donorCount Donatur Mendampingi',
+                                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Terkumpul: ${_formatRupiah(totalDonations)}',
+                                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                                ),
+                                Text(
+                                  'Target: ${_formatRupiah(totalTarget)}',
+                                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: LinearProgressIndicator(
+                                value: percentOverall / 100,
+                                minHeight: 8,
+                                backgroundColor: Colors.white24,
+                                valueColor: const AlwaysStoppedAnimation<Color>(Colors.greenAccent),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: Text(
+                                '${percentOverall.toStringAsFixed(1)}% Terpenuhi',
+                                style: const TextStyle(color: Colors.white70, fontSize: 11),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // ==================== RINCIAN PER KATEGORI KEBUTUHAN (BUTIR 3 & 4) ====================
+                      const Text(
+                        'Rincian Budget & Status Per Kategori:',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textPrimary),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Donatur dapat mendanai lebih dari 2 orang sampai target kategori terpenuhi.',
+                        style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                      ),
+                      const SizedBox(height: 10),
+                      if (catBudgetsMap.isEmpty)
+                        const Text('Tidak ada rincian kategori.', style: TextStyle(fontSize: 12, color: AppColors.textSecondary))
+                      else
+                        Column(
+                          children: catBudgetsMap.entries.map((entry) {
+                            final catName = entry.key;
+                            final catTarget = entry.value;
+
+                            // Hitung dana terkumpul untuk kategori ini
+                            int catCollected = 0;
+                            int catDonorCount = 0;
+                            for (var d in childDonations) {
+                              final pkg = (d['package_name'] ?? d['need_category'] ?? '').toString();
+                              if (pkg.toLowerCase().contains(catName.toLowerCase()) || catBudgetsMap.length == 1) {
+                                catCollected += ((d['amount_idr'] is num) ? (d['amount_idr'] as num).toInt() : 0);
+                                catDonorCount++;
+                              }
+                            }
+                            if (catBudgetsMap.length > 1 && catCollected == 0 && totalDonations > 0) {
+                              // Proporsional jika belum terpetakan paket
+                              catCollected = (totalDonations * (catTarget / totalTarget)).toInt();
+                            }
+
+                            final isFulfilled = catCollected >= catTarget;
+                            final remaining = (catTarget - catCollected).clamp(0, catTarget.toInt());
+
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: isFulfilled ? Colors.green.shade50 : AppColors.surfaceLight,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isFulfilled ? Colors.green.shade300 : AppColors.primary.withValues(alpha: 0.2),
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        catName,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                          color: isFulfilled ? Colors.green.shade800 : AppColors.textPrimary,
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: isFulfilled ? Colors.green : Colors.orange,
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          isFulfilled ? '✅ Terpenuhi ($catDonorCount Donatur)' : 'Kurang ${_formatRupiah(remaining)} ($catDonorCount Donatur)',
+                                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text('Target: ${_formatRupiah(catTarget)}', style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                                      Text('Terkumpul: ${_formatRupiah(catCollected)}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primaryDark)),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(6),
+                                    child: LinearProgressIndicator(
+                                      value: catTarget > 0 ? (catCollected / catTarget).clamp(0.0, 1.0) : 0.0,
+                                      minHeight: 6,
+                                      backgroundColor: Colors.grey[200],
+                                      valueColor: AlwaysStoppedAnimation<Color>(isFulfilled ? Colors.green : AppColors.primary),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      const SizedBox(height: 16),
+
+                      // ==================== DAFTAR DONATUR YANG TELAH BERDONASI ====================
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Riwayat Donatur ($donorCount Donatur):',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textPrimary),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      if (childDonations.isEmpty)
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.grey.shade200),
+                          ),
+                          child: const Center(
+                            child: Text(
+                              'Belum ada donatur yang memberikan dana untuk anak ini.',
+                              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                            ),
+                          ),
+                        )
+                      else
+                        Column(
+                          children: childDonations.map((d) {
+                            final dName = (d['donor_name'] ?? d['donor_email'] ?? 'Donatur Peduli').toString();
+                            final amt = (d['amount_idr'] is num) ? (d['amount_idr'] as num).toInt() : 0;
+                            final date = (d['created_at'] ?? '').toString();
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 6),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: Colors.grey.shade200),
+                              ),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 14,
+                                    backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                                    child: const Icon(Icons.volunteer_activism, size: 14, color: AppColors.primary),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(dName, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                        Text(date.isNotEmpty ? date.substring(0, date.length > 16 ? 16 : date.length) : '-', style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+                                      ],
+                                    ),
+                                  ),
+                                  Text(
+                                    _formatRupiah(amt),
+                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.green),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      const Divider(height: 28),
+
+                      // ==================== SECTION NOTA / LAPORAN BELANJA ANAK ====================
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -457,12 +933,12 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Laporan Keuangan & Nota',
-                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textPrimary),
+                                'Laporan Pengeluaran & Nota',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.textPrimary),
                               ),
                               Text(
-                                'Transparansi untuk donatur (On-Chain)',
-                                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                'Transparansi belanja khusus untuk anak ini',
+                                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
                               ),
                             ],
                           ),
@@ -484,7 +960,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                       const SizedBox(height: 12),
 
                       FutureBuilder<List<Map<String, dynamic>>>(
-                        future: _loadReceiptsForChild(child['name'] ?? child['alias'] ?? ''),
+                        future: _loadReceiptsForChild(childName),
                         builder: (context, snapshot) {
                           if (snapshot.connectionState == ConnectionState.waiting) {
                             return const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator(color: AppColors.primary)));
@@ -860,7 +1336,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                         style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
                                       ),
                                       const SizedBox(height: 6),
-                                      Row(
+                                      Wrap(
+                                        spacing: 6,
+                                        runSpacing: 4,
                                         children: [
                                           Container(
                                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -874,10 +1352,30 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                               style: const TextStyle(fontSize: 10, color: AppColors.primaryDark, fontWeight: FontWeight.bold),
                                             ),
                                           ),
-                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.secondary.withValues(alpha: 0.1),
+                                              borderRadius: BorderRadius.circular(6),
+                                            ),
+                                            child: Text(
+                                              '👥 ${child['donorCount'] ?? 0} Donatur',
+                                              style: const TextStyle(fontSize: 10, color: AppColors.secondary, fontWeight: FontWeight.bold),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
                                           Text(
-                                            'Target: Rp ${(child['target'] ?? 500000).toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}',
-                                            style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                                            'Terkumpul: ${_formatRupiah((child['totalDonations'] as int?) ?? 0)}',
+                                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.green),
+                                          ),
+                                          Text(
+                                            'Target: ${_formatRupiah(((child['target'] is num) ? (child['target'] as num).toDouble() : 500000.0))}',
+                                            style: const TextStyle(fontSize: 10, color: AppColors.textSecondary),
                                           ),
                                         ],
                                       ),

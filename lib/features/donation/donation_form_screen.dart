@@ -1,14 +1,13 @@
+import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-// Letak file: mobile/lib/features/donation/donation_form_screen.dart
-// Fungsi: UI Form Donasi Multi-Mata Uang, Konversi Rupiah Otomatis, Konfirmasi Biometrik, dan Antrean Donasi Offline (PBI-027, PBI-028, PBI-030, PBI-057)
-// Upgrade : Kurs real-time via ExchangeRateService (PBI-048, FR-43)
-
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../core/app_colors.dart';
 import '../../core/dio_client.dart';
 import '../../data/local_db.dart';
+import '../auth/auth_provider.dart';
 import '../../services/exchange_rate_service.dart';
 
 class DonationFormScreen extends StatefulWidget {
@@ -90,6 +89,80 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
       );
       return;
     }
+
+    // ============================================================
+    // VALIDASI PEMENUHAN BUDGET KATEGORI KEBUTUHAN (BUTIR 3)
+    // Satu anak bisa > 2 donatur, maksimal donatur menyumbang jika budget kategori terpenuhi
+    // ============================================================
+    try {
+      final childAlias = (widget.childData['alias'] ?? widget.childData['name'] ?? '').toString().trim().toLowerCase();
+      final categoryName = (widget.packageData['name'] ?? widget.childData['need_category'] ?? widget.childData['urgentNeeds'] ?? 'Pendidikan').toString();
+      
+      // Hitung target kategori
+      double categoryBudget = (widget.packageData['price_idr'] is num) ? (widget.packageData['price_idr'] as num).toDouble() : 0.0;
+      if (categoryBudget <= 0 && widget.childData['target'] is num) {
+        categoryBudget = (widget.childData['target'] as num).toDouble();
+      }
+
+      // Cek category_budgets JSON jika ada
+      final rawCatBudgets = widget.childData['category_budgets'] ?? widget.childData['categoryBudgets'];
+      if (rawCatBudgets != null && rawCatBudgets.toString().isNotEmpty) {
+        try {
+          final decoded = jsonDecode(rawCatBudgets.toString());
+          if (decoded is Map) {
+            for (var entry in decoded.entries) {
+              if (categoryName.toLowerCase().contains(entry.key.toString().toLowerCase())) {
+                categoryBudget = (entry.value is num) ? (entry.value as num).toDouble() : double.tryParse(entry.value.toString()) ?? categoryBudget;
+                break;
+              }
+            }
+          }
+        } catch (_) {}
+      }
+
+      if (categoryBudget > 0) {
+        final localDonations = await LocalDatabase().getCachedDonations();
+        int collectedSoFar = 0;
+        int donorCount = 0;
+        for (var d in localDonations) {
+          final dAlias = (d['child_alias'] ?? '').toString().trim().toLowerCase();
+          if (dAlias == childAlias) {
+            final amt = (d['amount_idr'] is num) ? (d['amount_idr'] as num).toInt() : 0;
+            collectedSoFar += amt;
+            donorCount++;
+          }
+        }
+
+        if (collectedSoFar >= categoryBudget) {
+          if (mounted) {
+            showDialog(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                title: Row(
+                  children: const [
+                    Icon(Icons.check_circle, color: Colors.green, size: 28),
+                    SizedBox(width: 8),
+                    Expanded(child: Text('Budget Kategori Terpenuhi!', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
+                  ],
+                ),
+                content: Text(
+                  'Alhamdulillah! Kebutuhan $categoryName untuk anak asuh ${widget.childData['alias']} sebesar Rp ${categoryBudget.toInt()} sudah 100% terpenuhi oleh $donorCount donatur.\n\nAnda dapat memilih kebutuhan kategori lainnya untuk anak ini atau mendampingi anak asuh yang masih membutuhkan bantuan.',
+                  style: const TextStyle(fontSize: 13, height: 1.4),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Kembali', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            );
+          }
+          return;
+        }
+      }
+    } catch (_) {}
 
     // Tampilkan QR Code Pembayaran (QRIS Dinamis) terlebih dahulu (Permintaan Butir 6)
     _showPaymentQrDialog(amountInput);
@@ -226,10 +299,24 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
 
     setState(() => _isProcessing = true);
 
+    // Ambil identitas donatur dari AuthProvider / SharedPreferences
+    String donorName = 'Donatur Peduli';
+    String donorEmail = 'donatur@asuhkita.id';
+    try {
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+      if (auth.userName.isNotEmpty) donorName = auth.userName;
+      if (auth.userEmail.isNotEmpty) donorEmail = auth.userEmail;
+    } catch (_) {}
+
+    final needCategory = (widget.packageData['name'] ?? widget.childData['need_category'] ?? widget.childData['urgentNeeds'] ?? 'Pendidikan').toString();
+
     final donationPayload = {
       'child_id': widget.childData['id'],
       'child_alias': widget.childData['alias'],
       'package_id': widget.packageData['id'],
+      'donor_name': donorName,
+      'donor_email': donorEmail,
+      'need_category': needCategory,
       'amount_original': amountInput,
       'currency': _selectedCurrency,
       'rate_used': _exchangeRates[_selectedCurrency] ?? 1.0,
@@ -267,6 +354,9 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
       'id': 'don_${DateTime.now().millisecondsSinceEpoch}',
       'sponsorship_id': 'sp_${DateTime.now().millisecondsSinceEpoch}',
       'child_alias': widget.childData['alias'],
+      'donor_name': donorName,
+      'donor_email': donorEmail,
+      'need_category': needCategory,
       'amount_original': amountInput,
       'currency': _selectedCurrency,
       'rate_used': _exchangeRates[_selectedCurrency] ?? 1.0,

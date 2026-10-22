@@ -36,11 +36,23 @@ class _HomeScreenState extends State<HomeScreen> {
   int _sponsoredCount = 0;
   int _totalPlatformChildren = 0;
   int _totalPlatformDonors = 0;
+  int _totalAdminFunds = 0;
 
   @override
   void initState() {
     super.initState();
     _loadData();
+  }
+
+  String _formatCompactRupiah(int val) {
+    if (val >= 1000000000) {
+      return 'Rp ${(val / 1000000000).toStringAsFixed(1)}M';
+    } else if (val >= 1000000) {
+      return 'Rp ${(val / 1000000).toStringAsFixed(1)}Jt';
+    } else if (val >= 1000) {
+      return 'Rp ${(val / 1000).toStringAsFixed(0)}Rb';
+    }
+    return 'Rp $val';
   }
 
   Future<void> _loadData() async {
@@ -91,14 +103,49 @@ class _HomeScreenState extends State<HomeScreen> {
         totalKids = uniqueKids.length;
       }
 
-      // Hitung donatur unik dari riwayat
+      // ============================================================
+      // TOTAL DANA & DONATUR TERINTEGRASI SUPABASE + SQLITE (NON STATIS)
+      // ============================================================
       final donorSet = <String>{};
+      int totalFundsCalculated = 0;
+
+      // 1. Dari donasi lokal SQLite
       for (var d in localDonations) {
-        if (d['sponsorship_id'] != null && d['sponsorship_id'].toString().isNotEmpty) {
-          donorSet.add(d['sponsorship_id'].toString());
+        final amt = (d['amount_idr'] is num) ? (d['amount_idr'] as num).toInt() : 0;
+        totalFundsCalculated += amt;
+        final donorKey = (d['donor_name'] ?? d['sponsorship_id'] ?? '').toString().trim();
+        if (donorKey.isNotEmpty) {
+          donorSet.add(donorKey.toLowerCase());
         }
       }
-      final totalDonors = donorSet.isNotEmpty ? donorSet.length : 0;
+
+      // 2. Coba sinkronisasi riwayat donasi dari Supabase API
+      try {
+        final donRes = await DioClient().dio.get('/donations');
+        if (donRes.statusCode == 200) {
+          List<dynamic> apiDonations = [];
+          if (donRes.data is List) {
+            apiDonations = donRes.data as List;
+          } else if (donRes.data is Map && donRes.data['data'] is List) {
+            apiDonations = donRes.data['data'] as List;
+          }
+          for (var ad in apiDonations) {
+            final amt = (ad['amount_idr'] is num) ? (ad['amount_idr'] as num).toInt() : 0;
+            // Jika belum terhitung di lokal
+            final donId = ad['id']?.toString() ?? '';
+            final alreadyInLocal = localDonations.any((ld) => ld['id']?.toString() == donId);
+            if (!alreadyInLocal && amt > 0) {
+              totalFundsCalculated += amt;
+              final dName = (ad['donor_name'] ?? ad['donor_email'] ?? '').toString().trim();
+              if (dName.isNotEmpty) {
+                donorSet.add(dName.toLowerCase());
+              }
+            }
+          }
+        }
+      } catch (_) {}
+
+      final totalDonors = donorSet.isNotEmpty ? donorSet.length : (localDonations.isNotEmpty ? 1 : 0);
 
       // Hitung anak asuh yang didampingi oleh donatur ini (dari riwayat donasi/sponsorship)
       final sponsoredKidSet = <String>{};
@@ -116,6 +163,7 @@ class _HomeScreenState extends State<HomeScreen> {
           _sponsoredCount = sponsoredKidSet.length;
           _totalPlatformChildren = totalKids;
           _totalPlatformDonors = totalDonors;
+          _totalAdminFunds = totalFundsCalculated;
         });
       }
     } catch (_) {}
@@ -210,7 +258,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 6),
                   Text(
                     isAdmin
-                        ? 'Kelola panti asuhan, input nota belanja transparan, dan pantau donatur & kotak amal IoT.'
+                        ? 'Kelola data anak asuh, pantau laporan keuangan terpadu, dan lacak donasi donatur terintegrasi Supabase.'
                         : 'Terima kasih telah membersamai mimpi dan masa depan anak-anak panti asuhan melalui transparansi teknologi.',
                     style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
                   ),
@@ -227,7 +275,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(width: 10),
                   _buildMetricCard('Total Donatur', '$_totalPlatformDonors Orang', Icons.volunteer_activism, AppColors.primary),
                   const SizedBox(width: 10),
-                  _buildMetricCard('Dana Kotak IoT', 'Lihat', Icons.savings, AppColors.secondary),
+                  _buildMetricCard('Total Dana Masuk', _formatCompactRupiah(_totalAdminFunds), Icons.account_balance_wallet, AppColors.secondary),
                 ],
               )
             else
@@ -274,24 +322,24 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   _buildFeatureCard(
                     context,
-                    title: 'Dana Kotak IoT',
-                    subtitle: 'Total dana masuk sensor',
-                    icon: Icons.savings,
-                    color: AppColors.secondary,
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const IotDonationScreen())),
+                    title: 'Riwayat Donasi Masuk',
+                    subtitle: 'Riwayat donasi donatur',
+                    icon: Icons.receipt_long,
+                    color: AppColors.accent1,
+                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DonationTrackingScreen())),
                   ),
                   _buildFeatureCard(
                     context,
-                    title: 'Kelola Anak & Nota',
-                    subtitle: 'Input & upload nota',
+                    title: 'Kelola Anak & Budget',
+                    subtitle: 'Multi-kategori & budget',
                     icon: Icons.admin_panel_settings,
                     color: AppColors.primaryDark,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminPanelScreen())),
                   ),
                   _buildFeatureCard(
                     context,
-                    title: 'Dashboard Keuangan',
-                    subtitle: 'Rekap dana & AI statement',
+                    title: 'Laporan Keuangan',
+                    subtitle: 'Rekap total per anak',
                     icon: Icons.account_balance_wallet,
                     color: AppColors.accent2,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FinanceDashboardScreen())),
