@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/app_colors.dart';
+import '../../core/dio_client.dart';
 import '../../data/local_db.dart';
 import '../auth/auth_provider.dart';
 import '../ledger/ledger_screen.dart';
@@ -46,15 +47,48 @@ class _HomeScreenState extends State<HomeScreen> {
       final prefs = await SharedPreferences.getInstance();
       final localDb = LocalDatabase();
       final localDonations = await localDb.getCachedDonations();
-      final count = localDonations.isNotEmpty
-          ? localDonations.length
-          : (prefs.getInt('asuhkita_user_sponsored_count') ?? 0);
       final notifActive = prefs.getBool('asuhkita_notif_active') ?? true;
 
-      // Hitung anak terdaftar di platform untuk admin
-      final cachedKids = await localDb.getCachedChildren();
-      final newKids = await localDb.getNewChildren();
-      final totalKids = cachedKids.length + newKids.length;
+      // ============================================================
+      // INTEGRASI: Ambil jumlah anak dari sumber SAMA seperti Ruang Kasih & Sponsor
+      // Sumber: Supabase API → SQLite cached_children + new_children
+      // ============================================================
+      int totalKids = 0;
+      try {
+        // 1. Coba ambil dari Supabase (sumber utama, sama seperti sponsor & ruang kasih)
+        final res = await DioClient().dio.get('/children');
+        if (res.statusCode == 200) {
+          List<dynamic> apiChildren = [];
+          if (res.data is List && (res.data as List).isNotEmpty) {
+            apiChildren = res.data as List;
+          } else if (res.data is Map && res.data['data'] is List) {
+            apiChildren = res.data['data'] as List;
+          }
+          if (apiChildren.isNotEmpty) {
+            totalKids = apiChildren.length;
+            // Cache ke SQLite supaya sinkron
+            await localDb.cacheChildren(
+              List<Map<String, dynamic>>.from(apiChildren),
+            );
+          }
+        }
+      } catch (_) {}
+
+      // 2. Fallback: hitung dari SQLite lokal (sama seperti Ruang Kasih)
+      if (totalKids == 0) {
+        final cachedKids = await localDb.getCachedChildren();
+        final newKids = await localDb.getNewChildren();
+        // Deduplicate berdasarkan alias (sama seperti Ruang Kasih)
+        final seen = <String>{};
+        final all = [...cachedKids, ...newKids];
+        final uniqueKids = all.where((c) {
+          final name = (c['alias'] ?? c['name'] ?? '').toString().toLowerCase();
+          if (seen.contains(name) || name.isEmpty) return false;
+          seen.add(name);
+          return true;
+        }).toList();
+        totalKids = uniqueKids.length;
+      }
 
       // Hitung donatur unik dari riwayat
       final donorSet = <String>{};
@@ -68,7 +102,8 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         setState(() {
           _isNotificationActive = notifActive;
-          _sponsoredCount = count;
+          // Donatur: tampilkan jumlah anak asuh SAMA PERSIS seperti Ruang Kasih
+          _sponsoredCount = totalKids;
           _totalPlatformChildren = totalKids;
           _totalPlatformDonors = totalDonors;
         });

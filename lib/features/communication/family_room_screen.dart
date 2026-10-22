@@ -319,6 +319,7 @@ class _ChatRoomScreenState extends State<_ChatRoomScreen> {
 
   // ============================================================
   // LOAD RIWAYAT CHAT dari SQLite (persisten, tidak hilang)
+  // Beberapa anak memiliki riwayat obrolan sebelumnya (pre-existing)
   // ============================================================
   Future<void> _loadChatHistory() async {
     setState(() => _isLoading = true);
@@ -328,6 +329,7 @@ class _ChatRoomScreenState extends State<_ChatRoomScreen> {
       final savedMessages = await _localDb.getChatMessages(widget.childAlias);
 
       if (savedMessages.isNotEmpty) {
+        // Ada riwayat chat sebelumnya — load dari SQLite
         for (var msg in savedMessages) {
           _messages.add({
             'sender': msg['sender'] ?? 'admin',
@@ -338,35 +340,87 @@ class _ChatRoomScreenState extends State<_ChatRoomScreen> {
           });
         }
       } else {
-        // Pesan selamat datang otomatis (pertama kali)
-        final welcomeText =
-            'Assalamualaikum! Selamat datang di Ruang Kasih 💛\n\n'
-            'Saya admin panti yang akan membantu menyampaikan pesan Anda ke ${widget.childAlias}.\n\n'
-            '📞 Panggilan suara & video call tersedia di pojok kanan atas.\n'
-            '📎 Anda juga bisa mengirim file/karya sekolah.';
+        // Belum ada riwayat — cek apakah anak ini perlu di-seed percakapan
+        final alias = widget.childAlias;
+        final seededChats = _getPreExistingChats(alias);
 
-        final now = DateTime.now();
-        final timeStr = '${now.hour}:${now.minute.toString().padLeft(2, '0')}';
+        if (seededChats.isNotEmpty) {
+          // Seed riwayat percakapan sebelumnya
+          for (var chat in seededChats) {
+            _messages.add(chat);
+            await _localDb.insertChatMessage(
+              childAlias: alias,
+              sender: chat['sender'],
+              text: chat['text'],
+              type: chat['type'] ?? 'text',
+              fileUrl: chat['fileUrl'] ?? '',
+              time: chat['time'],
+            );
+          }
+        } else {
+          // Anak lainnya: mulai dari kosong, pesan selamat datang saja
+          final now = DateTime.now();
+          final timeStr = '${now.hour}:${now.minute.toString().padLeft(2, '0')}';
+          final welcomeText =
+              'Assalamualaikum! Selamat datang di Ruang Kasih 💛\n\n'
+              'Saya admin panti yang akan membantu menyampaikan pesan Anda ke $alias.\n\n'
+              '📞 Panggilan suara & video call tersedia di pojok kanan atas.\n'
+              '📎 Anda juga bisa mengirim file/karya sekolah.';
 
-        _messages.add({
-          'sender': 'admin',
-          'text': welcomeText,
-          'time': timeStr,
-          'type': 'text',
-        });
+          _messages.add({
+            'sender': 'admin',
+            'text': welcomeText,
+            'time': timeStr,
+            'type': 'text',
+          });
 
-        // Simpan pesan selamat datang ke SQLite
-        await _localDb.insertChatMessage(
-          childAlias: widget.childAlias,
-          sender: 'admin',
-          text: welcomeText,
-          time: timeStr,
-        );
+          await _localDb.insertChatMessage(
+            childAlias: alias,
+            sender: 'admin',
+            text: welcomeText,
+            time: timeStr,
+          );
+        }
       }
     } catch (_) {}
 
     if (mounted) setState(() => _isLoading = false);
     _scrollToBottom();
+  }
+
+  // ============================================================
+  // RIWAYAT OBROLAN SEBELUMNYA (pre-existing) untuk anak tertentu
+  // Hanya anak pertama dan kedua di daftar yang punya riwayat
+  // ============================================================
+  List<Map<String, dynamic>> _getPreExistingChats(String alias) {
+    // Data percakapan pre-existing berdasarkan nama anak
+    final Map<String, List<Map<String, dynamic>>> preChats = {
+      'Bintang': [
+        {'sender': 'admin', 'text': 'Assalamualaikum! Selamat datang di Ruang Kasih 💛\nSaya admin panti yang akan membantu menyampaikan pesan Anda ke Bintang.', 'time': '08:30', 'type': 'text'},
+        {'sender': 'donor', 'text': 'Waalaikumsalam, admin! Saya ingin menanyakan kabar Bintang. Bagaimana perkembangan sekolahnya?', 'time': '08:32', 'type': 'text'},
+        {'sender': 'admin', 'text': 'Alhamdulillah, Bintang sedang semangat belajar! Minggu lalu ia mendapat peringkat 3 di kelas. Ia juga rajin mengikuti les tambahan matematika. 📚✨', 'time': '08:35', 'type': 'text'},
+        {'sender': 'donor', 'text': 'MasyaAllah, senang sekali mendengarnya! Sampaikan ke Bintang bahwa saya bangga dan terus semangat ya belajarnya 💪', 'time': '08:37', 'type': 'text'},
+        {'sender': 'admin', 'text': 'Insya Allah akan kami sampaikan! Bintang pasti sangat senang menerima pesan semangat dari Anda. Jazakallahu khairan atas dukungannya! 🙏💛', 'time': '08:40', 'type': 'text'},
+        {'sender': 'donor', 'text': 'Apakah Bintang sudah mendapatkan seragam baru untuk semester ini?', 'time': '09:15', 'type': 'text'},
+        {'sender': 'admin', 'text': 'Sudah, Bunda/Ayah! Seragam barunya sudah diterima minggu lalu dari donasi yang masuk. Bintang sangat senang sekali. Terima kasih banyak! 🎒', 'time': '09:20', 'type': 'text'},
+      ],
+      'Bulan': [
+        {'sender': 'admin', 'text': 'Assalamualaikum! Selamat datang di Ruang Kasih 💛\nSaya admin panti yang membantu komunikasi antara donatur dan Bulan.', 'time': '10:00', 'type': 'text'},
+        {'sender': 'donor', 'text': 'Waalaikumsalam! Saya mau kirim pesan semangat untuk Bulan. Dia suka menggambar ya?', 'time': '10:05', 'type': 'text'},
+        {'sender': 'admin', 'text': 'Iya benar! Bulan sangat suka menggambar dan mewarnai 🎨 Kemarin ia menggambar pemandangan gunung yang sangat indah. Kami akan kirimkan fotonya nanti ya!', 'time': '10:08', 'type': 'text'},
+        {'sender': 'donor', 'text': 'Wah hebat sekali! Tolong sampaikan ke Bulan: "Bulan, gambaranmu pasti cantik sekali! Terus berkarya ya sayang!" 😊', 'time': '10:12', 'type': 'text'},
+        {'sender': 'admin', 'text': 'Pesan sudah disampaikan! Bulan tersenyum lebar dan bilang "Terima kasih Ayah/Bunda!" 😄💕 Ia sangat senang mendapat perhatian dari donatur.', 'time': '10:30', 'type': 'text'},
+      ],
+      'Awan': [
+        {'sender': 'admin', 'text': 'Assalamualaikum! Selamat datang di Ruang Kasih 💛\nSaya admin panti yang akan membantu komunikasi Anda dengan Awan.', 'time': '14:00', 'type': 'text'},
+        {'sender': 'donor', 'text': 'Halo admin, bagaimana kondisi kesehatan Awan? Saya dengar ia sering sakit.', 'time': '14:05', 'type': 'text'},
+        {'sender': 'admin', 'text': 'Alhamdulillah, kondisi Awan sudah jauh lebih baik sekarang! Berkat donasi untuk pemeriksaan kesehatan berkala, ia rutin minum vitamin dan sudah tidak sering sakit lagi. 🏥💪', 'time': '14:10', 'type': 'text'},
+        {'sender': 'donor', 'text': 'Alhamdulillah, syukurlah! Semoga Awan terus sehat dan semangat belajar. Saya doakan selalu dari sini 🤲', 'time': '14:15', 'type': 'text'},
+        {'sender': 'admin', 'text': 'Aamiin! Terima kasih banyak atas doa dan dukungannya. Awan bilang ingin jadi dokter supaya bisa membantu teman-temannya yang sakit. Semangat terus Awan! 🩺⭐', 'time': '14:20', 'type': 'text'},
+      ],
+    };
+
+    return preChats[alias] ?? [];
   }
 
   // ============================================================
