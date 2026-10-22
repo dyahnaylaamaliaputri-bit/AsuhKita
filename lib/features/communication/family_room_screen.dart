@@ -12,6 +12,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../core/app_colors.dart';
 import '../../core/dio_client.dart';
 import '../../data/local_db.dart';
+import '../sponsor/sponsor_screen.dart';
 
 class FamilyRoomScreen extends StatefulWidget {
   const FamilyRoomScreen({super.key});
@@ -50,63 +51,80 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
   }
 
   // ============================================================
-  // LOAD DATA ANAK & INITIAL SEEDING UNTUK HISTORI REALISTIS
+  // LOAD DATA ANAK ASUH DONATUR (DARI RIWAYAT DONASI/SPONSORSHIP)
   // ============================================================
   Future<void> _loadChildrenAndMessages() async {
     setState(() => _isLoading = true);
 
     try {
-      // 1. Ambil data anak (API Supabase / Local SQLite)
-      List<Map<String, dynamic>> loadedChildren = [];
+      // 1. Ambil data anak asuh yang didampingi donatur dari riwayat donasi/sponsorship lokal
+      final localDonations = await LocalDatabase().getCachedDonations();
+      final sponsoredAliases = <String>{};
+      for (var d in localDonations) {
+        final alias = (d['child_alias'] ?? '').toString().trim();
+        if (alias.isNotEmpty) {
+          sponsoredAliases.add(alias.toLowerCase());
+        }
+      }
+
+      // 2. Ambil data katalog semua anak (API Supabase / Local SQLite)
+      List<Map<String, dynamic>> allCatalog = [];
       try {
         final res = await DioClient().dio.get('/children');
         if (res.statusCode == 200) {
           if (res.data is List && (res.data as List).isNotEmpty) {
-            loadedChildren = List<Map<String, dynamic>>.from(res.data);
+            allCatalog = List<Map<String, dynamic>>.from(res.data);
           } else if (res.data is Map && res.data['data'] is List) {
-            loadedChildren = List<Map<String, dynamic>>.from(res.data['data']);
+            allCatalog = List<Map<String, dynamic>>.from(res.data['data']);
           }
-          if (loadedChildren.isNotEmpty) {
-            await LocalDatabase().cacheChildren(loadedChildren);
+          if (allCatalog.isNotEmpty) {
+            await LocalDatabase().cacheChildren(allCatalog);
           }
         }
       } catch (_) {}
 
       // Fallback: baca dari SQLite lokal
-      if (loadedChildren.isEmpty) {
+      if (allCatalog.isEmpty) {
         final cached = await LocalDatabase().getCachedChildren();
         final newKids = await LocalDatabase().getNewChildren();
-        final all = [...cached, ...newKids];
+        allCatalog = [...cached, ...newKids];
+      }
+
+      // 3. Filter HANYA anak asuh yang dimiliki oleh donatur ini
+      List<Map<String, dynamic>> mySponsoredChildren = [];
+      if (sponsoredAliases.isNotEmpty) {
         final seen = <String>{};
-        loadedChildren = all.where((c) {
-          final name = (c['alias'] ?? c['name'] ?? '').toString().toLowerCase();
-          if (seen.contains(name) || name.isEmpty) return false;
-          seen.add(name);
-          return true;
-        }).toList();
+        for (var child in allCatalog) {
+          final name = (child['alias'] ?? child['name'] ?? '').toString().trim();
+          if (name.isNotEmpty && sponsoredAliases.contains(name.toLowerCase())) {
+            if (!seen.contains(name.toLowerCase())) {
+              seen.add(name.toLowerCase());
+              mySponsoredChildren.add(child);
+            }
+          }
+        }
+
+        // Jika anak ada di riwayat donasi tapi belum ada di katalog, buat entri profilnya
+        for (var alias in sponsoredAliases) {
+          if (!seen.contains(alias)) {
+            seen.add(alias);
+            final titleCase = alias.length > 1 ? '${alias[0].toUpperCase()}${alias.substring(1)}' : alias;
+            mySponsoredChildren.add({
+              'alias': titleCase,
+              'orphanage_city': 'PeduliAnak',
+              'need_category': 'Pendidikan',
+              'avatar': '',
+            });
+          }
+        }
       }
 
-      // Pastikan ada data anak minimal untuk demo
-      if (loadedChildren.isEmpty) {
-        loadedChildren = [
-          {'alias': 'Bintang', 'orphanage_city': 'Mataram, Lombok', 'need_category': 'Pendidikan', 'avatar': ''},
-          {'alias': 'Bulan', 'orphanage_city': 'Mataram, Lombok', 'need_category': 'Kesehatan', 'avatar': ''},
-          {'alias': 'Awan', 'orphanage_city': 'Sumbawa', 'need_category': 'Pendidikan', 'avatar': ''},
-          {'alias': 'Rian', 'orphanage_city': 'Lombok Barat', 'need_category': 'Nutrisi', 'avatar': ''},
-          {'alias': 'Siti', 'orphanage_city': 'Lombok Timur', 'need_category': 'Pendidikan', 'avatar': ''},
-        ];
-      }
+      // KOSONGKAN jika donatur belum memiliki anak asuh (0 anak asuh)
+      // Tidak menggunakan fallback mock dummy data
+      _children = mySponsoredChildren;
 
-      _children = loadedChildren;
-
-      // 2. Cek apakah SQLite sudah memiliki riwayat pesan
-      final hasHistory = await LocalDatabase().hasAnyChatMessages();
-      if (!hasHistory && _children.isNotEmpty) {
-        // Otomatis seed riwayat percakapan sebelumnya untuk 2 anak pertama
-        await _seedInitialConversations();
-      }
-
-      // 3. Load last message untuk setiap anak asuh
+      // 4. Load last message untuk setiap anak asuh yang dimiliki
+      _lastMessages = {};
       for (var child in _children) {
         final alias = (child['alias'] ?? child['name'] ?? '').toString();
         if (alias.isNotEmpty) {
@@ -119,50 +137,7 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
     if (mounted) setState(() => _isLoading = false);
   }
 
-  // Seed riwayat percakapan sebelumnya hanya untuk 2 anak pertama
-  Future<void> _seedInitialConversations() async {
-    final firstChild = (_children[0]['alias'] ?? _children[0]['name'] ?? 'Bintang').toString();
-    final secondChild = _children.length > 1
-        ? (_children[1]['alias'] ?? _children[1]['name'] ?? 'Bulan').toString()
-        : 'Bulan';
 
-    // Riwayat percakapan anak pertama (Topik: Prestasi & Perkembangan Sekolah)
-    final chatsChild1 = [
-      {'sender': 'admin', 'text': 'Assalamualaikum! Selamat datang di Ruang Kasih 💛 Saya admin panti yang mendampingi $firstChild.', 'time': '08:30', 'type': 'text'},
-      {'sender': 'donor', 'text': 'Waalaikumsalam, admin! Bagaimana kabar $firstChild hari ini? Apakah rapor sekolahnya sudah dibagikan?', 'time': '08:32', 'type': 'text'},
-      {'sender': 'admin', 'text': 'Alhamdulillah, kabar baik! Kemarin $firstChild berhasil meraih peringkat 3 di kelasnya 📚✨ Ia sangat bersemangat belajar matematika.', 'time': '08:36', 'type': 'text'},
-      {'sender': 'donor', 'text': 'MasyaAllah, hebat sekali! Tolong sampaikan bahwa saya sangat bangga padanya dan terus semangat belajarnya ya!', 'time': '08:40', 'type': 'text'},
-      {'sender': 'admin', 'text': 'Pesan sudah kami sampaikan! $firstChild tersenyum bahagia dan menitipkan salam hangat untuk Kakak donatur 💛', 'time': '08:45', 'type': 'text'},
-    ];
-
-    for (var c in chatsChild1) {
-      await LocalDatabase().insertChatMessage(
-        childAlias: firstChild,
-        sender: c['sender']!,
-        text: c['text']!,
-        time: c['time']!,
-        type: c['type']!,
-      );
-    }
-
-    // Riwayat percakapan anak kedua (Topik: Hobi Menggambar & Donasi Masuk)
-    final chatsChild2 = [
-      {'sender': 'admin', 'text': 'Assalamualaikum Kak! Salam hangat dari $secondChild di Panti Asuhan Peduli Anak 🌸', 'time': 'Kemarin', 'type': 'text'},
-      {'sender': 'donor', 'text': 'Halo admin, kemarin saya sudah kirimkan paket perlengkapan sekolah untuk $secondChild. Apakah sudah diterima?', 'time': 'Kemarin', 'type': 'text'},
-      {'sender': 'admin', 'text': 'Sudah diterima dengan sangat baik kemarin sore! $secondChild langsung mencoba pensil warna barunya untuk menggambar pemandangan 🎨', 'time': 'Kemarin', 'type': 'text'},
-      {'sender': 'donor', 'text': 'Alhamdulillah, senang mendengarnya! Terus berkarya ya anak pintar!', 'time': 'Kemarin', 'type': 'text'},
-    ];
-
-    for (var c in chatsChild2) {
-      await LocalDatabase().insertChatMessage(
-        childAlias: secondChild,
-        sender: c['sender']!,
-        text: c['text']!,
-        time: c['time']!,
-        type: c['type']!,
-      );
-    }
-  }
 
   String _getTimeAgo(String? createdAt) {
     if (createdAt == null || createdAt.isEmpty) return '';
@@ -221,7 +196,9 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
-          : CustomScrollView(
+          : _children.isEmpty
+              ? _buildEmptyState()
+              : CustomScrollView(
               slivers: [
                 // 1. Search Bar Instagram Style
                 SliverToBoxAdapter(
@@ -405,9 +382,177 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
                   ),
                 ],
 
+                if (activeChats.isEmpty && newChats.isEmpty && _searchQuery.isNotEmpty)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+                      child: Center(
+                        child: Text(
+                          'Tidak ada obrolan dengan nama "$_searchQuery"',
+                          style: const TextStyle(fontSize: 13, color: AppColors.textHint),
+                        ),
+                      ),
+                    ),
+                  ),
+
                 const SliverToBoxAdapter(child: SizedBox(height: 30)),
               ],
             ),
+    );
+  }
+
+  // ============================================================
+  // EMPTY STATE JIKA DONATUR BELUM MEMILIKI ANAK ASUH (0 ANAK)
+  // ============================================================
+  Widget _buildEmptyState() {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              width: 90,
+              height: 90,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.volunteer_activism_outlined,
+                size: 46,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Ruang Kasih Masih Kosong',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Anda belum memiliki anak asuh yang didampingi saat ini. Ruang Kasih akan otomatis menampilkan room chat dengan anak asuh dan pengurus panti setelah Anda melakukan sponsorship/donasi.',
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+                height: 1.5,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceLight,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Column(
+                children: [
+                  _buildBenefitRow(
+                    icon: Icons.chat_bubble_outline,
+                    color: AppColors.primary,
+                    title: 'Pesan Langsung Ramah',
+                    subtitle: 'Kirim salam hangat dan motivasi belajar untuk anak asuh.',
+                  ),
+                  const Divider(height: 20, color: Color(0xFFEEEEEE)),
+                  _buildBenefitRow(
+                    icon: Icons.auto_stories_outlined,
+                    color: AppColors.accent1,
+                    title: 'Pantau Nilai Rapor & Bakat',
+                    subtitle: 'Dapatkan kabar harian, prestasi, dan hasil karya anak asuh.',
+                  ),
+                  const Divider(height: 20, color: Color(0xFFEEEEEE)),
+                  _buildBenefitRow(
+                    icon: Icons.verified_user_outlined,
+                    color: AppColors.accent2,
+                    title: 'Didampingi Pengurus Panti',
+                    subtitle: 'Komunikasi aman, terverifikasi, dan transparan 100%.',
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 28),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SponsorScreen()),
+                  ).then((_) => _loadChildrenAndMessages());
+                },
+                icon: const Icon(Icons.favorite, size: 20),
+                label: const Text(
+                  'Pilih Anak Asuh di Menu Sponsor',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBenefitRow({
+    required IconData icon,
+    required Color color,
+    required String title,
+    required String subtitle,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, size: 20, color: color),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                  height: 1.3,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

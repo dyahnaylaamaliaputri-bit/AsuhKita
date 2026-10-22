@@ -99,11 +99,20 @@ class _HomeScreenState extends State<HomeScreen> {
       }
       final totalDonors = donorSet.isNotEmpty ? donorSet.length : 0;
 
+      // Hitung anak asuh yang didampingi oleh donatur ini (dari riwayat donasi/sponsorship)
+      final sponsoredKidSet = <String>{};
+      for (var d in localDonations) {
+        final alias = (d['child_alias'] ?? '').toString().trim();
+        if (alias.isNotEmpty) {
+          sponsoredKidSet.add(alias.toLowerCase());
+        }
+      }
+
       if (mounted) {
         setState(() {
           _isNotificationActive = notifActive;
-          // Donatur: tampilkan jumlah anak asuh SAMA PERSIS seperti Ruang Kasih
-          _sponsoredCount = totalKids;
+          // Donatur: jumlah anak asuh donatur ini (0 jika belum mendampingi anak asuh)
+          _sponsoredCount = sponsoredKidSet.length;
           _totalPlatformChildren = totalKids;
           _totalPlatformDonors = totalDonors;
         });
