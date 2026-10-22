@@ -24,7 +24,7 @@ class LocalDatabase {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: (db, version) async {
         await _createTables(db);
       },
@@ -134,6 +134,20 @@ class LocalDatabase {
         target REAL,
         dream TEXT,
         hobby TEXT,
+        created_at TEXT
+      )
+    ''');
+
+    // Tabel Riwayat Chat Ruang Kasih (Pesan tersimpan permanen per anak asuh)
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS chat_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        child_alias TEXT NOT NULL,
+        sender TEXT NOT NULL,
+        text TEXT,
+        type TEXT DEFAULT 'text',
+        file_url TEXT,
+        time TEXT,
         created_at TEXT
       )
     ''');
@@ -372,5 +386,49 @@ class LocalDatabase {
   Future<List<Map<String, dynamic>>> getAllFeedbacks() async {
     final db = await database;
     return await db.query('feedback_entries', orderBy: 'created_at DESC');
+  }
+
+  // ==================== OPERASI CHAT RUANG KASIH (RIWAYAT CHAT PERSISTEN) ====================
+  Future<void> insertChatMessage({
+    required String childAlias,
+    required String sender,
+    required String text,
+    String type = 'text',
+    String fileUrl = '',
+    String? time,
+  }) async {
+    final db = await database;
+    final now = DateTime.now();
+    await db.insert('chat_messages', {
+      'child_alias': childAlias,
+      'sender': sender,
+      'text': text,
+      'type': type,
+      'file_url': fileUrl,
+      'time': time ?? '${now.hour}:${now.minute.toString().padLeft(2, '0')}',
+      'created_at': now.toIso8601String(),
+    });
+  }
+
+  Future<List<Map<String, dynamic>>> getChatMessages(String childAlias) async {
+    final db = await database;
+    return await db.query(
+      'chat_messages',
+      where: 'child_alias = ?',
+      whereArgs: [childAlias],
+      orderBy: 'id ASC',
+    );
+  }
+
+  Future<Map<String, dynamic>?> getLastChatMessage(String childAlias) async {
+    final db = await database;
+    final rows = await db.query(
+      'chat_messages',
+      where: 'child_alias = ?',
+      whereArgs: [childAlias],
+      orderBy: 'id DESC',
+      limit: 1,
+    );
+    return rows.isNotEmpty ? rows.first : null;
   }
 }

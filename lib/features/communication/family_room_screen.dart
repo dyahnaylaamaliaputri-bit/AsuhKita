@@ -1,7 +1,8 @@
 // Letak file: mobile/lib/features/communication/family_room_screen.dart
 // Fungsi: Fitur Ruang Kasih — Perantara komunikasi donatur ↔ anak asuh via admin
-// Tampilan awal: Daftar ringkasan anak (seperti DM Instagram)
+// Tampilan awal: Daftar ringkasan anak (seperti DM Instagram) — terintegrasi Supabase + SQLite
 // Klik: Room chat + telepon, video call, pengiriman file karya sekolah
+// Riwayat chat tersimpan permanen di SQLite (tidak hilang saat keluar)
 
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -19,6 +20,7 @@ class FamilyRoomScreen extends StatefulWidget {
 
 class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
   List<Map<String, dynamic>> _children = [];
+  Map<String, Map<String, dynamic>?> _lastMessages = {};
   bool _isLoading = true;
 
   @override
@@ -29,8 +31,13 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
 
   Future<void> _loadChildren() async {
     setState(() => _isLoading = true);
+
+    // ============================================================
+    // INTEGRASI: Ambil data anak SAMA PERSIS seperti dashboard/sponsor
+    // Sumber: Supabase API → SQLite cached_children + new_children
+    // ============================================================
     try {
-      // Coba ambil dari Supabase
+      // 1. Coba ambil dari Supabase (sama seperti sponsor_screen)
       try {
         final res = await DioClient().dio.get('/children');
         if (res.statusCode == 200) {
@@ -39,10 +46,14 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
           } else if (res.data is Map && res.data['data'] is List) {
             _children = List<Map<String, dynamic>>.from(res.data['data']);
           }
+          // Cache ke SQLite supaya sync
+          if (_children.isNotEmpty) {
+            await LocalDatabase().cacheChildren(_children);
+          }
         }
       } catch (_) {}
 
-      // Juga ambil dari local
+      // 2. Fallback: ambil dari SQLite local (cached + admin-inputted)
       if (_children.isEmpty) {
         final cached = await LocalDatabase().getCachedChildren();
         final newKids = await LocalDatabase().getNewChildren();
@@ -55,9 +66,33 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
           return name.isNotEmpty;
         }).toList();
       }
+
+      // 3. Load last message untuk setiap anak (preview di DM list)
+      for (var child in _children) {
+        final alias = (child['alias'] ?? child['name'] ?? '').toString();
+        if (alias.isNotEmpty) {
+          final lastMsg = await LocalDatabase().getLastChatMessage(alias);
+          _lastMessages[alias] = lastMsg;
+        }
+      }
     } catch (_) {}
 
     if (mounted) setState(() => _isLoading = false);
+  }
+
+  String _getTimeAgo(String? createdAt) {
+    if (createdAt == null || createdAt.isEmpty) return '';
+    try {
+      final dt = DateTime.parse(createdAt);
+      final diff = DateTime.now().difference(dt);
+      if (diff.inMinutes < 1) return 'Baru saja';
+      if (diff.inMinutes < 60) return '${diff.inMinutes}m lalu';
+      if (diff.inHours < 24) return '${diff.inHours}j lalu';
+      if (diff.inDays < 7) return '${diff.inDays}h lalu';
+      return '${dt.day}/${dt.month}/${dt.year}';
+    } catch (_) {
+      return '';
+    }
   }
 
   @override
@@ -69,6 +104,13 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh',
+            onPressed: _loadChildren,
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
@@ -81,70 +123,172 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
                       const SizedBox(height: 16),
                       const Text('Belum ada anak asuh.', style: TextStyle(color: AppColors.textSecondary, fontSize: 16)),
                       const SizedBox(height: 8),
-                      const Text('Admin perlu menambahkan data anak terlebih dahulu.', style: TextStyle(color: AppColors.textHint, fontSize: 13)),
+                      const Text(
+                        'Admin perlu menambahkan data anak terlebih dahulu\ndi panel Admin.',
+                        style: TextStyle(color: AppColors.textHint, fontSize: 13),
+                        textAlign: TextAlign.center,
+                      ),
                     ],
                   ),
                 )
-              : ListView.builder(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  itemCount: _children.length,
-                  itemBuilder: (context, idx) {
-                    final child = _children[idx];
-                    final name = child['alias'] ?? child['name'] ?? 'Anak Asuh';
-                    final avatar = child['avatar'] ?? child['photo'] ?? '';
-                    final city = child['orphanage_city'] ?? child['city'] ?? '';
-                    return ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                      leading: CircleAvatar(
-                        radius: 28,
-                        backgroundColor: AppColors.surfaceLight,
-                        backgroundImage: avatar.toString().startsWith('http') ? NetworkImage(avatar) : null,
-                        child: avatar.toString().startsWith('http') ? null : const Icon(Icons.face, color: AppColors.primary, size: 28),
-                      ),
-                      title: Text(
-                        name,
-                        style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-                      ),
-                      subtitle: Text(
-                        city.isNotEmpty ? city : 'Ketuk untuk mulai chat',
+              : Column(
+                  children: [
+                    // Header info
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      color: AppColors.accent2.withValues(alpha: 0.3),
+                      child: Text(
+                        '💬 ${_children.length} anak asuh terdaftar • Ketuk untuk mulai chat',
                         style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                        textAlign: TextAlign.center,
                       ),
-                      trailing: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.accent1.withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Text('Chat', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primaryDark)),
-                      ),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => _ChatRoomScreen(
-                              childAlias: name,
-                              childAvatar: avatar,
+                    ),
+                    // DM List (Instagram-style)
+                    Expanded(
+                      child: ListView.separated(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        itemCount: _children.length,
+                        separatorBuilder: (_, __) => Divider(height: 1, color: Colors.grey.shade200, indent: 78),
+                        itemBuilder: (context, idx) {
+                          final child = _children[idx];
+                          final name = (child['alias'] ?? child['name'] ?? 'Anak Asuh').toString();
+                          final avatar = (child['avatar'] ?? child['photo'] ?? '').toString();
+                          final city = (child['orphanage_city'] ?? child['city'] ?? '').toString();
+                          final category = (child['need_category'] ?? child['urgentNeeds'] ?? '').toString();
+                          final lastMsg = _lastMessages[name];
+                          final lastText = lastMsg != null ? (lastMsg['text'] ?? '').toString() : '';
+                          final lastTime = lastMsg != null ? _getTimeAgo(lastMsg['created_at']?.toString()) : '';
+                          final hasMessages = lastMsg != null;
+
+                          return InkWell(
+                            onTap: () async {
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => _ChatRoomScreen(
+                                    childAlias: name,
+                                    childAvatar: avatar,
+                                    childCity: city,
+                                    childCategory: category,
+                                  ),
+                                ),
+                              );
+                              // Refresh last messages setelah kembali dari chat
+                              final updated = await LocalDatabase().getLastChatMessage(name);
+                              if (mounted) {
+                                setState(() => _lastMessages[name] = updated);
+                              }
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              child: Row(
+                                children: [
+                                  // Avatar
+                                  Stack(
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 28,
+                                        backgroundColor: AppColors.surfaceLight,
+                                        backgroundImage: avatar.startsWith('http') ? NetworkImage(avatar) : null,
+                                        child: avatar.startsWith('http') ? null : const Icon(Icons.face, color: AppColors.primary, size: 28),
+                                      ),
+                                      Positioned(
+                                        bottom: 0,
+                                        right: 0,
+                                        child: Container(
+                                          width: 14,
+                                          height: 14,
+                                          decoration: BoxDecoration(
+                                            color: AppColors.accent1,
+                                            shape: BoxShape.circle,
+                                            border: Border.all(color: Colors.white, width: 2),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(width: 14),
+                                  // Name + last message
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                name,
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 15,
+                                                  color: AppColors.textPrimary,
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            if (lastTime.isNotEmpty)
+                                              Text(
+                                                lastTime,
+                                                style: const TextStyle(fontSize: 11, color: AppColors.textHint),
+                                              ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          hasMessages
+                                              ? (lastText.length > 45 ? '${lastText.substring(0, 45)}...' : lastText)
+                                              : city.isNotEmpty
+                                                  ? '📍 $city${category.isNotEmpty ? " • $category" : ""}'
+                                                  : 'Ketuk untuk mulai chat',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: hasMessages ? AppColors.textSecondary : AppColors.textHint,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  // Chat icon
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary.withValues(alpha: 0.1),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(Icons.chat_bubble_outline, size: 18, color: AppColors.primary),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                        );
-                      },
-                    );
-                  },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                 ),
     );
   }
 }
 
 // ====================================================================
-// CHAT ROOM SCREEN — Per anak asuh
+// CHAT ROOM SCREEN — Per anak asuh (dengan riwayat chat tersimpan)
 // ====================================================================
 class _ChatRoomScreen extends StatefulWidget {
   final String childAlias;
   final String childAvatar;
+  final String childCity;
+  final String childCategory;
 
   const _ChatRoomScreen({
     required this.childAlias,
     required this.childAvatar,
+    this.childCity = '',
+    this.childCategory = '',
   });
 
   @override
@@ -155,6 +299,7 @@ class _ChatRoomScreenState extends State<_ChatRoomScreen> {
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
   final _picker = ImagePicker();
+  final _localDb = LocalDatabase();
 
   final List<Map<String, dynamic>> _messages = [];
   bool _isLoading = true;
@@ -162,7 +307,7 @@ class _ChatRoomScreenState extends State<_ChatRoomScreen> {
   @override
   void initState() {
     super.initState();
-    _loadMessages();
+    _loadChatHistory();
   }
 
   @override
@@ -172,53 +317,89 @@ class _ChatRoomScreenState extends State<_ChatRoomScreen> {
     super.dispose();
   }
 
-  Future<void> _loadMessages() async {
+  // ============================================================
+  // LOAD RIWAYAT CHAT dari SQLite (persisten, tidak hilang)
+  // ============================================================
+  Future<void> _loadChatHistory() async {
     setState(() => _isLoading = true);
-    // Coba load dari Supabase
+
     try {
-      final res = await DioClient().dio.get('/letters', queryParameters: {'child_alias': widget.childAlias});
-      if (res.statusCode == 200 && res.data is List) {
-        for (var m in res.data) {
+      // Load pesan tersimpan dari SQLite
+      final savedMessages = await _localDb.getChatMessages(widget.childAlias);
+
+      if (savedMessages.isNotEmpty) {
+        for (var msg in savedMessages) {
           _messages.add({
-            'sender': m['sender'] ?? 'donor',
-            'text': m['text'] ?? m['content'] ?? '',
-            'time': m['time'] ?? '',
-            'type': m['type'] ?? 'text',
-            'fileUrl': m['file_url'] ?? '',
+            'sender': msg['sender'] ?? 'admin',
+            'text': msg['text'] ?? '',
+            'time': msg['time'] ?? '',
+            'type': msg['type'] ?? 'text',
+            'fileUrl': msg['file_url'] ?? '',
           });
         }
+      } else {
+        // Pesan selamat datang otomatis (pertama kali)
+        final welcomeText =
+            'Assalamualaikum! Selamat datang di Ruang Kasih 💛\n\n'
+            'Saya admin panti yang akan membantu menyampaikan pesan Anda ke ${widget.childAlias}.\n\n'
+            '📞 Panggilan suara & video call tersedia di pojok kanan atas.\n'
+            '📎 Anda juga bisa mengirim file/karya sekolah.';
+
+        final now = DateTime.now();
+        final timeStr = '${now.hour}:${now.minute.toString().padLeft(2, '0')}';
+
+        _messages.add({
+          'sender': 'admin',
+          'text': welcomeText,
+          'time': timeStr,
+          'type': 'text',
+        });
+
+        // Simpan pesan selamat datang ke SQLite
+        await _localDb.insertChatMessage(
+          childAlias: widget.childAlias,
+          sender: 'admin',
+          text: welcomeText,
+          time: timeStr,
+        );
       }
     } catch (_) {}
-
-    // Pesan awal jika kosong
-    if (_messages.isEmpty) {
-      _messages.add({
-        'sender': 'admin',
-        'text': 'Selamat datang di Ruang Kasih! Pesan Anda akan diteruskan melalui admin panti ke ${widget.childAlias}. 💛',
-        'time': '${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')}',
-        'type': 'text',
-      });
-    }
 
     if (mounted) setState(() => _isLoading = false);
     _scrollToBottom();
   }
 
+  // ============================================================
+  // KIRIM PESAN — Simpan ke SQLite + sync ke Supabase
+  // ============================================================
   void _sendMessage({String? text, String? fileUrl, String type = 'text'}) {
     final content = text ?? _messageController.text.trim();
     if (content.isEmpty && fileUrl == null) return;
+
+    final now = DateTime.now();
+    final timeStr = '${now.hour}:${now.minute.toString().padLeft(2, '0')}';
 
     setState(() {
       _messages.add({
         'sender': 'donor',
         'text': content,
-        'time': '${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')}',
+        'time': timeStr,
         'type': type,
         'fileUrl': fileUrl ?? '',
       });
       _messageController.clear();
     });
     _scrollToBottom();
+
+    // Simpan ke SQLite (permanen)
+    _localDb.insertChatMessage(
+      childAlias: widget.childAlias,
+      sender: 'donor',
+      text: content,
+      type: type,
+      fileUrl: fileUrl ?? '',
+      time: timeStr,
+    );
 
     // Sync to Supabase
     try {
@@ -231,18 +412,42 @@ class _ChatRoomScreenState extends State<_ChatRoomScreen> {
       });
     } catch (_) {}
 
-    // Simulasi respon admin
+    // Simulasi respon admin (delay 2 detik)
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) {
+        final replyTime = DateTime.now();
+        final replyTimeStr = '${replyTime.hour}:${replyTime.minute.toString().padLeft(2, '0')}';
+
+        String replyText;
+        if (type == 'file') {
+          replyText = 'File/karya telah diterima! Akan kami tunjukkan ke ${widget.childAlias}. Terima kasih atas kiriman berharganya! 🎨📚';
+        } else {
+          final replies = [
+            'Pesan Anda telah diterima dan akan disampaikan ke ${widget.childAlias}. Terima kasih atas perhatiannya! 🙏',
+            '${widget.childAlias} pasti senang menerima pesan dari Anda! Kami akan segera menyampaikannya. 😊',
+            'Insya Allah pesan ini akan kami sampaikan ke ${widget.childAlias} hari ini. Jazakallahu khairan! 💛',
+            'Pesan telah dicatat. ${widget.childAlias} sedang belajar sekarang, nanti kami bacakan pesannya ya! 📖',
+          ];
+          replyText = replies[DateTime.now().second % replies.length];
+        }
+
         setState(() {
           _messages.add({
             'sender': 'admin',
-            'text': 'Pesan Anda telah diterima dan akan disampaikan ke ${widget.childAlias}. Terima kasih atas perhatiannya! 🙏',
-            'time': '${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')}',
+            'text': replyText,
+            'time': replyTimeStr,
             'type': 'text',
           });
         });
         _scrollToBottom();
+
+        // Simpan respon admin ke SQLite juga
+        _localDb.insertChatMessage(
+          childAlias: widget.childAlias,
+          sender: 'admin',
+          text: replyText,
+          time: replyTimeStr,
+        );
       }
     });
   }
@@ -359,7 +564,19 @@ class _ChatRoomScreenState extends State<_ChatRoomScreen> {
               child: widget.childAvatar.startsWith('http') ? null : const Icon(Icons.face, size: 18, color: AppColors.primary),
             ),
             const SizedBox(width: 10),
-            Text(widget.childAlias, style: const TextStyle(fontSize: 16)),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(widget.childAlias, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                  if (widget.childCity.isNotEmpty)
+                    Text(
+                      '${widget.childCity}${widget.childCategory.isNotEmpty ? " • ${widget.childCategory}" : ""}',
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.normal),
+                    ),
+                ],
+              ),
+            ),
           ],
         ),
         backgroundColor: AppColors.primary,
@@ -401,65 +618,79 @@ class _ChatRoomScreenState extends State<_ChatRoomScreen> {
 
                 // Chat messages
                 Expanded(
-                  child: ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _messages.length,
-                    itemBuilder: (context, idx) {
-                      final msg = _messages[idx];
-                      final isDonor = msg['sender'] == 'donor';
-                      final isFile = msg['type'] == 'file';
+                  child: _messages.isEmpty
+                      ? const Center(
+                          child: Text('Belum ada pesan. Mulai kirim pesan pertamamu!',
+                              style: TextStyle(color: AppColors.textHint)),
+                        )
+                      : ListView.builder(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.all(16),
+                          itemCount: _messages.length,
+                          itemBuilder: (context, idx) {
+                            final msg = _messages[idx];
+                            final isDonor = msg['sender'] == 'donor';
+                            final isFile = msg['type'] == 'file';
 
-                      return Align(
-                        alignment: isDonor ? Alignment.centerRight : Alignment.centerLeft,
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
-                          decoration: BoxDecoration(
-                            color: isDonor ? AppColors.primary : Colors.white,
-                            borderRadius: BorderRadius.circular(16).copyWith(
-                              bottomRight: isDonor ? const Radius.circular(0) : const Radius.circular(16),
-                              bottomLeft: isDonor ? const Radius.circular(16) : const Radius.circular(0),
-                            ),
-                            boxShadow: [
-                              BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 2)),
-                            ],
-                          ),
-                          child: Column(
-                            crossAxisAlignment: isDonor ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                            children: [
-                              if (!isDonor)
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 4),
-                                  child: Text(
-                                    msg['sender'] == 'admin' ? '👨‍💼 Admin Panti' : '🧒 ${widget.childAlias}',
-                                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.primaryDark),
+                            return Align(
+                              alignment: isDonor ? Alignment.centerRight : Alignment.centerLeft,
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
+                                decoration: BoxDecoration(
+                                  color: isDonor ? AppColors.primary : Colors.white,
+                                  borderRadius: BorderRadius.circular(16).copyWith(
+                                    bottomRight: isDonor ? const Radius.circular(0) : const Radius.circular(16),
+                                    bottomLeft: isDonor ? const Radius.circular(16) : const Radius.circular(0),
                                   ),
+                                  boxShadow: [
+                                    BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 2)),
+                                  ],
                                 ),
-                              if (isFile && msg['fileUrl'] != null && (msg['fileUrl'] as String).isNotEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 8),
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: _buildImage(msg['fileUrl'], 200),
-                                  ),
+                                child: Column(
+                                  crossAxisAlignment: isDonor ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                                  children: [
+                                    if (!isDonor)
+                                      Padding(
+                                        padding: const EdgeInsets.only(bottom: 4),
+                                        child: Text(
+                                          msg['sender'] == 'admin' ? '👨‍💼 Admin Panti' : '🧒 ${widget.childAlias}',
+                                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.primaryDark),
+                                        ),
+                                      ),
+                                    if (isFile && msg['fileUrl'] != null && (msg['fileUrl'] as String).isNotEmpty)
+                                      Padding(
+                                        padding: const EdgeInsets.only(bottom: 8),
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: _buildImage(msg['fileUrl'], 200),
+                                        ),
+                                      ),
+                                    Text(
+                                      msg['text'] ?? '',
+                                      style: TextStyle(color: isDonor ? Colors.white : AppColors.textPrimary, fontSize: 13, height: 1.4),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          msg['time'] ?? '',
+                                          style: TextStyle(color: isDonor ? Colors.white70 : AppColors.textHint, fontSize: 10),
+                                        ),
+                                        if (isDonor) ...[
+                                          const SizedBox(width: 4),
+                                          Icon(Icons.done_all, size: 14, color: Colors.white.withValues(alpha: 0.7)),
+                                        ],
+                                      ],
+                                    ),
+                                  ],
                                 ),
-                              Text(
-                                msg['text'] ?? '',
-                                style: TextStyle(color: isDonor ? Colors.white : AppColors.textPrimary, fontSize: 13, height: 1.4),
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                msg['time'] ?? '',
-                                style: TextStyle(color: isDonor ? Colors.white70 : AppColors.textHint, fontSize: 10),
-                              ),
-                            ],
-                          ),
+                            );
+                          },
                         ),
-                      );
-                    },
-                  ),
                 ),
 
                 // Message input
