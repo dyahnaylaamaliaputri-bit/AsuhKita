@@ -2,6 +2,7 @@
 // Fungsi: Layar pendaftaran akun donatur dan admin panti (PBI-005, FR-01, FR-06)
 
 import 'package:flutter/material.dart';
+import '../../core/app_colors.dart';
 import 'package:provider/provider.dart';
 import 'auth_provider.dart';
 
@@ -46,7 +47,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Pendaftaran berhasil! Silakan masuk dengan akun Anda.'),
-              backgroundColor: Colors.teal,
+              backgroundColor: AppColors.primary,
             ),
           );
           Navigator.pop(context);
@@ -70,7 +71,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text('Daftar Akun AsuhKita'),
-        backgroundColor: Colors.teal,
+        backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
       ),
@@ -87,7 +88,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
-                    color: Colors.teal,
+                    color: AppColors.primary,
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -101,13 +102,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.teal.shade50,
+                    color: AppColors.surfaceLight,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.teal.shade200),
+                    border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.volunteer_activism, color: Colors.teal, size: 24),
+                      const Icon(Icons.volunteer_activism, color: AppColors.primary, size: 24),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
@@ -115,7 +116,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           children: [
                             const Text(
                               'Pendaftaran: Donatur / Orang Tua Asuh',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.teal),
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primary),
                             ),
                             const SizedBox(height: 2),
                             Text(
@@ -197,7 +198,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ElevatedButton(
                   onPressed: auth.isLoading ? null : _handleRegister,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.teal,
+                    backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

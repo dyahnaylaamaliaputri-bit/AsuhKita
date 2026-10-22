@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import '../../core/app_colors.dart';
 import '../../core/dio_client.dart';
 import '../../data/local_db.dart';
 import '../../services/exchange_rate_service.dart';
@@ -200,7 +201,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
-            const Icon(Icons.verified, color: Colors.teal, size: 28),
+            const Icon(Icons.verified, color: AppColors.primary, size: 28),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
@@ -227,15 +228,15 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.teal.shade50,
+                  color: AppColors.surfaceLight,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.teal.shade200),
+                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
                 ),
                 child: Column(
                   children: [
                     const Text(
                       'SERTIFIKAT ORANG TUA ASUH',
-                      style: TextStyle(fontWeight: FontWeight.bold, color: Colors.teal, fontSize: 13),
+                      style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary, fontSize: 13),
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -265,7 +266,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
               Navigator.pop(context); // Kembali ke list
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.teal,
+              backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
             ),
             child: const Text('Selesai'),
@@ -278,10 +279,10 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Form Donasi & Kurs'),
-        backgroundColor: Colors.teal,
+        backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
       ),
@@ -299,8 +300,8 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
                   children: [
                     CircleAvatar(
                       radius: 28,
-                      backgroundColor: Colors.teal.shade50,
-                      child: const Icon(Icons.face, size: 36, color: Colors.teal),
+                      backgroundColor: AppColors.surfaceLight,
+                      child: const Icon(Icons.face, size: 36, color: AppColors.primary),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
@@ -314,7 +315,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
                           const SizedBox(height: 4),
                           Text(
                             widget.packageData['name'],
-                            style: TextStyle(fontSize: 13, color: Colors.teal.shade800),
+                            style: const TextStyle(fontSize: 13, color: AppColors.primaryDark),
                           ),
                         ],
                       ),
@@ -351,7 +352,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12),
                           decoration: BoxDecoration(
-                            border: Border.all(color: Colors.teal),
+                            border: Border.all(color: AppColors.primary),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: DropdownButtonHideUnderline(
@@ -362,7 +363,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
                                   value: c,
                                   child: Text(
                                     c,
-                                    style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.teal),
+                                    style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary),
                                   ),
                                 );
                               }).toList(),
@@ -411,12 +412,12 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: _isUsingRealtimeRates
-                            ? Colors.green.shade50
+                            ? AppColors.accent1.withValues(alpha: 0.2)
                             : Colors.orange.shade50,
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
                           color: _isUsingRealtimeRates
-                              ? Colors.green.shade200
+                              ? AppColors.accent1.withValues(alpha: 0.5)
                               : Colors.orange.shade200,
                         ),
                       ),
@@ -439,7 +440,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
                                   width: 14,
                                   height: 14,
                                   child: CircularProgressIndicator(
-                                      strokeWidth: 2, color: Colors.teal),
+                                      strokeWidth: 2, color: AppColors.primary),
                                 )
                               : Row(
                                   children: [
@@ -461,7 +462,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
                                         fontSize: 11,
                                         fontWeight: FontWeight.bold,
                                         color: _isUsingRealtimeRates
-                                            ? Colors.green.shade700
+                                            ? AppColors.primaryDark
                                             : Colors.orange.shade700,
                                       ),
                                     ),
@@ -476,23 +477,23 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.teal.shade50,
+                        color: AppColors.surfaceLight,
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.teal.shade200),
+                        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const Text(
                             'Estimasi Setara IDR:',
-                            style: TextStyle(fontWeight: FontWeight.w600, color: Colors.teal),
+                            style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.primary),
                           ),
                           Text(
                             _formatRupiah(_calculatedIdr),
                             style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
-                              color: Colors.teal,
+                              color: AppColors.primary,
                             ),
                           ),
                         ],
@@ -521,7 +522,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
                           child: ChoiceChip(
                             label: const Center(child: Text('Bulanan (Orang Tua Asuh)')),
                             selected: _frequency == 'Bulanan',
-                            selectedColor: Colors.teal,
+                            selectedColor: AppColors.primary,
                             labelStyle: TextStyle(
                               color: _frequency == 'Bulanan' ? Colors.white : Colors.black87,
                               fontWeight: FontWeight.bold,
@@ -536,7 +537,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
                           child: ChoiceChip(
                             label: const Center(child: Text('Sekali Donasi')),
                             selected: _frequency == 'Sekali',
-                            selectedColor: Colors.teal,
+                            selectedColor: AppColors.primary,
                             labelStyle: TextStyle(
                               color: _frequency == 'Sekali' ? Colors.white : Colors.black87,
                               fontWeight: FontWeight.bold,
@@ -569,7 +570,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.teal,
+                backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

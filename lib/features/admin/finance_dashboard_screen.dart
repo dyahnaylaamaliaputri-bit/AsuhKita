@@ -2,6 +2,7 @@
 // Fungsi: Layar Dashboard Laporan Keuangan Panti Asuhan, Transparansi Belanja, dan Narasi Laporan Akuntansi Berbantuan AI (PBI-039, PBI-062)
 
 import 'package:flutter/material.dart';
+import '../../core/app_colors.dart';
 import '../../services/gemini_service.dart';
 import '../../data/local_db.dart';
 
@@ -122,10 +123,10 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FBF9),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Dashboard Laporan Keuangan'),
-        backgroundColor: const Color(0xFF1B5E20),
+        backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
@@ -142,7 +143,7 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
           Card(
             elevation: 3,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            color: const Color(0xFF1B5E20),
+            color: AppColors.primaryDark,
             child: Padding(
               padding: const EdgeInsets.all(20.0),
               child: Column(
@@ -186,7 +187,7 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
           Card(
             elevation: 1,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            color: Colors.green.shade50,
+            color: AppColors.surfaceLight,
             child: Padding(
               padding: const EdgeInsets.all(16.0),
               child: Column(
@@ -194,9 +195,9 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
                 children: [
                   Row(
                     children: const [
-                      Icon(Icons.auto_awesome, color: Color(0xFF1B5E20), size: 22),
+                      Icon(Icons.auto_awesome, color: AppColors.primary, size: 22),
                       SizedBox(width: 8),
-                      Text('AI: Buat Narasi Laporan Keuangan Otomatis', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1B5E20))),
+                      Text('AI: Buat Narasi Laporan Keuangan Otomatis', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.primaryDark)),
                     ],
                   ),
                   const SizedBox(height: 6),
@@ -213,7 +214,7 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
                           ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                           : const Icon(Icons.summarize),
                       label: const Text('Buat Narasi Laporan dengan AI'),
-                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2E7D32), foregroundColor: Colors.white),
+                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
                     ),
                   ),
                   if (_aiGeneratedNarrative != null) ...[
@@ -222,7 +223,7 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
                     const SizedBox(height: 8),
                     Container(
                       padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.green.shade300)),
+                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: AppColors.primary.withValues(alpha: 0.3))),
                       child: Text(_aiGeneratedNarrative!, style: const TextStyle(fontSize: 12, height: 1.45)),
                     ),
                   ],
@@ -237,7 +238,7 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: const [
               Text('Daftar Penyaluran Dana & Nota', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              Text('Terkunci SHA-256', style: TextStyle(fontSize: 11, color: Color(0xFF2E7D32), fontWeight: FontWeight.bold)),
+              Text('Terkunci SHA-256', style: TextStyle(fontSize: 11, color: AppColors.primaryDark, fontWeight: FontWeight.bold)),
             ],
           ),
           const SizedBox(height: 10),
@@ -266,7 +267,7 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
                           ),
                           Text(
                             _formatRupiah(exp['nominal']),
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF2E7D32)),
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.primary),
                           ),
                         ],
                       ),
@@ -275,8 +276,8 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
                         children: [
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(4)),
-                            child: Text(exp['category'], style: TextStyle(fontSize: 10, color: Colors.green.shade900, fontWeight: FontWeight.w600)),
+                            decoration: BoxDecoration(color: AppColors.surfaceLight, borderRadius: BorderRadius.circular(4)),
+                            child: Text(exp['category'], style: const TextStyle(fontSize: 10, color: AppColors.primaryDark, fontWeight: FontWeight.w600)),
                           ),
                           const SizedBox(width: 8),
                           Text(exp['date'], style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
@@ -289,7 +290,7 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
                         decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(8)),
                         child: Row(
                           children: [
-                            const Icon(Icons.receipt, size: 18, color: Color(0xFF2E7D32)),
+                            const Icon(Icons.receipt, size: 18, color: AppColors.primary),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(

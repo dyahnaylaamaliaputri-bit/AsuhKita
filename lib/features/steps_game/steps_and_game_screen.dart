@@ -4,6 +4,7 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import '../../core/app_colors.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -160,7 +161,7 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Permainan Selesai! Skor Anda: $_gameScore. Ditambahkan ke Poin Kebaikan!'),
-        backgroundColor: Colors.teal,
+        backgroundColor: AppColors.primary,
       ),
     );
   }
@@ -171,7 +172,7 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
         title: const Text('Sensor & Mini Game Gamifikasi'),
-        backgroundColor: Colors.teal,
+        backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
         bottom: TabBar(
@@ -204,10 +205,10 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
                         Container(
                           padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
-                            color: Colors.teal.shade50,
+                            color: AppColors.surfaceLight,
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(Icons.directions_walk, size: 70, color: Colors.teal),
+                          child: const Icon(Icons.directions_walk, size: 70, color: AppColors.primary),
                         ),
                         const SizedBox(height: 16),
                         const Text(
@@ -217,7 +218,7 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
                         const SizedBox(height: 8),
                         Text(
                           '$_stepCount',
-                          style: const TextStyle(fontSize: 54, fontWeight: FontWeight.bold, color: Colors.teal),
+                          style: const TextStyle(fontSize: 54, fontWeight: FontWeight.bold, color: AppColors.primary),
                         ),
                         const Text(
                           'Langkah Hari Ini',
@@ -246,7 +247,7 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
                             Column(
                               children: [
                                 Text('${(_stepCount / 20).floor()} Poin',
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.teal)),
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.primary)),
                                 const SizedBox(height: 2),
                                 const Text('Poin Kebaikan', style: TextStyle(fontSize: 12, color: Colors.grey)),
                               ],
@@ -293,7 +294,7 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
                             content: Text(
                               '🎉 Sukses! ${claimedSteps} langkah berhasil diklaim menjadi ${points} Poin Kebaikan! Total Poin Anda: ${newTotalPoin} Poin (Cek tab Profil).',
                             ),
-                            backgroundColor: Colors.teal,
+                            backgroundColor: AppColors.primary,
                             duration: const Duration(seconds: 4),
                           ),
                         );
@@ -309,7 +310,7 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
                   icon: const Icon(Icons.volunteer_activism),
                   label: const Text('Klaim & Sumbangkan Poin Langkah'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.teal,
+                    backgroundColor: AppColors.primary,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -334,8 +335,8 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
                           );
                         }
                       },
-                      icon: const Icon(Icons.add, size: 16, color: Colors.teal),
-                      label: const Text('+100 Langkah (Demo)', style: TextStyle(color: Colors.teal, fontSize: 12)),
+                      icon: const Icon(Icons.add, size: 16, color: AppColors.primary),
+                      label: const Text('+100 Langkah (Demo)', style: TextStyle(color: AppColors.primary, fontSize: 12)),
                     ),
                     const SizedBox(width: 8),
                     TextButton.icon(
@@ -370,11 +371,11 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Skor: $_gameScore', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.teal)),
+                    Text('Skor: $_gameScore', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.primary)),
                     ElevatedButton(
                       onPressed: _isGameRunning ? _stopGame : _startGame,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: _isGameRunning ? Colors.redAccent : Colors.teal,
+                        backgroundColor: _isGameRunning ? Colors.redAccent : AppColors.primary,
                         foregroundColor: Colors.white,
                       ),
                       child: Text(_isGameRunning ? 'Berhenti' : 'Mulai Game'),
@@ -400,7 +401,7 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
                         decoration: BoxDecoration(
                           color: Colors.indigo.shade900,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.teal.shade300, width: 2),
+                          border: Border.all(color: AppColors.primary.withValues(alpha: 0.5), width: 2),
                         ),
                         child: GestureDetector(
                           onPanUpdate: (details) {
@@ -485,7 +486,7 @@ class GameCanvasPainter extends CustomPainter {
     canvas.drawCircle(Offset(starX, starY), 18, glowPaint);
 
     // 2. Gambar Keranjang Penampung yang dikendalikan Gyroscope
-    final basketPaint = Paint()..color = Colors.tealAccent;
+    final basketPaint = Paint()..color = AppColors.accent1;
     final rrect = RRect.fromRectAndRadius(
       Rect.fromCenter(center: Offset(basketX, size.height - 40), width: 70, height: 24),
       const Radius.circular(8),

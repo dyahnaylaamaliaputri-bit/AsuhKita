@@ -148,7 +148,7 @@ class _MainNavigationState extends State<MainNavigation> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         type: BottomNavigationBarType.fixed,
-        selectedItemColor: const Color(0xFF1B5E20),
+        selectedItemColor: const Color(0xFFB7A6F0),
         unselectedItemColor: Colors.grey.shade600,
         selectedFontSize: 12,
         unselectedFontSize: 11,

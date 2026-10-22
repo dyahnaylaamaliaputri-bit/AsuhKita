@@ -2,6 +2,7 @@
 // Fungsi: Layar Tracking Donasi Donatur untuk Admin Panti Asuhan (Melacak donatur, anak yang didonasi, nominal, dan jenis paket)
 
 import 'package:flutter/material.dart';
+import '../../core/app_colors.dart';
 import '../../data/local_db.dart';
 
 class DonationTrackingScreen extends StatefulWidget {
@@ -130,7 +131,7 @@ class _DonationTrackingScreenState extends State<DonationTrackingScreen> {
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
         title: const Text('Tracking Donasi Donatur'),
-        backgroundColor: Colors.teal,
+        backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
       ),
@@ -139,7 +140,7 @@ class _DonationTrackingScreenState extends State<DonationTrackingScreen> {
           // Banner Ringkasan Tracking
           Container(
             padding: const EdgeInsets.all(16),
-            color: Colors.teal.shade50,
+            color: AppColors.surfaceLight,
             child: Row(
               children: [
                 Expanded(
@@ -150,14 +151,14 @@ class _DonationTrackingScreenState extends State<DonationTrackingScreen> {
                       const SizedBox(height: 2),
                       Text(
                         _formatRupiah(totalTersalurkan),
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.teal),
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary),
                       ),
                     ],
                   ),
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(color: Colors.teal, borderRadius: BorderRadius.circular(20)),
+                  decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(20)),
                   child: Text(
                     '${_donations.length} Transaksi Donasi',
                     style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
@@ -174,7 +175,7 @@ class _DonationTrackingScreenState extends State<DonationTrackingScreen> {
               onChanged: (val) => setState(() => _searchQuery = val),
               decoration: InputDecoration(
                 hintText: 'Cari nama donatur, anak asuh, atau paket...',
-                prefixIcon: const Icon(Icons.search, color: Colors.teal),
+                prefixIcon: const Icon(Icons.search, color: AppColors.primary),
                 filled: true,
                 fillColor: Colors.white,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16),
@@ -186,7 +187,7 @@ class _DonationTrackingScreenState extends State<DonationTrackingScreen> {
           // List Data Tracking
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator(color: Colors.teal))
+                ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
                 : filtered.isEmpty
                     ? const Center(child: Text('Tidak ada data donasi yang cocok.'))
                     : ListView.builder(
@@ -209,9 +210,9 @@ class _DonationTrackingScreenState extends State<DonationTrackingScreen> {
                                       Row(
                                         children: [
                                           CircleAvatar(
-                                            backgroundColor: Colors.teal.shade100,
+                                            backgroundColor: AppColors.primary.withValues(alpha: 0.2),
                                             radius: 18,
-                                            child: const Icon(Icons.person, color: Colors.teal, size: 20),
+                                            child: const Icon(Icons.person, color: AppColors.primary, size: 20),
                                           ),
                                           const SizedBox(width: 10),
                                           Column(
@@ -252,7 +253,7 @@ class _DonationTrackingScreenState extends State<DonationTrackingScreen> {
                                           const Text('Mendonasi Anak:', style: TextStyle(fontSize: 11, color: Colors.grey)),
                                           Text(
                                             '${item['child_alias']} (${item['child_age']} th)',
-                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.teal),
+                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.primary),
                                           ),
                                         ],
                                       ),

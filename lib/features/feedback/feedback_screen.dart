@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../auth/auth_provider.dart';
+import '../../core/app_colors.dart';
 import '../../core/dio_client.dart';
 import '../../data/local_db.dart';
 
@@ -136,7 +137,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Saran & Kesan tersimpan secara permanen (tidak hilang saat logout)!'),
-            backgroundColor: Color(0xFF2E7D32),
+            backgroundColor: AppColors.primary,
           ),
         );
       }
@@ -149,7 +150,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
         title: const Text('Saran & Kesan PAM'),
-        backgroundColor: const Color(0xFF1B5E20),
+        backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
       ),
@@ -171,7 +172,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                     children: [
                       const Text(
                         'Form Evaluasi Kuliah PAM',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20)),
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primaryDark),
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -233,7 +234,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                           icon: const Icon(Icons.send),
                           label: const Text('Kirim Saran & Kesan'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF2E7D32),
+                            backgroundColor: AppColors.primary,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

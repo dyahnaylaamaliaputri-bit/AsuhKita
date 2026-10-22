@@ -2,6 +2,7 @@
 // Fungsi: Layar Peta Panti LBS (Location Based Service), Jarak Haversine, & Validasi Check-In Radius 100 Meter (PBI-043, PBI-044, FR-35, FR-36, FR-37)
 
 import 'package:flutter/material.dart';
+import '../../core/app_colors.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -51,7 +52,7 @@ class _MapScreenState extends State<MapScreen> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: Row(
             children: const [
-              Icon(Icons.check_circle, color: Colors.teal),
+              Icon(Icons.check_circle, color: AppColors.primary),
               SizedBox(width: 8),
               Text('Check-in Berhasil!'),
             ],
@@ -62,7 +63,7 @@ class _MapScreenState extends State<MapScreen> {
           actions: [
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
               child: const Text('OK'),
             ),
           ],
@@ -100,7 +101,7 @@ class _MapScreenState extends State<MapScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Peta Panti Asuhan (LBS)'),
-        backgroundColor: Colors.teal,
+        backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
       ),
@@ -167,10 +168,10 @@ class _MapScreenState extends State<MapScreen> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: isNear ? Colors.teal.shade50 : Colors.grey.shade100,
+                          color: isNear ? AppColors.surfaceLight : Colors.grey.shade100,
                           shape: BoxShape.circle,
                         ),
-                        child: Icon(Icons.apartment, color: isNear ? Colors.teal : Colors.grey),
+                        child: Icon(Icons.apartment, color: isNear ? AppColors.primary : Colors.grey),
                       ),
                       const SizedBox(width: 14),
                       Expanded(
@@ -188,7 +189,7 @@ class _MapScreenState extends State<MapScreen> {
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
-                                color: isNear ? Colors.teal : Colors.grey.shade700,
+                                color: isNear ? AppColors.primary : Colors.grey.shade700,
                               ),
                             ),
                           ],
@@ -197,7 +198,7 @@ class _MapScreenState extends State<MapScreen> {
                       ElevatedButton(
                         onPressed: () => _handleCheckIn(panti),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: isNear ? Colors.teal : Colors.grey.shade600,
+                          backgroundColor: isNear ? AppColors.primary : Colors.grey.shade600,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),

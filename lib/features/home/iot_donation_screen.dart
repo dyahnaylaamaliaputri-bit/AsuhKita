@@ -2,6 +2,7 @@
 // Fungsi: Tampilan Event Donasi Kotak Amal Pintar IoT ESP32 & Fallback Simulasi (PBI-069, FR-52, FR-53, FR-54)
 
 import 'package:flutter/material.dart';
+import '../../core/app_colors.dart';
 
 class IotDonationScreen extends StatefulWidget {
   const IotDonationScreen({super.key});
@@ -44,7 +45,7 @@ class _IotDonationScreenState extends State<IotDonationScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Sensor IR ESP32 Mendeteksi Uang Masuk Rp ${nominal.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}! Blok DONASI_KOTAK dibuat di Ledger.'),
-        backgroundColor: Colors.teal,
+        backgroundColor: AppColors.primary,
       ),
     );
   }
@@ -55,7 +56,7 @@ class _IotDonationScreenState extends State<IotDonationScreen> {
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
         title: const Text('Kotak Amal Pintar (IoT ESP32)'),
-        backgroundColor: Colors.teal,
+        backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
       ),
@@ -65,7 +66,7 @@ class _IotDonationScreenState extends State<IotDonationScreen> {
           // Penjelasan Komprehensif Fungsi Kotak Amal IoT
           Card(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            color: Colors.teal.shade50,
+            color: AppColors.surfaceLight,
             child: Padding(
               padding: const EdgeInsets.all(16.0),
               child: Column(
@@ -75,14 +76,14 @@ class _IotDonationScreenState extends State<IotDonationScreen> {
                     children: [
                       Container(
                         padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(color: Colors.teal, borderRadius: BorderRadius.circular(10)),
+                        decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(10)),
                         child: const Icon(Icons.sensors, color: Colors.white, size: 28),
                       ),
                       const SizedBox(width: 12),
                       const Expanded(
                         child: Text(
                           'Integrasi Hardware ESP32: Fungsi Kotak Amal IoT',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.teal),
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.primary),
                         ),
                       ),
                     ],
@@ -124,25 +125,25 @@ class _IotDonationScreenState extends State<IotDonationScreen> {
                       children: [
                         ElevatedButton(
                           onPressed: () => _simulateIotEvent(10000),
-                          style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
+                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
                           child: const Text('+ Rp 10.000'),
                         ),
                         const SizedBox(width: 8),
                         ElevatedButton(
                           onPressed: () => _simulateIotEvent(20000),
-                          style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
+                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
                           child: const Text('+ Rp 20.000'),
                         ),
                         const SizedBox(width: 8),
                         ElevatedButton(
                           onPressed: () => _simulateIotEvent(50000),
-                          style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
+                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
                           child: const Text('+ Rp 50.000'),
                         ),
                         const SizedBox(width: 8),
                         ElevatedButton(
                           onPressed: () => _simulateIotEvent(100000),
-                          style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, foregroundColor: Colors.white),
+                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
                           child: const Text('+ Rp 100.000'),
                         ),
                       ],
@@ -174,7 +175,7 @@ class _IotDonationScreenState extends State<IotDonationScreen> {
                   ),
                   title: Text(
                     'Rp ${ev['nominal'].toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.teal),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.primary),
                   ),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

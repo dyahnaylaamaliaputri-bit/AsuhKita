@@ -1,9 +1,10 @@
 // Letak file: mobile/lib/features/donation/donation_history_screen.dart
-// Fungsi: Riwayat Donasi dengan Cache SQLite & Sinkronisasi Antrean Offline (PBI-029, PBI-030, FR-26)
+// Fungsi: UI Riwayat Donasi Pengguna + Sinkronisasi SQLite ↔ Supabase (PBI-029, PBI-030, FR-19, FR-20)
 
 import 'package:flutter/material.dart';
-import '../../data/local_db.dart';
+import '../../core/app_colors.dart';
 import '../../core/dio_client.dart';
+import '../../data/local_db.dart';
 
 class DonationHistoryScreen extends StatefulWidget {
   const DonationHistoryScreen({super.key});
@@ -13,281 +14,312 @@ class DonationHistoryScreen extends StatefulWidget {
 }
 
 class _DonationHistoryScreenState extends State<DonationHistoryScreen> {
-  List<Map<String, dynamic>> _history = [];
-  List<Map<String, dynamic>> _offlineQueue = [];
+  List<Map<String, dynamic>> _donations = [];
   bool _isLoading = true;
   bool _isSyncing = false;
-
-  final List<Map<String, dynamic>> _dummyHistory = [
-    {
-      'id': 'don_001',
-      'child_alias': 'Bintang',
-      'amount_original': 250000.0,
-      'currency': 'IDR',
-      'rate_used': 1.0,
-      'amount_idr': 250000.0,
-      'frequency': 'Bulanan',
-      'created_at': '2026-10-15 14:20',
-      'status': 'Terverifikasi di Ledger',
-    },
-    {
-      'id': 'don_002',
-      'child_alias': 'Alya',
-      'amount_original': 20.0,
-      'currency': 'USD',
-      'rate_used': 15850.0,
-      'amount_idr': 317000.0,
-      'frequency': 'Sekali',
-      'created_at': '2026-10-10 09:12',
-      'status': 'Terverifikasi di Ledger',
-    },
-  ];
+  int _unsyncedCount = 0;
 
   @override
   void initState() {
     super.initState();
-    _loadHistory();
+    _loadDonations();
   }
 
-  Future<void> _loadHistory() async {
+  Future<void> _loadDonations() async {
     setState(() => _isLoading = true);
-    _offlineQueue = await LocalDatabase().getUnsyncedDonations();
 
-    // 1. Baca transaksi tersimpan dari Database Lokal SQLite
-    final localDonations = await LocalDatabase().getCachedDonations();
+    List<Map<String, dynamic>> allDonations = [];
 
+    // 1. Coba ambil dari Supabase
     try {
-      // 2. Coba sinkronkan dengan cloud server jika terhubung
-      final res = await DioClient().dio.get('/donations/history');
-      if (res.statusCode == 200 && res.data is List && (res.data as List).isNotEmpty) {
-        _history = List<Map<String, dynamic>>.from(res.data);
-      } else {
-        _history = localDonations;
-      }
-    } catch (_) {
-      _history = localDonations;
-    }
-
-    setState(() => _isLoading = false);
-  }
-
-  // Sinkronisasi antrean donasi offline ke server online (PBI-030, FR-20)
-  Future<void> _syncOfflineQueue() async {
-    if (_offlineQueue.isEmpty) return;
-
-    setState(() => _isSyncing = true);
-    int syncedCount = 0;
-
-    for (var item in _offlineQueue) {
-      try {
-        final res = await DioClient().dio.post('/donations', data: item);
-        if (res.statusCode == 200 || res.statusCode == 201) {
-          await LocalDatabase().markDonationSynced(item['id']);
-          syncedCount++;
+      final res = await DioClient().dio.get('/donations');
+      if (res.statusCode == 200) {
+        if (res.data is List && (res.data as List).isNotEmpty) {
+          allDonations = List<Map<String, dynamic>>.from(res.data);
+        } else if (res.data is Map && res.data['data'] is List) {
+          allDonations = List<Map<String, dynamic>>.from(res.data['data']);
         }
-      } catch (_) {
-        // Abaikan jika masih belum bisa tersambung
+      }
+    } catch (_) {}
+
+    // 2. Ambil dari SQLite lokal
+    final localDonations = await LocalDatabase().getCachedDonations();
+    if (localDonations.isNotEmpty) {
+      // Merge: prioritas Supabase, tambahkan yang tidak ada
+      final existingIds = allDonations.map((d) => (d['id'] ?? '').toString()).toSet();
+      for (var d in localDonations) {
+        final id = (d['id'] ?? '').toString();
+        if (!existingIds.contains(id)) {
+          allDonations.add(d);
+        }
       }
     }
 
-    setState(() => _isSyncing = false);
-    await _loadHistory();
+    // Sort by created_at descending
+    allDonations.sort((a, b) {
+      final dateA = a['created_at']?.toString() ?? '';
+      final dateB = b['created_at']?.toString() ?? '';
+      return dateB.compareTo(dateA);
+    });
+
+    // Cek unsynced
+    final unsynced = await LocalDatabase().getUnsyncedDonations();
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('$syncedCount donasi offline berhasil disinkronkan ke server!'),
-          backgroundColor: Colors.teal,
-        ),
-      );
+      setState(() {
+        _donations = allDonations;
+        _unsyncedCount = unsynced.length;
+        _isLoading = false;
+      });
     }
   }
 
-  String _formatCurrency(double val) {
-    return 'Rp ${val.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}';
+  Future<void> _syncOfflineDonations() async {
+    setState(() => _isSyncing = true);
+
+    final unsynced = await LocalDatabase().getUnsyncedDonations();
+    int syncCount = 0;
+
+    for (var donation in unsynced) {
+      try {
+        final res = await DioClient().dio.post('/donations', data: {
+          'child_id': donation['child_id'],
+          'package_id': donation['package_id'],
+          'amount_original': donation['amount_original'],
+          'currency': donation['currency'],
+          'rate_used': donation['rate_used'],
+          'amount_idr': donation['amount_idr'],
+          'frequency': donation['frequency'],
+        });
+        if (res.statusCode == 200 || res.statusCode == 201) {
+          await LocalDatabase().markDonationSynced(donation['id'] as int);
+          syncCount++;
+        }
+      } catch (_) {
+        break;
+      }
+    }
+
+    if (mounted) {
+      setState(() => _isSyncing = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(syncCount > 0
+              ? '$syncCount donasi offline berhasil disinkronkan ke Supabase!'
+              : 'Tidak ada donasi baru untuk disinkronkan atau gagal terhubung.'),
+          backgroundColor: syncCount > 0 ? AppColors.primary : Colors.orange,
+        ),
+      );
+      _loadDonations();
+    }
+  }
+
+  String _formatRupiah(dynamic val) {
+    final num value = val is num ? val : (double.tryParse(val?.toString() ?? '0') ?? 0);
+    return 'Rp ${value.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}';
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Riwayat Donasi & Sinkronisasi'),
-        backgroundColor: Colors.teal,
+        title: const Text('Riwayat Donasi & Sync'),
+        backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.sync),
-            tooltip: 'Sinkronisasi Donasi Offline',
-            onPressed: _isSyncing ? null : _syncOfflineQueue,
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Muat Ulang',
+            onPressed: _loadDonations,
           ),
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Colors.teal))
-          : RefreshIndicator(
-              onRefresh: _loadHistory,
-              child: ListView(
-                padding: const EdgeInsets.all(16.0),
-                children: [
-                  // Banner Antrean Offline jika ada yang menunggu sync
-                  if (_offlineQueue.isNotEmpty)
-                    Card(
-                      color: Colors.orange.shade50,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(color: Colors.orange.shade300),
-                      ),
-                      margin: const EdgeInsets.only(bottom: 16),
-                      child: Padding(
-                        padding: const EdgeInsets.all(14.0),
-                        child: Row(
+          ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+          : Column(
+              children: [
+                // Sync Banner
+                if (_unsyncedCount > 0)
+                  Container(
+                    width: double.infinity,
+                    color: AppColors.accent2.withValues(alpha: 0.4),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.cloud_upload, color: Color(0xFF8B6914), size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '$_unsyncedCount donasi offline menunggu sinkronisasi ke Supabase.',
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF8B6914)),
+                          ),
+                        ),
+                        ElevatedButton(
+                          onPressed: _isSyncing ? null : _syncOfflineDonations,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          child: _isSyncing
+                              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                              : const Text('Sync', style: TextStyle(fontSize: 12)),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                // Summary Card
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  margin: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: AppColors.primaryGradient,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(color: AppColors.primary.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 4)),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(Icons.cloud_upload, color: Colors.orange),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '${_offlineQueue.length} Donasi Tersimpan di Antrean Offline',
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  const Text(
-                                    'Dibuat saat offline dan siap dikirim saat tersambung internet.',
-                                    style: TextStyle(fontSize: 11),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            ElevatedButton(
-                              onPressed: _isSyncing ? null : _syncOfflineQueue,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.orange,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                              ),
-                              child: _isSyncing
-                                  ? const SizedBox(
-                                      height: 14,
-                                      width: 14,
-                                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                                    )
-                                  : const Text('Kirim', style: TextStyle(fontSize: 12)),
+                            const Text('Total Donasi Anda', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${_donations.length} Transaksi',
+                              style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
                             ),
                           ],
                         ),
                       ),
-                    ),
-
-                  const Text(
-                    'Daftar Transaksi Donasi Tercatat',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 12),
-
-                  if (_history.isEmpty)
-                    Container(
-                      padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 20),
-                      alignment: Alignment.center,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Icon(Icons.receipt_long_outlined, size: 64, color: Colors.grey.shade400),
-                          const SizedBox(height: 16),
-                          const Text(
-                            'Belum Ada Riwayat Donasi',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black54),
-                          ),
-                          const SizedBox(height: 8),
+                          const Text('Total Nominal', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                          const SizedBox(height: 4),
                           Text(
-                            'Akun Anda belum pernah melakukan transaksi donasi.\nSemua transaksi baru akan tercatat di sini dan terkunci di blockchain ledger.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                            _formatRupiah(_donations.fold<double>(0.0, (sum, d) {
+                              final amt = d['amount_idr'];
+                              if (amt is num) return sum + amt.toDouble();
+                              return sum + (double.tryParse(amt?.toString() ?? '0') ?? 0);
+                            })),
+                            style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                           ),
                         ],
                       ),
-                    )
-                  else
-                  ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: _history.length,
-                    itemBuilder: (context, idx) {
-                      final don = _history[idx];
-                      final orig = don['amount_original'] ?? 0.0;
-                      final curr = don['currency'] ?? 'IDR';
-                      final idr = don['amount_idr'] ?? 0.0;
-                      final rate = don['rate_used'] ?? 1.0;
-
-                      return Card(
-                        elevation: 1,
-                        margin: const EdgeInsets.only(bottom: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    'Donasi untuk ${don['child_alias']}',
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: Colors.teal.shade50,
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Text(
-                                      don['status'] ?? 'Berhasil',
-                                      style: const TextStyle(fontSize: 11, color: Colors.teal, fontWeight: FontWeight.bold),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    '$orig $curr',
-                                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.teal),
-                                  ),
-                                  Text(
-                                    _formatCurrency(idr.toDouble()),
-                                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                                  ),
-                                ],
-                              ),
-                              if (curr != 'IDR') ...[
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Kurs Terpakai: 1 $curr = ${_formatCurrency(rate.toDouble())}',
-                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                                ),
-                              ],
-                              const Divider(height: 16),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text('Frekuensi: ${don['frequency'] ?? 'Bulanan'}', style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
-                                  Text(don['created_at']?.toString().substring(0, 10) ?? '', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
+                    ],
                   ),
-                ],
-              ),
+                ),
+
+                // Donation list
+                if (_donations.isEmpty)
+                  Expanded(
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.receipt_long_outlined, size: 64, color: AppColors.primary.withValues(alpha: 0.4)),
+                          const SizedBox(height: 16),
+                          const Text('Belum ada riwayat donasi.', style: TextStyle(color: AppColors.textSecondary, fontSize: 16)),
+                          const SizedBox(height: 8),
+                          const Text('Mulai berdonasi di halaman Sponsor!', style: TextStyle(color: AppColors.textHint, fontSize: 13)),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  Expanded(
+                    child: ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: _donations.length,
+                      itemBuilder: (context, idx) {
+                        final d = _donations[idx];
+                        final alias = d['child_alias'] ?? d['child_name'] ?? '-';
+                        final amt = d['amount_idr'] ?? d['amount_original'] ?? 0;
+                        final currency = d['currency'] ?? 'IDR';
+                        final date = d['created_at']?.toString() ?? '-';
+                        final status = d['status']?.toString() ?? 'Tercatat';
+
+                        final isVerified = status.toLowerCase().contains('terverifikasi') || status.toLowerCase().contains('ledger');
+                        final isPending = status.toLowerCase().contains('menunggu') || status.toLowerCase().contains('sqlite');
+
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          child: Padding(
+                            padding: const EdgeInsets.all(14),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        'Donasi untuk $alias',
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textPrimary),
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: isVerified
+                                            ? AppColors.accent1.withValues(alpha: 0.3)
+                                            : isPending
+                                                ? AppColors.accent2.withValues(alpha: 0.4)
+                                                : AppColors.surfaceLight,
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        isVerified ? '✅ Verified' : isPending ? '⏳ Pending' : '📋 Tercatat',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          color: isVerified
+                                              ? Colors.green.shade700
+                                              : isPending
+                                                  ? const Color(0xFF8B6914)
+                                                  : AppColors.primaryDark,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      _formatRupiah(amt),
+                                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary),
+                                    ),
+                                    if (currency != 'IDR')
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.surfaceLight,
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(currency, style: const TextStyle(fontSize: 11, color: AppColors.primaryDark, fontWeight: FontWeight.bold)),
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                Text('Tanggal: $date', style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+              ],
             ),
     );
   }

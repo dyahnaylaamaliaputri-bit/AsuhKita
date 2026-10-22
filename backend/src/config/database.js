@@ -219,6 +219,29 @@ const executeMockQuery = (text, params = []) => {
     return { rows, rowCount: rows.length };
   }
 
+  // INSERT INTO children (admin menambah anak baru)
+  if (sql.includes('INSERT INTO CHILDREN') || (sql.includes('INSERT INTO') && sql.includes('CHILDREN'))) {
+    const newChild = {
+      id: generateMockId(),
+      orphanage_id: params[0] || 'orp-001',
+      alias: params[1] || 'Anak Baru',
+      age: params[2] || 8,
+      gender: params[3] || 'L',
+      need_category: params[4] || 'Pendidikan',
+      story_summary: params[5] || '',
+      avatar: params[6] || '',
+      status: 'Tersedia',
+      orphanage_name: params[7] || 'Peduli Anak Foundation',
+      orphanage_city: params[8] || 'Lombok',
+      target: params[9] || 500000,
+      dream: params[10] || '',
+      hobby: params[11] || '',
+      created_at: new Date().toISOString(),
+    };
+    mockDb.children.push(newChild);
+    return { rows: [newChild], rowCount: 1 };
+  }
+
   // SELECT COUNT(*) FROM children
   if (sql.includes('SELECT COUNT(*)') && sql.includes('CHILDREN')) {
     return { rows: [{ count: String(mockDb.children.length) }], rowCount: 1 };

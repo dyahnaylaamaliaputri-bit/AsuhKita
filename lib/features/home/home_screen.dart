@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/app_colors.dart';
 import '../../data/local_db.dart';
 import '../auth/auth_provider.dart';
 import '../ledger/ledger_screen.dart';
@@ -31,9 +32,8 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   bool _isNotificationActive = true;
   int _sponsoredCount = 0;
-  int _totalPlatformChildren = 37;
-  int _totalPlatformDonors = 8;
-  double _totalIotFunds = 1850000;
+  int _totalPlatformChildren = 0;
+  int _totalPlatformDonors = 0;
 
   @override
   void initState() {
@@ -54,7 +54,7 @@ class _HomeScreenState extends State<HomeScreen> {
       // Hitung anak terdaftar di platform untuk admin
       final cachedKids = await localDb.getCachedChildren();
       final newKids = await localDb.getNewChildren();
-      final totalKids = (cachedKids.isNotEmpty ? cachedKids.length : 37) + newKids.length;
+      final totalKids = cachedKids.length + newKids.length;
 
       // Hitung donatur unik dari riwayat
       final donorSet = <String>{};
@@ -63,7 +63,7 @@ class _HomeScreenState extends State<HomeScreen> {
           donorSet.add(d['sponsorship_id'].toString());
         }
       }
-      final totalDonors = donorSet.isNotEmpty ? donorSet.length + 5 : 8;
+      final totalDonors = donorSet.isNotEmpty ? donorSet.length : 0;
 
       if (mounted) {
         setState(() {
@@ -92,7 +92,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ? '🔔 Notifikasi Lokal DIAKTIFKAN: Pengingat & pembaruan aktif!'
                 : '🔕 Notifikasi Lokal DINONAKTIFKAN.',
           ),
-          backgroundColor: newState ? const Color(0xFF2E7D32) : Colors.grey.shade700,
+          backgroundColor: newState ? AppColors.primary : Colors.grey.shade700,
           duration: const Duration(seconds: 2),
         ),
       );
@@ -105,17 +105,17 @@ class _HomeScreenState extends State<HomeScreen> {
     final isAdmin = auth.userRole == 'admin_panti';
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FBF9),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text(isAdmin ? 'AsuhKita • Pengurus Panti' : 'AsuhKita'),
-        backgroundColor: const Color(0xFF1B5E20),
+        backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
           IconButton(
             icon: Icon(
               _isNotificationActive ? Icons.notifications_active : Icons.notifications_off_outlined,
-              color: _isNotificationActive ? Colors.amberAccent : Colors.white60,
+              color: _isNotificationActive ? AppColors.accent2 : Colors.white60,
             ),
             tooltip: _isNotificationActive ? 'Notifikasi Aktif' : 'Notifikasi Mati',
             onPressed: _toggleNotification,
@@ -131,16 +131,10 @@ class _HomeScreenState extends State<HomeScreen> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: isAdmin
-                      ? [const Color(0xFF1B5E20), const Color(0xFF2E7D32)]
-                      : [const Color(0xFF2E7D32), const Color(0xFF43A047)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+                gradient: isAdmin ? AppColors.adminGradient : AppColors.donaturGradient,
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
-                  BoxShadow(color: const Color(0xFF1B5E20).withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(0, 4)),
+                  BoxShadow(color: AppColors.primary.withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(0, 4)),
                 ],
               ),
               child: Column(
@@ -181,28 +175,24 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 20),
 
             // ==================== 3 FIELD STATUS ATAS ====================
-            // Kebutuhan revisi: Khusus ADMIN bedakan:
-            // 1. Total anak terdaftar di platform
-            // 2. Total donatur yang donasi
-            // 3. Total dana masuk ke kotak amal IoT
             if (isAdmin)
               Row(
                 children: [
-                  _buildMetricCard('Anak Terdaftar', '$_totalPlatformChildren Anak', Icons.groups, Colors.blue),
+                  _buildMetricCard('Anak Terdaftar', '$_totalPlatformChildren Anak', Icons.groups, AppColors.accent3),
                   const SizedBox(width: 10),
-                  _buildMetricCard('Total Donatur', '$_totalPlatformDonors Orang', Icons.volunteer_activism, Colors.teal),
+                  _buildMetricCard('Total Donatur', '$_totalPlatformDonors Orang', Icons.volunteer_activism, AppColors.primary),
                   const SizedBox(width: 10),
-                  _buildMetricCard('Dana Kotak IoT', 'Rp 1,85 Jt', Icons.savings, Colors.amber.shade800),
+                  _buildMetricCard('Dana Kotak IoT', 'Lihat', Icons.savings, AppColors.secondary),
                 ],
               )
             else
               Row(
                 children: [
-                  _buildMetricCard('Anak Asuh', '$_sponsoredCount Anak', Icons.face, Colors.blue),
+                  _buildMetricCard('Anak Asuh', '$_sponsoredCount Anak', Icons.face, AppColors.accent3),
                   const SizedBox(width: 10),
-                  _buildMetricCard('Transparansi', '100% SHA-256', Icons.security, Colors.green),
+                  _buildMetricCard('Transparansi', '100% SHA-256', Icons.security, AppColors.accent1),
                   const SizedBox(width: 10),
-                  _buildMetricCard('IoT Panti', 'Aktif', Icons.sensors, Colors.orange),
+                  _buildMetricCard('IoT Panti', 'Aktif', Icons.sensors, AppColors.accent2),
                 ],
               ),
             const SizedBox(height: 24),
@@ -210,12 +200,11 @@ class _HomeScreenState extends State<HomeScreen> {
             // ==================== DAFTAR MENU FITUR ====================
             Text(
               isAdmin ? 'Fitur & Manajemen Panti Asuhan' : 'Menu & Fasilitas Unggulan',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
             ),
             const SizedBox(height: 12),
 
             if (isAdmin)
-              // GRID ADMIN: Tanpa Peta LBS, Tanpa Sensor & Game
               GridView.count(
                 crossAxisCount: 2,
                 shrinkWrap: true,
@@ -229,7 +218,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     title: 'Tracking Donatur',
                     subtitle: 'Donatur, anak, & nominal',
                     icon: Icons.track_changes,
-                    color: Colors.teal,
+                    color: AppColors.primary,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DonationTrackingScreen())),
                   ),
                   _buildFeatureCard(
@@ -237,15 +226,15 @@ class _HomeScreenState extends State<HomeScreen> {
                     title: 'Dana Kotak IoT',
                     subtitle: 'Total dana masuk sensor',
                     icon: Icons.savings,
-                    color: Colors.pink.shade700,
+                    color: AppColors.secondary,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const IotDonationScreen())),
                   ),
                   _buildFeatureCard(
                     context,
                     title: 'Kelola Anak & Nota',
-                    subtitle: 'PeduliAnak + upload nota',
+                    subtitle: 'Input & upload nota',
                     icon: Icons.admin_panel_settings,
-                    color: const Color(0xFF1B5E20),
+                    color: AppColors.primaryDark,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminPanelScreen())),
                   ),
                   _buildFeatureCard(
@@ -253,15 +242,15 @@ class _HomeScreenState extends State<HomeScreen> {
                     title: 'Dashboard Keuangan',
                     subtitle: 'Rekap dana & AI statement',
                     icon: Icons.account_balance_wallet,
-                    color: Colors.deepOrange,
+                    color: AppColors.accent2,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FinanceDashboardScreen())),
                   ),
                   _buildFeatureCard(
                     context,
-                    title: 'Ruang Komunikasi',
-                    subtitle: 'Surat, karya & video call',
+                    title: 'Ruang Kasih',
+                    subtitle: 'Chat, karya & video call',
                     icon: Icons.favorite,
-                    color: Colors.red.shade600,
+                    color: AppColors.secondary,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FamilyRoomScreen())),
                   ),
                   _buildFeatureCard(
@@ -269,7 +258,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     title: 'Sahabat Asuh AI',
                     subtitle: 'Bantuan laporan & data',
                     icon: Icons.auto_awesome,
-                    color: Colors.cyan.shade800,
+                    color: AppColors.accent3,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AiAssistantScreen())),
                   ),
                   _buildFeatureCard(
@@ -277,7 +266,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     title: 'Blockchain Ledger',
                     subtitle: 'Audit nota on-chain',
                     icon: Icons.link,
-                    color: Colors.deepPurple,
+                    color: AppColors.primaryDark,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LedgerScreen())),
                   ),
                   _buildFeatureCard(
@@ -285,13 +274,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     title: 'Jadwal 4 Zona',
                     subtitle: 'WIB, WITA, WIT, London',
                     icon: Icons.schedule,
-                    color: Colors.indigo,
+                    color: AppColors.accent1,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ScheduleScreen())),
                   ),
                 ],
               )
             else
-              // GRID DONATUR: Mempertahankan Peta LBS & Sensor/Game
               GridView.count(
                 crossAxisCount: 2,
                 shrinkWrap: true,
@@ -305,19 +293,19 @@ class _HomeScreenState extends State<HomeScreen> {
                     title: 'Sponsori Anak',
                     subtitle: 'Cari & filter paket anak',
                     icon: Icons.volunteer_activism,
-                    color: const Color(0xFF2E7D32),
+                    color: AppColors.primary,
                     onTap: () {
                       if (widget.onNavigateTab != null) {
-                        widget.onNavigateTab!(1); // Pindah ke tab Sponsor
+                        widget.onNavigateTab!(1);
                       }
                     },
                   ),
                   _buildFeatureCard(
                     context,
-                    title: 'Ruang Kasih Asuh',
-                    subtitle: 'Kirim surat & video call',
+                    title: 'Ruang Kasih',
+                    subtitle: 'Chat & video call',
                     icon: Icons.favorite,
-                    color: Colors.pink.shade600,
+                    color: AppColors.secondary,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FamilyRoomScreen())),
                   ),
                   _buildFeatureCard(
@@ -325,7 +313,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     title: 'Blockchain Ledger',
                     subtitle: 'Hash chain & verifikasi',
                     icon: Icons.link,
-                    color: Colors.deepPurple,
+                    color: AppColors.primaryDark,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LedgerScreen())),
                   ),
                   _buildFeatureCard(
@@ -333,7 +321,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     title: 'Peta Panti LBS',
                     subtitle: 'Jarak & check-in 100m',
                     icon: Icons.map,
-                    color: Colors.blue,
+                    color: AppColors.accent3,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MapScreen())),
                   ),
                   _buildFeatureCard(
@@ -341,7 +329,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     title: 'Jadwal 4 Zona',
                     subtitle: 'WIB, WITA, WIT, London',
                     icon: Icons.schedule,
-                    color: Colors.indigo,
+                    color: AppColors.accent1,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ScheduleScreen())),
                   ),
                   _buildFeatureCard(
@@ -349,7 +337,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     title: 'Sensor & Game',
                     subtitle: 'Langkah & Gyroscope',
                     icon: Icons.sports_esports,
-                    color: Colors.amber.shade800,
+                    color: AppColors.accent2,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const StepsAndGameScreen())),
                   ),
                   _buildFeatureCard(
@@ -357,7 +345,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     title: 'Sahabat Asuh AI',
                     subtitle: 'Surat & ringkasan LLM',
                     icon: Icons.auto_awesome,
-                    color: Colors.cyan.shade800,
+                    color: AppColors.accent3,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AiAssistantScreen())),
                   ),
                   _buildFeatureCard(
@@ -365,15 +353,15 @@ class _HomeScreenState extends State<HomeScreen> {
                     title: 'Kotak Amal IoT',
                     subtitle: 'Deteksi sensor koin/uang',
                     icon: Icons.savings,
-                    color: Colors.pink.shade700,
+                    color: AppColors.secondary,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const IotDonationScreen())),
                   ),
                   _buildFeatureCard(
                     context,
                     title: 'Riwayat & Sync',
-                    subtitle: 'Offline queue SQLite',
+                    subtitle: 'Donasi & sinkronisasi',
                     icon: Icons.history,
-                    color: Colors.green.shade800,
+                    color: AppColors.primary,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DonationHistoryScreen())),
                   ),
                 ],
@@ -402,7 +390,7 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 6),
             Text(
               value,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.textPrimary),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -448,11 +436,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Icon(icon, color: color, size: 24),
               ),
               const SizedBox(height: 8),
-              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary)),
               const SizedBox(height: 2),
               Text(
                 subtitle,
-                style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                style: const TextStyle(fontSize: 10, color: AppColors.textSecondary),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),

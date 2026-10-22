@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../core/app_colors.dart';
+import '../../core/dio_client.dart';
 import '../../data/local_db.dart';
 import 'finance_dashboard_screen.dart';
 
@@ -19,88 +21,6 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
   bool _isLoading = true;
   String _searchQuery = '';
 
-  // Data awal anak panti asuhan dari pedulianak.org
-  final List<Map<String, dynamic>> _peduliAnakScraped = [
-    {
-      'id': 'c1',
-      'name': 'Arfa',
-      'age': 8,
-      'gender': 'Laki-laki',
-      'city': 'Peduli Anak Lombok',
-      'urgentNeeds': 'Pendidikan & Alat Tulis',
-      'story': 'Arfa adalah anak yang ceria dan penuh semangat belajar di Pusat Peduli Anak Lombok. Bercita-cita menjadi arsitek dan sangat menyukai matematika.',
-      'photo': 'https://www.pedulianak.org/wp-content/uploads/2025/08/6-200x300.jpg',
-      'target': 500000.0,
-      'dream': 'Arsitek',
-      'hobby': 'Matematika & Menggambar',
-    },
-    {
-      'id': 'c2',
-      'name': 'Ayra',
-      'age': 6,
-      'gender': 'Perempuan',
-      'city': 'Peduli Anak Lombok',
-      'urgentNeeds': 'Kebutuhan Sehari-hari & Nutrisi',
-      'story': 'Ayra adalah anak periang yang suka menggambar pemandangan alam. Membutuhkan dukungan nutrisi, pakaian, dan perlengkapan harian.',
-      'photo': 'https://www.pedulianak.org/wp-content/uploads/2026/07/Ayra-200x300.jpg',
-      'target': 450000.0,
-      'dream': 'Dokter',
-      'hobby': 'Menggambar',
-    },
-    {
-      'id': 'c3',
-      'name': 'Azkya',
-      'age': 9,
-      'gender': 'Perempuan',
-      'city': 'Peduli Anak Lombok',
-      'urgentNeeds': 'Pendidikan',
-      'story': 'Azkya rajin membaca buku cerita dan bercita-cita menjadi guru SD. Membutuhkan seragam sekolah, tas, dan buku-buku pelajaran.',
-      'photo': 'https://www.pedulianak.org/wp-content/uploads/2026/07/DSCF6859-200x300.jpg',
-      'target': 550000.0,
-      'dream': 'Guru SD',
-      'hobby': 'Membaca Buku Cerita',
-    },
-    {
-      'id': 'c4',
-      'name': 'Elsa Saputri',
-      'age': 10,
-      'gender': 'Perempuan',
-      'city': 'Peduli Anak Sumbawa',
-      'urgentNeeds': 'Perawatan Esensial & Kesehatan',
-      'story': 'Elsa anak yang mandiri dan peduli pada teman-temannya di asrama. Membutuhkan dukungan biaya kesehatan berkala dan suplemen vitamin.',
-      'photo': 'https://www.pedulianak.org/wp-content/uploads/2026/07/DSCF6838-200x300.jpg',
-      'target': 600000.0,
-      'dream': 'Perawat',
-      'hobby': 'Menyanyi',
-    },
-    {
-      'id': 'c5',
-      'name': 'Farel Pratama',
-      'age': 7,
-      'gender': 'Laki-laki',
-      'city': 'Peduli Anak Lombok',
-      'urgentNeeds': 'Pendidikan',
-      'story': 'Farel sangat aktif dan senang berolahraga lari dan sepak bola. Membutuhkan sepatu sekolah baru dan perlengkapan ekstrakurikuler.',
-      'photo': 'https://www.pedulianak.org/wp-content/uploads/2026/07/DSCF6845-200x300.jpg',
-      'target': 500000.0,
-      'dream': 'Atlet Sepak Bola',
-      'hobby': 'Sepak Bola',
-    },
-    {
-      'id': 'c6',
-      'name': 'Gita Rahmawati',
-      'age': 11,
-      'gender': 'Perempuan',
-      'city': 'Peduli Anak Mataram',
-      'urgentNeeds': 'Pendidikan & Komputer',
-      'story': 'Gita tertarik dengan dunia teknologi informasi dan suka belajar mengetik serta coding sederhana di lab komputer panti.',
-      'photo': 'https://www.pedulianak.org/wp-content/uploads/2026/07/DSCF6849-200x300.jpg',
-      'target': 650000.0,
-      'dream': 'Programmer Komputer',
-      'hobby': 'Komputer & Desain',
-    },
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -110,37 +30,45 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
   Future<void> _loadChildren() async {
     setState(() => _isLoading = true);
     try {
-      final cached = await _localDb.getCachedChildren();
+      // 1. Coba ambil dari Supabase via API
+      List<Map<String, dynamic>> apiChildren = [];
+      try {
+        final res = await DioClient().dio.get('/children');
+        if (res.statusCode == 200) {
+          final data = res.data;
+          if (data is List && data.isNotEmpty) {
+            apiChildren = List<Map<String, dynamic>>.from(data);
+          } else if (data is Map && data['data'] is List) {
+            apiChildren = List<Map<String, dynamic>>.from(data['data']);
+          }
+        }
+      } catch (_) {}
+
+      // 2. Ambil anak yang diinput admin secara lokal
       final newKids = await _localDb.getNewChildren();
 
+      // Gabungkan: API + lokal baru (deduplikasi by name)
       final Map<String, Map<String, dynamic>> map = {};
-      
-      // Masukkan scraped default dari Peduli Anak
-      for (var k in _peduliAnakScraped) {
-        map[k['name'].toString().toLowerCase()] = Map<String, dynamic>.from(k);
-      }
 
-      // Masukkan yang ada di cached_children
-      for (var k in cached) {
+      for (var k in apiChildren) {
         final name = (k['alias'] ?? k['name'] ?? '').toString();
         if (name.isNotEmpty) {
           map[name.toLowerCase()] = {
             'id': k['id'],
             'name': name,
             'age': k['age'] ?? 8,
-            'gender': 'Laki-laki/Perempuan',
-            'city': k['orphanage_city'] ?? 'PeduliAnak Lombok',
-            'urgentNeeds': k['need_category'] ?? 'Pendidikan',
-            'story': k['story_summary'] ?? 'Anak asuh bersemangat dan giat belajar.',
-            'photo': k['avatar'] ?? 'https://www.pedulianak.org/wp-content/uploads/2025/08/6-200x300.jpg',
-            'target': 500000.0,
-            'dream': 'Guru',
-            'hobby': 'Membaca',
+            'gender': k['gender'] ?? 'Laki-laki/Perempuan',
+            'city': k['orphanage_city'] ?? k['city'] ?? '',
+            'urgentNeeds': k['need_category'] ?? k['urgentNeeds'] ?? 'Pendidikan',
+            'story': k['story_summary'] ?? k['story'] ?? '',
+            'photo': k['avatar'] ?? k['photo'] ?? '',
+            'target': (k['target'] is num) ? (k['target'] as num).toDouble() : 500000.0,
+            'dream': k['dream'] ?? '',
+            'hobby': k['hobby'] ?? '',
           };
         }
       }
 
-      // Masukkan yang baru diinputkan admin
       for (var k in newKids) {
         final name = (k['name'] ?? k['alias'] ?? '').toString();
         if (name.isNotEmpty) {
@@ -157,7 +85,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _children = List.from(_peduliAnakScraped);
+          _children = [];
           _isLoading = false;
         });
       }
@@ -180,8 +108,10 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     final dreamCtrl = TextEditingController();
     final hobbyCtrl = TextEditingController();
     final storyCtrl = TextEditingController();
-    final needCtrl = TextEditingController(text: 'Pendidikan');
+    final cityCtrl = TextEditingController(text: 'Peduli Anak Lombok');
     final targetCtrl = TextEditingController(text: '500000');
+    String selectedNeed = 'Pendidikan';
+    String selectedGender = 'Laki-laki';
     String? base64Image;
 
     await showModalBottomSheet(
@@ -218,11 +148,11 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                 const SizedBox(height: 16),
                 const Text(
                   'Tambah Data Anak Asuh Baru',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20)),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                 ),
                 const Text(
-                  'Data akan langsung dipromosikan untuk para donatur.',
-                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                  'Data akan langsung tersimpan & muncul di halaman donatur.',
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                 ),
                 const SizedBox(height: 16),
                 Center(
@@ -240,9 +170,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                       width: 100,
                       height: 100,
                       decoration: BoxDecoration(
-                        color: Colors.grey[100],
+                        color: AppColors.surfaceLight,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.green.shade300, width: 2),
+                        border: Border.all(color: AppColors.primary, width: 2),
                       ),
                       child: base64Image != null
                           ? ClipRRect(
@@ -255,9 +185,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                           : Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.add_a_photo, color: Colors.green.shade700, size: 30),
+                                Icon(Icons.add_a_photo, color: AppColors.primary, size: 30),
                                 const SizedBox(height: 4),
-                                const Text('Foto Anak', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                                const Text('Foto Anak', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
                               ],
                             ),
                     ),
@@ -266,7 +196,11 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                 const SizedBox(height: 16),
                 TextField(
                   controller: nameCtrl,
-                  decoration: const InputDecoration(labelText: 'Nama Lengkap Anak', border: OutlineInputBorder()),
+                  decoration: InputDecoration(
+                    labelText: 'Nama Lengkap Anak',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Row(
@@ -275,50 +209,94 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                       child: TextField(
                         controller: ageCtrl,
                         keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: 'Usia (Tahun)', border: OutlineInputBorder()),
+                        decoration: InputDecoration(
+                          labelText: 'Usia (Tahun)',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: DropdownButtonFormField<String>(
-                        value: 'Pendidikan',
-                        items: ['Pendidikan', 'Kesehatan', 'Nutrisi', 'Kebutuhan Harian']
+                        value: selectedGender,
+                        items: ['Laki-laki', 'Perempuan']
                             .map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 13))))
                             .toList(),
-                        onChanged: (v) => needCtrl.text = v ?? 'Pendidikan',
-                        decoration: const InputDecoration(labelText: 'Kategori Kebutuhan', border: OutlineInputBorder()),
+                        onChanged: (v) => setModalState(() => selectedGender = v ?? 'Laki-laki'),
+                        decoration: InputDecoration(
+                          labelText: 'Jenis Kelamin',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: selectedNeed,
+                  items: AppColors.needCategoriesInput
+                      .map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 13))))
+                      .toList(),
+                  onChanged: (v) => setModalState(() => selectedNeed = v ?? 'Pendidikan'),
+                  decoration: InputDecoration(
+                    labelText: 'Kategori Kebutuhan',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: cityCtrl,
+                  decoration: InputDecoration(
+                    labelText: 'Asal Panti / Kota',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
+                  ),
+                ),
+                const SizedBox(height: 12),
                 TextField(
                   controller: dreamCtrl,
-                  decoration: const InputDecoration(labelText: 'Cita-Cita', border: OutlineInputBorder()),
+                  decoration: InputDecoration(
+                    labelText: 'Cita-Cita',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: hobbyCtrl,
-                  decoration: const InputDecoration(labelText: 'Hobi & Minat', border: OutlineInputBorder()),
+                  decoration: InputDecoration(
+                    labelText: 'Hobi & Minat',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: targetCtrl,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Target Donasi Bulanan (Rp)', border: OutlineInputBorder()),
+                  decoration: InputDecoration(
+                    labelText: 'Target Donasi Bulanan (Rp)',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: storyCtrl,
                   maxLines: 3,
-                  decoration: const InputDecoration(labelText: 'Kisah / Latar Belakang Anak', border: OutlineInputBorder()),
+                  decoration: InputDecoration(
+                    labelText: 'Kisah / Latar Belakang Anak',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
+                  ),
                 ),
                 const SizedBox(height: 20),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2E7D32),
+                      backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -335,25 +313,48 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                         'id': 'child_${DateTime.now().millisecondsSinceEpoch}',
                         'name': nameCtrl.text.trim(),
                         'age': int.tryParse(ageCtrl.text) ?? 8,
-                        'gender': 'Laki-laki',
-                        'city': 'Peduli Anak Mataram, Lombok',
-                        'urgentNeeds': needCtrl.text,
+                        'gender': selectedGender,
+                        'city': cityCtrl.text.trim().isEmpty ? 'Peduli Anak Lombok' : cityCtrl.text.trim(),
+                        'urgentNeeds': selectedNeed,
                         'story': storyCtrl.text.isEmpty ? 'Anak asuh bersemangat untuk menempuh pendidikan.' : storyCtrl.text,
-                        'photo': base64Image ?? 'https://www.pedulianak.org/wp-content/uploads/2025/08/6-200x300.jpg',
+                        'photo': base64Image ?? '',
                         'target': double.tryParse(targetCtrl.text) ?? 500000.0,
-                        'dream': dreamCtrl.text.isEmpty ? 'Guru' : dreamCtrl.text,
-                        'hobby': hobbyCtrl.text.isEmpty ? 'Membaca' : hobbyCtrl.text,
+                        'dream': dreamCtrl.text.isEmpty ? '' : dreamCtrl.text,
+                        'hobby': hobbyCtrl.text.isEmpty ? '' : hobbyCtrl.text,
                         'createdAt': DateTime.now().toIso8601String(),
                       };
 
+                      // Simpan ke lokal DB
                       await _localDb.insertChild(newKid);
+
+                      // Coba simpan ke Supabase via API
+                      try {
+                        await DioClient().dio.post('/children', data: {
+                          'alias': newKid['name'],
+                          'age': newKid['age'],
+                          'gender': newKid['gender'],
+                          'need_category': newKid['urgentNeeds'],
+                          'story_summary': newKid['story'],
+                          'avatar': newKid['photo'],
+                          'orphanage_city': newKid['city'],
+                          'target': newKid['target'],
+                          'dream': newKid['dream'],
+                          'hobby': newKid['hobby'],
+                        });
+                      } catch (_) {
+                        // Offline: sudah tersimpan lokal
+                      }
+
                       if (ctx.mounted) {
                         Navigator.pop(ctx);
                       }
                       _loadChildren();
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Anak asuh "${nameCtrl.text}" berhasil ditambahkan & dipromosikan!')),
+                          SnackBar(
+                            content: Text('Anak asuh "${nameCtrl.text}" berhasil ditambahkan!'),
+                            backgroundColor: AppColors.primary,
+                          ),
                         );
                       }
                     },
@@ -397,7 +398,6 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Header child card
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -412,24 +412,24 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                               children: [
                                 Text(
                                   child['name'] ?? child['alias'] ?? 'Anak Asuh',
-                                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  'Usia: ${child['age'] ?? '-'} Tahun • ${child['city'] ?? child['orphanage_city'] ?? 'PeduliAnak'}',
-                                  style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                                  'Usia: ${child['age'] ?? '-'} Tahun • ${child['city'] ?? child['orphanage_city'] ?? ''}',
+                                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
                                 ),
                                 const SizedBox(height: 6),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                   decoration: BoxDecoration(
-                                    color: Colors.green.shade50,
+                                    color: AppColors.surfaceLight,
                                     borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(color: Colors.green.shade200),
+                                    border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
                                   ),
                                   child: Text(
                                     'Kebutuhan: ${child['urgentNeeds'] ?? child['need_category'] ?? 'Pendidikan'}',
-                                    style: TextStyle(color: Colors.green.shade800, fontSize: 12, fontWeight: FontWeight.bold),
+                                    style: const TextStyle(color: AppColors.primaryDark, fontSize: 12, fontWeight: FontWeight.bold),
                                   ),
                                 ),
                               ],
@@ -439,13 +439,13 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'Cita-cita: ${child['dream'] ?? 'Mandiri & Berprestasi'} | Hobi: ${child['hobby'] ?? 'Membaca'}',
-                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Colors.black87),
+                        'Cita-cita: ${child['dream'] ?? '-'} | Hobi: ${child['hobby'] ?? '-'}',
+                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.textPrimary),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         child['story'] ?? child['story_summary'] ?? 'Belum ada kisah latar belakang.',
-                        style: TextStyle(color: Colors.grey[700], fontSize: 13, height: 1.4),
+                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.4),
                       ),
                       const Divider(height: 32),
                       
@@ -458,17 +458,17 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                             children: [
                               Text(
                                 'Laporan Keuangan & Nota',
-                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1B5E20)),
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textPrimary),
                               ),
                               Text(
                                 'Transparansi untuk donatur (On-Chain)',
-                                style: TextStyle(fontSize: 12, color: Colors.grey),
+                                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                               ),
                             ],
                           ),
                           ElevatedButton.icon(
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF2E7D32),
+                              backgroundColor: AppColors.primary,
                               foregroundColor: Colors.white,
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -487,14 +487,14 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                         future: _loadReceiptsForChild(child['name'] ?? child['alias'] ?? ''),
                         builder: (context, snapshot) {
                           if (snapshot.connectionState == ConnectionState.waiting) {
-                            return const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()));
+                            return const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator(color: AppColors.primary)));
                           }
                           final receipts = snapshot.data ?? [];
                           if (receipts.isEmpty) {
                             return Container(
                               padding: const EdgeInsets.all(20),
                               decoration: BoxDecoration(
-                                color: Colors.grey[50],
+                                color: AppColors.surfaceLight,
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(color: Colors.grey[200]!),
                               ),
@@ -503,7 +503,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                   children: [
                                     Icon(Icons.receipt_long_outlined, size: 40, color: Colors.grey[400]),
                                     const SizedBox(height: 8),
-                                    const Text('Belum ada nota/laporan belanja diinputkan untuk anak ini.', style: TextStyle(fontSize: 12, color: Colors.grey), textAlign: TextAlign.center),
+                                    const Text('Belum ada nota/laporan belanja diinputkan untuk anak ini.', style: TextStyle(fontSize: 12, color: AppColors.textSecondary), textAlign: TextAlign.center),
                                   ],
                                 ),
                               ),
@@ -518,7 +518,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                 decoration: BoxDecoration(
                                   color: Colors.white,
                                   borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: Colors.green.shade100),
+                                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
                                   boxShadow: [
                                     BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 4, offset: const Offset(0, 2)),
                                   ],
@@ -536,10 +536,10 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                         width: 60,
                                         height: 60,
                                         decoration: BoxDecoration(
-                                          color: Colors.green.shade50,
+                                          color: AppColors.surfaceLight,
                                           borderRadius: BorderRadius.circular(8),
                                         ),
-                                        child: const Icon(Icons.receipt, color: Colors.green),
+                                        child: const Icon(Icons.receipt, color: AppColors.primary),
                                       ),
                                     const SizedBox(width: 12),
                                     Expanded(
@@ -548,15 +548,15 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                         children: [
                                           Text(
                                             r['title'] ?? 'Belanja Kebutuhan',
-                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textPrimary),
                                           ),
                                           Text(
                                             'Nominal: Rp ${r['amount']}',
-                                            style: const TextStyle(color: Color(0xFF2E7D32), fontWeight: FontWeight.bold, fontSize: 13),
+                                            style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 13),
                                           ),
                                           Text(
                                             'Tanggal: ${r['date'] ?? '-'}',
-                                            style: TextStyle(color: Colors.grey[600], fontSize: 11),
+                                            style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
                                           ),
                                           const SizedBox(height: 4),
                                           Container(
@@ -609,7 +609,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       builder: (dCtx) => StatefulBuilder(
         builder: (dCtx, setDialogState) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text('Input Nota untuk $childName', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          title: Text('Input Nota untuk $childName', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -628,9 +628,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                     height: 100,
                     width: double.infinity,
                     decoration: BoxDecoration(
-                      color: Colors.grey[100],
+                      color: AppColors.surfaceLight,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.green.shade300, strokeAlign: BorderSide.strokeAlignInside),
+                      border: Border.all(color: AppColors.primary, strokeAlign: BorderSide.strokeAlignInside),
                     ),
                     child: receiptBase64 != null
                         ? ClipRRect(
@@ -640,9 +640,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                         : Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.camera_alt, color: Colors.green.shade700, size: 28),
+                              Icon(Icons.camera_alt, color: AppColors.primary, size: 28),
                               const SizedBox(height: 4),
-                              const Text('Upload Bukti Struk/Nota', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                              const Text('Upload Bukti Struk/Nota', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
                             ],
                           ),
                   ),
@@ -650,26 +650,26 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                 const SizedBox(height: 12),
                 TextField(
                   controller: titleCtrl,
-                  decoration: const InputDecoration(labelText: 'Peruntukan (Contoh: Beli Buku & Seragam)', border: OutlineInputBorder()),
+                  decoration: InputDecoration(labelText: 'Peruntukan (Contoh: Beli Buku & Seragam)', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: amountCtrl,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Nominal Biaya (Rp)', border: OutlineInputBorder()),
+                  decoration: InputDecoration(labelText: 'Nominal Biaya (Rp)', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: descCtrl,
-                  decoration: const InputDecoration(labelText: 'Keterangan Toko / Tanggal', border: OutlineInputBorder()),
+                  decoration: InputDecoration(labelText: 'Keterangan Toko / Tanggal', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
                 ),
               ],
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(dCtx), child: const Text('Batal')),
+            TextButton(onPressed: () => Navigator.pop(dCtx), child: const Text('Batal', style: TextStyle(color: AppColors.textSecondary))),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2E7D32), foregroundColor: Colors.white),
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
               onPressed: () async {
                 if (titleCtrl.text.isEmpty || amountCtrl.text.isEmpty) {
                   return;
@@ -685,13 +685,19 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                   'hash': '0x${DateTime.now().millisecondsSinceEpoch.toRadixString(16)}sha256',
                 };
                 await _localDb.insertReceipt(newReceipt);
+
+                // Sync to Supabase
+                try {
+                  await DioClient().dio.post('/ledger/receipts', data: newReceipt);
+                } catch (_) {}
+
                 if (dCtx.mounted) {
                   Navigator.pop(dCtx);
                 }
                 if (mounted) {
-                  Navigator.pop(context); // Close child detail sheet to refresh
+                  Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Nota berhasil disimpan & dicatat ke Blockchain Ledger!')),
+                    const SnackBar(content: Text('Nota berhasil disimpan & dicatat ke Blockchain Ledger!'), backgroundColor: AppColors.primary),
                   );
                 }
               },
@@ -719,26 +725,29 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
         errorBuilder: (_, __, ___) => Container(
           width: width,
           height: height,
-          color: Colors.grey[300],
-          child: const Icon(Icons.person, color: Colors.grey),
+          color: AppColors.surfaceLight,
+          child: const Icon(Icons.person, color: AppColors.primary),
         ),
       );
     }
     return Container(
       width: width,
       height: height,
-      color: Colors.grey[200],
-      child: const Icon(Icons.person, color: Colors.grey),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceLight,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: const Icon(Icons.person, color: AppColors.primary),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF7FBF7),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Panel Admin Panti Asuhan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-        backgroundColor: const Color(0xFF1B5E20),
+        backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
@@ -757,25 +766,25 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: const Color(0xFF2E7D32),
+        backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         icon: const Icon(Icons.person_add),
         label: const Text('Tambah Anak Asuh'),
         onPressed: _showAddChildDialog,
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
           : Column(
               children: [
                 Container(
-                  color: const Color(0xFF1B5E20),
+                  color: AppColors.primary,
                   padding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
                   child: TextField(
                     onChanged: (v) => setState(() => _searchQuery = v),
                     decoration: InputDecoration(
                       hintText: 'Cari nama anak atau asal panti...',
                       hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
-                      prefixIcon: const Icon(Icons.search, color: Color(0xFF1B5E20)),
+                      prefixIcon: const Icon(Icons.search, color: AppColors.primary),
                       filled: true,
                       fillColor: Colors.white,
                       isDense: true,
@@ -790,15 +799,31 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                     children: [
                       Text(
                         'Total Terdaftar: ${_filteredChildren.length} Anak',
-                        style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1B5E20)),
+                        style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                       ),
                       const Text(
                         'Klik kartu untuk input nota belanja',
-                        style: TextStyle(fontSize: 11, color: Colors.grey),
+                        style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
                       ),
                     ],
                   ),
                 ),
+                if (_filteredChildren.isEmpty)
+                  Expanded(
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.child_care, size: 64, color: AppColors.primary.withValues(alpha: 0.4)),
+                          const SizedBox(height: 16),
+                          const Text('Belum ada data anak asuh.', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
+                          const SizedBox(height: 8),
+                          const Text('Tekan tombol + untuk menambah anak asuh baru.', style: TextStyle(fontSize: 13, color: AppColors.textHint)),
+                        ],
+                      ),
+                    ),
+                  )
+                else
                 Expanded(
                   child: ListView.builder(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -827,12 +852,12 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                     children: [
                                       Text(
                                         child['name'] ?? child['alias'] ?? 'Anak Asuh',
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.textPrimary),
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
-                                        'Usia ${child['age'] ?? '-'} Thn • ${child['city'] ?? child['orphanage_city'] ?? 'PeduliAnak Lombok'}',
-                                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                                        'Usia ${child['age'] ?? '-'} Thn • ${child['city'] ?? child['orphanage_city'] ?? ''}',
+                                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
                                       ),
                                       const SizedBox(height: 6),
                                       Row(
@@ -840,26 +865,26 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                           Container(
                                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                             decoration: BoxDecoration(
-                                              color: Colors.green.shade50,
+                                              color: AppColors.surfaceLight,
                                               borderRadius: BorderRadius.circular(6),
-                                              border: Border.all(color: Colors.green.shade200),
+                                              border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
                                             ),
                                             child: Text(
                                               child['urgentNeeds'] ?? child['need_category'] ?? 'Pendidikan',
-                                              style: TextStyle(fontSize: 10, color: Colors.green.shade900, fontWeight: FontWeight.bold),
+                                              style: const TextStyle(fontSize: 10, color: AppColors.primaryDark, fontWeight: FontWeight.bold),
                                             ),
                                           ),
                                           const SizedBox(width: 8),
                                           Text(
                                             'Target: Rp ${(child['target'] ?? 500000).toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}',
-                                            style: TextStyle(fontSize: 11, color: Colors.grey[700]),
+                                            style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
                                           ),
                                         ],
                                       ),
                                     ],
                                   ),
                                 ),
-                                const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+                                const Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.textHint),
                               ],
                             ),
                           ),

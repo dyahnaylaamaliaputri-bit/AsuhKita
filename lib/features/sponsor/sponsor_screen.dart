@@ -2,9 +2,11 @@
 // Fungsi: UI Pencarian & Filter Anak Asuh (Tab Sponsor), Integrasi Cache SQLite Offline, dan Shake-to-Refresh (PBI-018, PBI-019, PBI-020, PBI-052)
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:sensors_plus/sensors_plus.dart';
+import '../../core/app_colors.dart';
 import '../../data/local_db.dart';
 import '../../core/dio_client.dart';
 import 'child_detail_screen.dart';
@@ -29,124 +31,8 @@ class _SponsorScreenState extends State<SponsorScreen> {
   StreamSubscription? _accelerometerSubscription;
   DateTime _lastShakeTime = DateTime.now();
 
-  final List<String> _categories = [
-    'Semua',
-    'Pendidikan',
-    'Kebutuhan Sehari-hari',
-    'Perawatan Esensial',
-  ];
-
-  // Data anak asuh dari Yayasan Peduli Anak (pedulianak.org)
-  final List<Map<String, dynamic>> _dummyChildren = [
-    {
-      'id': 'c1',
-      'orphanage_id': 'o1',
-      'alias': 'Arfa',
-      'age': 8,
-      'need_category': 'Pendidikan',
-      'story_summary': 'Arfa adalah anak yang ceria dan penuh semangat belajar di Pusat Peduli Anak Lombok. Bercita-cita menjadi arsitek dan sangat menyukai matematika.',
-      'avatar': 'https://www.pedulianak.org/wp-content/uploads/2025/08/6-200x300.jpg',
-      'status': 'Tersedia',
-      'orphanage_name': 'Peduli Anak Foundation',
-      'orphanage_city': 'Lombok Barat',
-    },
-    {
-      'id': 'c2',
-      'orphanage_id': 'o1',
-      'alias': 'Ayra',
-      'age': 6,
-      'need_category': 'Kebutuhan Sehari-hari',
-      'story_summary': 'Ayra adalah anak periang yang suka menggambar pemandangan alam. Membutuhkan dukungan nutrisi, pakaian, dan perlengkapan harian.',
-      'avatar': 'https://www.pedulianak.org/wp-content/uploads/2026/07/Ayra-200x300.jpg',
-      'status': 'Tersedia',
-      'orphanage_name': 'Peduli Anak Foundation',
-      'orphanage_city': 'Lombok Barat',
-    },
-    {
-      'id': 'c3',
-      'orphanage_id': 'o1',
-      'alias': 'Azkya',
-      'age': 9,
-      'need_category': 'Pendidikan',
-      'story_summary': 'Azkya rajin membaca buku cerita dan bercita-cita menjadi guru SD. Membutuhkan seragam sekolah, tas, dan buku-buku pelajaran.',
-      'avatar': 'https://www.pedulianak.org/wp-content/uploads/2026/07/DSCF6859-200x300.jpg',
-      'status': 'Tersedia',
-      'orphanage_name': 'Peduli Anak Foundation',
-      'orphanage_city': 'Lombok Tengah',
-    },
-    {
-      'id': 'c4',
-      'orphanage_id': 'o1',
-      'alias': 'Elsa Saputri',
-      'age': 10,
-      'need_category': 'Perawatan Esensial',
-      'story_summary': 'Elsa anak yang mandiri dan peduli pada teman-temannya di asrama. Membutuhkan dukungan biaya kesehatan berkala dan suplemen vitamin.',
-      'avatar': 'https://www.pedulianak.org/wp-content/uploads/2026/07/DSCF6838-200x300.jpg',
-      'status': 'Tersedia',
-      'orphanage_name': 'Peduli Anak Sumbawa',
-      'orphanage_city': 'Sumbawa',
-    },
-    {
-      'id': 'c5',
-      'orphanage_id': 'o1',
-      'alias': 'Rangga',
-      'age': 11,
-      'need_category': 'Pendidikan',
-      'story_summary': 'Rangga gemar berolahraga sepak bola dan sains alam. Sangat antusias mengikuti kegiatan les ekstrakurikuler sains di panti asuhan.',
-      'avatar': 'https://www.pedulianak.org/wp-content/uploads/2026/07/DSCF6843-200x300.jpg',
-      'status': 'Tersedia',
-      'orphanage_name': 'Peduli Anak Foundation',
-      'orphanage_city': 'Lombok Utara',
-    },
-    {
-      'id': 'c6',
-      'orphanage_id': 'o1',
-      'alias': 'Sasmita',
-      'age': 7,
-      'need_category': 'Kebutuhan Sehari-hari',
-      'story_summary': 'Sasmita menyukai kesenian tari tradisional dan menyanyi. Memerlukan bantuan paket makanan bergizi seimbang dan susu pertumbuhan.',
-      'avatar': 'https://www.pedulianak.org/wp-content/uploads/2026/08/DSCF8123-200x300.jpg',
-      'status': 'Tersedia',
-      'orphanage_name': 'Peduli Anak Mataram',
-      'orphanage_city': 'Mataram',
-    },
-    {
-      'id': 'c7',
-      'orphanage_id': 'o1',
-      'alias': 'Seregar',
-      'age': 12,
-      'need_category': 'Pendidikan',
-      'story_summary': 'Seregar adalah siswa berprestasi di sekolah menengah dan memiliki cita-cita menjadi insinyur teknik elektro masa depan.',
-      'avatar': 'https://www.pedulianak.org/wp-content/uploads/2026/08/DSCF7024-200x300.jpg',
-      'status': 'Tersedia',
-      'orphanage_name': 'Peduli Anak Foundation',
-      'orphanage_city': 'Praya',
-    },
-    {
-      'id': 'c8',
-      'orphanage_id': 'o1',
-      'alias': 'Shiddiq',
-      'age': 9,
-      'need_category': 'Kebutuhan Sehari-hari',
-      'story_summary': 'Shiddiq anak yang santun dan suka membantu pengurus panti merawat taman. Membutuhkan perlengkapan sekolah dan pakaian asrama.',
-      'avatar': 'https://www.pedulianak.org/wp-content/uploads/2026/08/DSCF8114-200x300.jpg',
-      'status': 'Tersedia',
-      'orphanage_name': 'Peduli Anak Foundation',
-      'orphanage_city': 'Lombok Barat',
-    },
-    {
-      'id': 'c9',
-      'orphanage_id': 'o1',
-      'alias': 'Hamdi',
-      'age': 13,
-      'need_category': 'Pendidikan',
-      'story_summary': 'Hamdi gemar mempelajari teknologi komputer dan aktif memimpin kegiatan doa bersama adik-adik di panti asuhan.',
-      'avatar': 'https://www.pedulianak.org/wp-content/uploads/2022/10/Hamdi.jpg',
-      'status': 'Tersedia',
-      'orphanage_name': 'Peduli Anak Foundation',
-      'orphanage_city': 'Lombok Barat',
-    },
-  ];
+  // Kategori kebutuhan — SAMA dengan admin (unified)
+  final List<String> _categories = AppColors.needCategories;
 
   @override
   void initState() {
@@ -166,7 +52,6 @@ class _SponsorScreenState extends State<SponsorScreen> {
   void _initShakeDetector() {
     _accelerometerSubscription = accelerometerEventStream().listen((event) {
       final acceleration = sqrt(event.x * event.x + event.y * event.y + event.z * event.z);
-      // Deteksi ambang shake (> 22 m/s²) dengan debounce minimal 2 detik
       if (acceleration > 22) {
         final now = DateTime.now();
         if (now.difference(_lastShakeTime).inSeconds > 2) {
@@ -175,7 +60,7 @@ class _SponsorScreenState extends State<SponsorScreen> {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('Sensor Goyang (Shake) terdeteksi! Memperbarui data anak...'),
-                backgroundColor: Colors.teal,
+                backgroundColor: AppColors.primary,
                 duration: Duration(seconds: 1),
               ),
             );
@@ -193,24 +78,27 @@ class _SponsorScreenState extends State<SponsorScreen> {
     }
 
     if (_forceOfflineMode) {
-      // Mode offline manual (demonstrasi cache SQLite untuk dosen)
+      // Mode offline manual (demonstrasi cache SQLite)
       _isOffline = true;
       final cached = await LocalDatabase().getCachedChildren(
         query: _searchController.text.trim(),
         category: _selectedCategory,
       );
-      if (cached.isNotEmpty) {
-        _allChildren = cached;
-      } else {
-        await LocalDatabase().cacheChildren(_dummyChildren);
-        _allChildren = await LocalDatabase().getCachedChildren();
-      }
+      _allChildren = cached;
     } else {
       try {
         // 1. Coba ambil dari online API Supabase
         final res = await DioClient().dio.get('/children');
-        if (res.statusCode == 200 && res.data is List && (res.data as List).isNotEmpty) {
-          final List<Map<String, dynamic>> apiData = List<Map<String, dynamic>>.from(res.data);
+        List<Map<String, dynamic>> apiData = [];
+        if (res.statusCode == 200) {
+          if (res.data is List && (res.data as List).isNotEmpty) {
+            apiData = List<Map<String, dynamic>>.from(res.data);
+          } else if (res.data is Map && res.data['data'] is List) {
+            apiData = List<Map<String, dynamic>>.from(res.data['data']);
+          }
+        }
+
+        if (apiData.isNotEmpty) {
           // Simpan ke SQLite cache untuk offline mode (PBI-020, FR-19)
           await LocalDatabase().cacheChildren(apiData);
           _allChildren = apiData;
@@ -225,16 +113,23 @@ class _SponsorScreenState extends State<SponsorScreen> {
           query: _searchController.text.trim(),
           category: _selectedCategory,
         );
-
-        if (cached.isNotEmpty) {
-          _allChildren = cached;
-        } else {
-          // Jika DB pertama kali kosong, inisialisasi dummy ke SQLite cache
-          await LocalDatabase().cacheChildren(_dummyChildren);
-          _allChildren = await LocalDatabase().getCachedChildren();
-        }
+        _allChildren = cached;
       }
     }
+
+    // Juga ambil anak yang di-input admin lokal
+    try {
+      final newKids = await LocalDatabase().getNewChildren();
+      if (newKids.isNotEmpty) {
+        final existingIds = _allChildren.map((c) => (c['name'] ?? c['alias'] ?? '').toString().toLowerCase()).toSet();
+        for (var k in newKids) {
+          final name = (k['name'] ?? k['alias'] ?? '').toString().toLowerCase();
+          if (name.isNotEmpty && !existingIds.contains(name)) {
+            _allChildren.add(k);
+          }
+        }
+      }
+    } catch (_) {}
 
     // Filter lokal berdasarkan query pencarian dan kategori
     _applyLocalFilter();
@@ -244,13 +139,13 @@ class _SponsorScreenState extends State<SponsorScreen> {
 
   void _applyLocalFilter() {
     final query = _searchController.text.toLowerCase().trim();
-    final sourceList = _allChildren.isNotEmpty ? _allChildren : _dummyChildren;
     setState(() {
-      _children = sourceList.where((child) {
-        final matchesQuery = query.isEmpty ||
-            child['alias'].toString().toLowerCase().contains(query) ||
-            child['orphanage_city'].toString().toLowerCase().contains(query);
-        final matchesCategory = _selectedCategory == 'Semua' || child['need_category'] == _selectedCategory;
+      _children = _allChildren.where((child) {
+        final alias = (child['alias'] ?? child['name'] ?? '').toString().toLowerCase();
+        final city = (child['orphanage_city'] ?? child['city'] ?? '').toString().toLowerCase();
+        final matchesQuery = query.isEmpty || alias.contains(query) || city.contains(query);
+        final category = child['need_category'] ?? child['urgentNeeds'] ?? '';
+        final matchesCategory = _selectedCategory == 'Semua' || category == _selectedCategory;
         return matchesQuery && matchesCategory;
       }).toList();
     });
@@ -259,10 +154,10 @@ class _SponsorScreenState extends State<SponsorScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Anak Asuh (Sponsor)'),
-        backgroundColor: Colors.teal,
+        backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
@@ -275,6 +170,7 @@ class _SponsorScreenState extends State<SponsorScreen> {
                 SnackBar(
                   content: Text(_isOffline ? 'Beralih ke Mode Online (Supabase)...' : 'Beralih ke Mode Offline (Cache SQLite)...'),
                   duration: const Duration(seconds: 1),
+                  backgroundColor: AppColors.primary,
                 ),
               );
             },
@@ -292,14 +188,14 @@ class _SponsorScreenState extends State<SponsorScreen> {
           if (_forceOfflineMode)
           Container(
             width: double.infinity,
-            color: _isOffline ? Colors.amber.shade100 : Colors.teal.shade50,
+            color: _isOffline ? AppColors.accent2.withValues(alpha: 0.4) : AppColors.accent1.withValues(alpha: 0.3),
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
             child: Row(
               children: [
                 Icon(
                   _isOffline ? Icons.cloud_off : Icons.cloud_done,
                   size: 18,
-                  color: _isOffline ? Colors.amber.shade900 : Colors.teal.shade800,
+                  color: _isOffline ? const Color(0xFF8B6914) : AppColors.primaryDark,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -309,7 +205,7 @@ class _SponsorScreenState extends State<SponsorScreen> {
                         : 'Mode Online: Terhubung ke Cloud Database Supabase.',
                     style: TextStyle(
                       fontSize: 12,
-                      color: _isOffline ? Colors.amber.shade900 : Colors.teal.shade800,
+                      color: _isOffline ? const Color(0xFF8B6914) : AppColors.primaryDark,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -321,7 +217,7 @@ class _SponsorScreenState extends State<SponsorScreen> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: _isOffline ? Colors.amber.shade200 : Colors.teal.shade100,
+                      color: _isOffline ? AppColors.accent2 : AppColors.accent1,
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
@@ -329,7 +225,7 @@ class _SponsorScreenState extends State<SponsorScreen> {
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
-                        color: _isOffline ? Colors.amber.shade900 : Colors.teal.shade900,
+                        color: _isOffline ? const Color(0xFF8B6914) : AppColors.primaryDark,
                       ),
                     ),
                   ),
@@ -349,7 +245,7 @@ class _SponsorScreenState extends State<SponsorScreen> {
                   onChanged: (_) => _applyLocalFilter(),
                   decoration: InputDecoration(
                     hintText: 'Cari nama samaran anak atau kota...',
-                    prefixIcon: const Icon(Icons.search, color: Colors.teal),
+                    prefixIcon: const Icon(Icons.search, color: AppColors.primary),
                     suffixIcon: _searchController.text.isNotEmpty
                         ? IconButton(
                             icon: const Icon(Icons.clear),
@@ -360,7 +256,7 @@ class _SponsorScreenState extends State<SponsorScreen> {
                           )
                         : null,
                     filled: true,
-                    fillColor: Colors.grey.shade100,
+                    fillColor: AppColors.surfaceLight,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -370,7 +266,7 @@ class _SponsorScreenState extends State<SponsorScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // Kategori Filter Kebutuhan (PBI-018, FR-16)
+                // Kategori Filter Kebutuhan — SERAGAM dengan admin (PBI-018, FR-16)
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
@@ -381,9 +277,9 @@ class _SponsorScreenState extends State<SponsorScreen> {
                         child: ChoiceChip(
                           label: Text(cat),
                           selected: isSelected,
-                          selectedColor: Colors.teal,
+                          selectedColor: AppColors.primary,
                           labelStyle: TextStyle(
-                            color: isSelected ? Colors.white : Colors.black87,
+                            color: isSelected ? Colors.white : AppColors.textPrimary,
                             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                           ),
                           onSelected: (val) {
@@ -404,15 +300,17 @@ class _SponsorScreenState extends State<SponsorScreen> {
           // Daftar Kartu Anak Asuh (PBI-018, FR-17)
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator(color: Colors.teal))
+                ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
                 : _children.isEmpty
                     ? Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.search_off, size: 60, color: Colors.grey.shade400),
+                            Icon(Icons.search_off, size: 60, color: AppColors.primary.withValues(alpha: 0.4)),
                             const SizedBox(height: 12),
-                            Text('Tidak ada anak asuh yang cocok.', style: TextStyle(color: Colors.grey.shade600)),
+                            const Text('Belum ada anak asuh terdaftar.', style: TextStyle(color: AppColors.textSecondary)),
+                            const SizedBox(height: 8),
+                            const Text('Data akan muncul setelah admin menambahkan.', style: TextStyle(color: AppColors.textHint, fontSize: 12)),
                           ],
                         ),
                       )
@@ -439,38 +337,13 @@ class _SponsorScreenState extends State<SponsorScreen> {
                                 padding: const EdgeInsets.all(16.0),
                                 child: Row(
                                   children: [
-                                    // Foto Profil Anak dari Peduli Anak (FR-17, NFR-06)
+                                    // Foto Profil Anak (FR-17, NFR-06)
                                     ClipRRect(
                                       borderRadius: BorderRadius.circular(16),
                                       child: SizedBox(
                                         width: 72,
                                         height: 72,
-                                        child: (child['avatar'] != null && child['avatar'].toString().startsWith('http'))
-                                            ? Image.network(
-                                                child['avatar'].toString(),
-                                                fit: BoxFit.cover,
-                                                loadingBuilder: (context, childWidget, progress) {
-                                                  if (progress == null) return childWidget;
-                                                  return Container(
-                                                    color: Colors.teal.shade50,
-                                                    child: const Center(
-                                                      child: SizedBox(
-                                                        width: 20,
-                                                        height: 20,
-                                                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.teal),
-                                                      ),
-                                                    ),
-                                                  );
-                                                },
-                                                errorBuilder: (context, error, stackTrace) => Container(
-                                                  color: Colors.teal.shade50,
-                                                  child: const Icon(Icons.face, size: 40, color: Colors.teal),
-                                                ),
-                                              )
-                                            : Container(
-                                                color: Colors.teal.shade50,
-                                                child: const Icon(Icons.face, size: 40, color: Colors.teal),
-                                              ),
+                                        child: _buildAvatar(child),
                                       ),
                                     ),
                                     const SizedBox(width: 16),
@@ -483,12 +356,13 @@ class _SponsorScreenState extends State<SponsorScreen> {
                                             children: [
                                               Expanded(
                                                 child: Text(
-                                                  '${child['alias']} (${child['age']} th)',
+                                                  '${child['alias'] ?? child['name'] ?? 'Anak'} (${child['age'] ?? '-'} th)',
                                                   maxLines: 1,
                                                   overflow: TextOverflow.ellipsis,
                                                   style: const TextStyle(
                                                     fontSize: 16,
                                                     fontWeight: FontWeight.bold,
+                                                    color: AppColors.textPrimary,
                                                   ),
                                                 ),
                                               ),
@@ -496,14 +370,14 @@ class _SponsorScreenState extends State<SponsorScreen> {
                                               Container(
                                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                                 decoration: BoxDecoration(
-                                                  color: Colors.teal.shade50,
+                                                  color: AppColors.surfaceLight,
                                                   borderRadius: BorderRadius.circular(8),
                                                 ),
                                                 child: Text(
-                                                  child['need_category'] ?? '',
+                                                  child['need_category'] ?? child['urgentNeeds'] ?? '',
                                                   style: const TextStyle(
                                                     fontSize: 11,
-                                                    color: Colors.teal,
+                                                    color: AppColors.primaryDark,
                                                     fontWeight: FontWeight.bold,
                                                   ),
                                                 ),
@@ -512,22 +386,22 @@ class _SponsorScreenState extends State<SponsorScreen> {
                                           ),
                                           const SizedBox(height: 6),
                                           Text(
-                                            child['story_summary'] ?? '',
+                                            child['story_summary'] ?? child['story'] ?? '',
                                             maxLines: 2,
                                             overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                                            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
                                           ),
                                           const SizedBox(height: 8),
                                           Row(
                                             children: [
-                                              Icon(Icons.location_on, size: 14, color: Colors.grey.shade600),
+                                              const Icon(Icons.location_on, size: 14, color: AppColors.textSecondary),
                                               const SizedBox(width: 4),
                                               Expanded(
                                                 child: Text(
-                                                  '${child['orphanage_name']} • ${child['orphanage_city']}',
+                                                  '${child['orphanage_name'] ?? 'Peduli Anak'} • ${child['orphanage_city'] ?? child['city'] ?? ''}',
                                                   maxLines: 1,
                                                   overflow: TextOverflow.ellipsis,
-                                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                                                 ),
                                               ),
                                             ],
@@ -545,6 +419,43 @@ class _SponsorScreenState extends State<SponsorScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildAvatar(Map<String, dynamic> child) {
+    final avatarUrl = (child['avatar'] ?? child['photo'] ?? '').toString();
+    if (avatarUrl.startsWith('data:image')) {
+      try {
+        final bytes = base64Decode(avatarUrl.split(',').last);
+        return Image.memory(bytes, fit: BoxFit.cover);
+      } catch (_) {}
+    }
+    if (avatarUrl.startsWith('http')) {
+      return Image.network(
+        avatarUrl,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, childWidget, progress) {
+          if (progress == null) return childWidget;
+          return Container(
+            color: AppColors.surfaceLight,
+            child: const Center(
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+              ),
+            ),
+          );
+        },
+        errorBuilder: (context, error, stackTrace) => Container(
+          color: AppColors.surfaceLight,
+          child: const Icon(Icons.face, size: 40, color: AppColors.primary),
+        ),
+      );
+    }
+    return Container(
+      color: AppColors.surfaceLight,
+      child: const Icon(Icons.face, size: 40, color: AppColors.primary),
     );
   }
 }

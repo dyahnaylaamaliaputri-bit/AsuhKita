@@ -4,6 +4,7 @@
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
+import '../../core/app_colors.dart';
 
 class LedgerScreen extends StatefulWidget {
   const LedgerScreen({super.key});
@@ -145,7 +146,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
         title: const Text('Ledger Blockchain Sederhana'),
-        backgroundColor: Colors.teal,
+        backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
@@ -205,7 +206,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                         : const Icon(Icons.security),
                     label: const Text('Verifikasi Rantai'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.teal,
+                      backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -241,7 +242,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                     side: BorderSide(
-                      color: isBroken ? Colors.red : Colors.teal.shade200,
+                      color: isBroken ? Colors.red : AppColors.primary.withValues(alpha: 0.3),
                       width: isBroken ? 2 : 1,
                     ),
                   ),
@@ -256,7 +257,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
-                                color: isBroken ? Colors.red : Colors.teal,
+                                color: isBroken ? Colors.red : AppColors.primary,
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
@@ -291,7 +292,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                             fontSize: 11,
                             fontFamily: 'monospace',
                             fontWeight: FontWeight.bold,
-                            color: isBroken ? Colors.red : Colors.teal.shade800,
+                            color: isBroken ? Colors.red : AppColors.primaryDark,
                           ),
                         ),
                       ],

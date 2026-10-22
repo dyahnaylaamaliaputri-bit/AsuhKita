@@ -218,4 +218,65 @@ const getPackages = async (req, res, next) => {
   }
 };
 
-module.exports = { getChildren, getChildDetail, getPackages };
+// ============================================================
+// POST CREATE CHILD — Admin menambah anak baru
+// POST /api/children
+// Revisi: Admin input anak baru → langsung masuk Supabase → muncul di donatur
+// ============================================================
+const createChild = async (req, res, next) => {
+  try {
+    const {
+      alias,
+      age = 8,
+      gender = 'L',
+      need_category = 'Pendidikan',
+      story_summary = '',
+      avatar = '',
+      orphanage_id = 'orp-001',
+      orphanage_city = 'Lombok',
+      orphanage_name = 'Peduli Anak Foundation',
+      target = 500000,
+      dream = '',
+      hobby = '',
+    } = req.body;
+
+    if (!alias || alias.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: 'Nama/alias anak wajib diisi.',
+        error: 'MISSING_ALIAS',
+      });
+    }
+
+    const sql = `
+      INSERT INTO children (orphanage_id, alias, age, gender, need_category, story_summary, avatar, status, orphanage_name, orphanage_city, target, dream, hobby)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, 'Tersedia', $8, $9, $10, $11, $12)
+      RETURNING *
+    `;
+
+    const result = await query(sql, [
+      orphanage_id,
+      alias.trim(),
+      parseInt(age),
+      gender,
+      need_category,
+      story_summary,
+      avatar,
+      orphanage_name || 'Peduli Anak Foundation',
+      orphanage_city || 'Lombok',
+      parseFloat(target) || 500000,
+      dream || '',
+      hobby || '',
+    ]);
+
+    return res.status(201).json({
+      success: true,
+      message: `Anak "${alias}" berhasil ditambahkan.`,
+      data: result.rows[0],
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { getChildren, getChildDetail, getPackages, createChild };

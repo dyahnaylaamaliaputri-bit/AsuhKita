@@ -3,6 +3,7 @@
 // Upgrade : Integrasi NotificationService pengingat Video Call (PBI-055, FR-41)
 
 import 'package:flutter/material.dart';
+import '../../core/app_colors.dart';
 import 'package:intl/intl.dart';
 import '../../services/notification_service.dart';
 
@@ -81,7 +82,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
         title: const Text('Jadwal Video Call 4 Zona Waktu'),
-        backgroundColor: Colors.teal,
+        backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
       ),
@@ -101,7 +102,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                   children: [
                     const Text(
                       'Pilih Waktu Video Call Ramah Anak',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.teal),
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.primary),
                     ),
                     const SizedBox(height: 6),
                     Text(
@@ -113,7 +114,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                       controller: _childController,
                       decoration: InputDecoration(
                         labelText: 'Anak Asuh',
-                        prefixIcon: const Icon(Icons.face, color: Colors.teal),
+                        prefixIcon: const Icon(Icons.face, color: AppColors.primary),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                     ),
@@ -122,7 +123,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                       controller: _topicController,
                       decoration: InputDecoration(
                         labelText: 'Topik Panggilan Video',
-                        prefixIcon: const Icon(Icons.videocam_outlined, color: Colors.teal),
+                        prefixIcon: const Icon(Icons.videocam_outlined, color: AppColors.primary),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                     ),
@@ -135,16 +136,16 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                         decoration: BoxDecoration(
-                          color: Colors.teal.shade50,
+                          color: AppColors.surfaceLight,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.teal.shade200),
+                          border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Row(
                               children: [
-                                const Icon(Icons.calendar_month, color: Colors.teal),
+                                const Icon(Icons.calendar_month, color: AppColors.primary),
                                 const SizedBox(width: 12),
                                 Text(
                                   DateFormat('dd MMM yyyy • HH:mm').format(_selectedDateTime),
@@ -152,7 +153,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                 ),
                               ],
                             ),
-                            const Text('Ubah', style: TextStyle(color: Colors.teal, fontWeight: FontWeight.bold)),
+                            const Text('Ubah', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
                           ],
                         ),
                       ),
@@ -178,7 +179,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                   side: BorderSide(
-                    color: isLondon ? Colors.indigo.shade200 : Colors.teal.shade100,
+                    color: isLondon ? Colors.indigo.shade200 : AppColors.primary.withValues(alpha: 0.2),
                   ),
                 ),
                 child: Padding(
@@ -188,12 +189,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: isLondon ? Colors.indigo.shade50 : Colors.teal.shade50,
+                          color: isLondon ? Colors.indigo.shade50 : AppColors.surfaceLight,
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
                           isLondon ? Icons.public : Icons.access_time_filled,
-                          color: isLondon ? Colors.indigo : Colors.teal,
+                          color: isLondon ? Colors.indigo : AppColors.primary,
                           size: 24,
                         ),
                       ),
@@ -207,7 +208,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 14,
-                                color: isLondon ? Colors.indigo.shade900 : Colors.teal.shade900,
+                                color: isLondon ? Colors.indigo.shade900 : AppColors.primaryDark,
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -255,7 +256,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                     const SnackBar(
                       content: Text(
                           'Jadwal video call berhasil disimpan! Notifikasi pengingat 30 menit sebelum disiapkan.'),
-                      backgroundColor: Colors.teal,
+                      backgroundColor: AppColors.primary,
                     ),
                   );
                   Navigator.pop(context);
@@ -264,7 +265,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
               icon: const Icon(Icons.check),
               label: const Text('Simpan & Pasang Pengingat'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.teal,
+                backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

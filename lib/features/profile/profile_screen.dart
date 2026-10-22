@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../auth/auth_provider.dart';
+import '../../core/app_colors.dart';
 import '../../data/local_db.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -131,7 +132,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Foto profil berhasil disimpan permanen! Tidak akan hilang saat logout.'),
-              backgroundColor: Colors.teal,
+              backgroundColor: AppColors.primary,
             ),
           );
         }
@@ -155,7 +156,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Wrap(
           children: [
             ListTile(
-              leading: const Icon(Icons.camera_alt, color: Colors.teal),
+              leading: const Icon(Icons.camera_alt, color: AppColors.primary),
               title: const Text('Ambil dari Kamera'),
               onTap: () {
                 Navigator.pop(context);
@@ -163,7 +164,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.photo_library, color: Colors.teal),
+              leading: const Icon(Icons.photo_library, color: AppColors.primary),
               title: const Text('Pilih dari Galeri'),
               onTap: () {
                 Navigator.pop(context);
@@ -191,7 +192,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Profil berhasil disimpan (Nomor HP terenkripsi AES-256)!'),
-          backgroundColor: Colors.teal,
+          backgroundColor: AppColors.primary,
         ),
       );
     }
@@ -205,7 +206,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
         title: const Text('Profil Pengguna'),
-        backgroundColor: Colors.teal,
+        backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
@@ -224,7 +225,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       body: RefreshIndicator(
         onRefresh: _loadProfileData,
-        color: Colors.teal,
+        color: AppColors.primary,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(20.0),
@@ -236,12 +237,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   children: [
                     CircleAvatar(
                       radius: 55,
-                      backgroundColor: Colors.teal.shade100,
+                      backgroundColor: AppColors.primary.withValues(alpha: 0.2),
                       backgroundImage: _imageBytes != null
                           ? MemoryImage(_imageBytes!)
                           : (_imageFile != null ? FileImage(_imageFile!) : null),
                       child: (_imageBytes == null && _imageFile == null)
-                          ? const Icon(Icons.person, size: 60, color: Colors.teal)
+                          ? const Icon(Icons.person, size: 60, color: AppColors.primary)
                           : null,
                     ),
                     Positioned(
@@ -252,7 +253,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         child: Container(
                           padding: const EdgeInsets.all(8),
                           decoration: const BoxDecoration(
-                            color: Colors.teal,
+                            color: AppColors.primary,
                             shape: BoxShape.circle,
                           ),
                           child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
@@ -269,7 +270,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               Text(
                 'Peran: ${auth.userRole == 'admin_panti' ? 'Pengurus Panti' : 'Orang Tua Asuh'}',
-                style: TextStyle(fontSize: 14, color: Colors.teal.shade700, fontWeight: FontWeight.w500),
+                style: TextStyle(fontSize: 14, color: AppColors.primaryDark, fontWeight: FontWeight.w500),
               ),
               const SizedBox(height: 20),
 
@@ -278,7 +279,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Card(
                   elevation: 2,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  color: Colors.teal.shade50,
+                  color: AppColors.surfaceLight,
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Row(
@@ -302,7 +303,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     : _kebaikanPoints >= 100
                                         ? 'Badge: Sahabat Mulia ⭐'
                                         : 'Badge: Sahabat Peduli 🌱',
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.teal),
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.primary),
                               ),
                               const SizedBox(height: 4),
                               Text(
@@ -320,13 +321,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 Card(
                   elevation: 2,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  color: const Color(0xFF1B5E20).withValues(alpha: 0.08),
+                  color: AppColors.primary.withValues(alpha: 0.08),
                   child: const Padding(
                     padding: EdgeInsets.all(16.0),
                     child: Row(
                       children: [
                         CircleAvatar(
-                          backgroundColor: Color(0xFF1B5E20),
+                          backgroundColor: AppColors.primaryDark,
                           child: Icon(Icons.verified_user, color: Colors.white),
                         ),
                         SizedBox(width: 16),
@@ -336,7 +337,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             children: [
                               Text(
                                 'Identitas Pengurus Panti Asuhan',
-                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1B5E20)),
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.primaryDark),
                               ),
                               SizedBox(height: 2),
                               Text(
@@ -368,7 +369,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       const Divider(height: 24),
                       ListTile(
                         contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.email_outlined, color: Colors.teal),
+                        leading: const Icon(Icons.email_outlined, color: AppColors.primary),
                         title: const Text('Email', style: TextStyle(fontSize: 12, color: Colors.grey)),
                         subtitle: Text(
                           auth.userEmail.isNotEmpty ? auth.userEmail : 'donatur@asuhkita.id',
@@ -381,7 +382,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         enabled: _isEditing,
                         decoration: InputDecoration(
                           labelText: 'Nama Lengkap',
-                          prefixIcon: const Icon(Icons.person_outline, color: Colors.teal),
+                          prefixIcon: const Icon(Icons.person_outline, color: AppColors.primary),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                           filled: !_isEditing,
                           fillColor: _isEditing ? Colors.white : Colors.grey.shade100,
@@ -393,7 +394,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         enabled: _isEditing,
                         decoration: InputDecoration(
                           labelText: 'Nomor WhatsApp / HP (Enkripsi AES-256)',
-                          prefixIcon: const Icon(Icons.phone_outlined, color: Colors.teal),
+                          prefixIcon: const Icon(Icons.phone_outlined, color: AppColors.primary),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                           filled: !_isEditing,
                           fillColor: _isEditing ? Colors.white : Colors.grey.shade100,
@@ -416,14 +417,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     children: [
                       SwitchListTile(
                         contentPadding: EdgeInsets.zero,
-                        secondary: const Icon(Icons.fingerprint, color: Colors.teal, size: 28),
+                        secondary: const Icon(Icons.fingerprint, color: AppColors.primary, size: 28),
                         title: const Text(
                           'Login dengan Biometrik',
                           style: TextStyle(fontWeight: FontWeight.w600),
                         ),
                         subtitle: const Text('Gunakan sidik jari/wajah untuk membuka sesi cepat'),
                         value: auth.isBiometricEnabled,
-                        activeThumbColor: Colors.teal,
+                        activeThumbColor: AppColors.primary,
                         onChanged: (val) async {
                           if (val) {
                             final ok = await auth.registerBiometricPrompt();
@@ -431,7 +432,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
                                   content: Text('Sidik jari berhasil didaftarkan dan diaktifkan!'),
-                                  backgroundColor: Colors.teal,
+                                  backgroundColor: AppColors.primary,
                                 ),
                               );
                             }

@@ -2,6 +2,7 @@
 // Fungsi: Layar Login pengguna dengan email, password terenkripsi, dan opsi login biometrik (PBI-005, PBI-056)
 
 import 'package:flutter/material.dart';
+import '../../core/app_colors.dart';
 import 'package:provider/provider.dart';
 import '../../core/secure_storage.dart';
 import 'auth_provider.dart';
@@ -72,7 +73,7 @@ class _LoginScreenState extends State<LoginScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Autentikasi biometrik berhasil! Selamat datang, ${auth.userName}.'),
-          backgroundColor: Colors.teal,
+          backgroundColor: AppColors.primary,
         ),
       );
     } else if (!success && mounted && auth.errorMessage != null) {
@@ -106,13 +107,13 @@ class _LoginScreenState extends State<LoginScreen> {
                     width: 80,
                     height: 80,
                     decoration: BoxDecoration(
-                      color: Colors.teal.shade50,
+                      color: AppColors.surfaceLight,
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
                       Icons.volunteer_activism,
                       size: 48,
-                      color: Colors.teal,
+                      color: AppColors.primary,
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -122,7 +123,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
-                      color: Colors.teal,
+                      color: AppColors.primary,
                       letterSpacing: 0.5,
                     ),
                   ),
@@ -189,7 +190,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ElevatedButton(
                     onPressed: auth.isLoading ? null : _handleLogin,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.teal,
+                      backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
@@ -217,14 +218,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   if (auth.isBiometricAvailable) ...[
                     OutlinedButton.icon(
                       onPressed: auth.isLoading ? null : _handleBiometricLogin,
-                      icon: const Icon(Icons.fingerprint, color: Colors.teal, size: 26),
+                      icon: const Icon(Icons.fingerprint, color: AppColors.primary, size: 26),
                       label: const Text(
                         'Masuk dengan Sidik Jari / Biometrik',
-                        style: TextStyle(color: Colors.teal, fontWeight: FontWeight.w600),
+                        style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w600),
                       ),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        side: const BorderSide(color: Colors.teal),
+                        side: const BorderSide(color: AppColors.primary),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -235,7 +236,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       Text(
                         'Sidik jari tertaut: $_savedBioEmail',
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 12, color: Colors.teal.shade700, fontWeight: FontWeight.w500),
+                        style: TextStyle(fontSize: 12, color: AppColors.primaryDark, fontWeight: FontWeight.w500),
                       ),
                     ],
                   ],
@@ -260,7 +261,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: const Text(
                           'Daftar Sekarang',
                           style: TextStyle(
-                            color: Colors.teal,
+                            color: AppColors.primary,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
