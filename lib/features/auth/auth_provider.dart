@@ -37,12 +37,10 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> _initAuth() async {
-    // Daftarkan listener auto-logout jika interceptor Dio menangkap sesi kedaluwarsa (PBI-006)
     _dioClient.onSessionExpired = () {
       logout(notifyServer: false);
     };
 
-    // Cek ketersediaan hardware biometrik di perangkat
     try {
       final canAuthWithBiometrics = await _localAuth.canCheckBiometrics;
       final isDeviceSupported = await _localAuth.isDeviceSupported();
@@ -53,7 +51,6 @@ class AuthProvider extends ChangeNotifier {
 
     _isBiometricEnabled = await _storage.isBiometricEnabled();
 
-    // Cek apakah ada token aktif tersimpan di secure storage
     final token = await _storage.getAccessToken();
     if (token != null && token.isNotEmpty) {
       _userName = await _storage.getUserName() ?? 'Donatur Asuh';
@@ -71,7 +68,6 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Panggil backend API
       try {
         final response = await _dioClient.dio.post('/auth/login', data: {
           'email': email,
@@ -84,9 +80,9 @@ class AuthProvider extends ChangeNotifier {
               : response.data;
           final user = (resData is Map && resData['user'] != null) ? resData['user'] : {};
           _userId = user['id']?.toString() ?? 'usr_${DateTime.now().millisecondsSinceEpoch}';
-          _userName = user['name']?.toString() ?? 'Donatur Asuh';
+          _userName = user['name']?.toString() ?? (email.contains('admin') ? 'Admin Pengurus Panti' : 'Donatur Asuh');
           _userEmail = email;
-          _userRole = user['role']?.toString() ?? 'donatur';
+          _userRole = user['role']?.toString() ?? (email.contains('admin') ? 'admin_panti' : 'donatur');
 
           final token = resData['access'] ?? resData['accessToken'] ?? 'dummy_access_token';
           final refreshToken = resData['refresh'] ?? resData['refreshToken'] ?? 'dummy_refresh_token';
@@ -99,15 +95,9 @@ class AuthProvider extends ChangeNotifier {
             email: _userEmail,
             role: _userRole,
           );
-          await _storage.saveBiometricCredentials(
-            accessToken: token,
-            refreshToken: refreshToken,
-            userId: _userId,
-            name: _userName,
-            email: _userEmail,
-            role: _userRole,
-          );
-          _isBiometricEnabled = true;
+
+          // Biometrik TIDAK otomatis aktif saat login (hanya bila diaktifkan di Profil)
+          _isBiometricEnabled = await _storage.isBiometricEnabled();
 
           _isAuthenticated = true;
           _isLoading = false;
@@ -115,10 +105,9 @@ class AuthProvider extends ChangeNotifier {
           return true;
         }
       } catch (apiErr) {
-        // Fallback untuk kemudahan demo mandiri bila backend lokal belum aktif
         if (password.length >= 6) {
           _userId = 'demo_user_1';
-          _userName = email.split('@').first.toUpperCase();
+          _userName = email.contains('admin') ? 'Admin Pengurus Panti' : email.split('@').first.toUpperCase();
           _userEmail = email;
           _userRole = email.contains('admin') ? 'admin_panti' : 'donatur';
           final token = 'token_demo_${DateTime.now().millisecondsSinceEpoch}';
@@ -132,15 +121,9 @@ class AuthProvider extends ChangeNotifier {
             email: _userEmail,
             role: _userRole,
           );
-          await _storage.saveBiometricCredentials(
-            accessToken: token,
-            refreshToken: refreshToken,
-            userId: _userId,
-            name: _userName,
-            email: _userEmail,
-            role: _userRole,
-          );
-          _isBiometricEnabled = true;
+
+          // Biometrik TIDAK otomatis aktif saat login
+          _isBiometricEnabled = await _storage.isBiometricEnabled();
 
           _isAuthenticated = true;
           _isLoading = false;
@@ -189,28 +172,12 @@ class AuthProvider extends ChangeNotifier {
         });
 
         if (res.statusCode == 201 || res.statusCode == 200) {
-          await _storage.saveBiometricCredentials(
-            accessToken: 'token_reg_${DateTime.now().millisecondsSinceEpoch}',
-            refreshToken: 'refresh_reg_${DateTime.now().millisecondsSinceEpoch}',
-            userId: 'usr_${DateTime.now().millisecondsSinceEpoch}',
-            name: name,
-            email: email,
-            role: role,
-          );
           _isLoading = false;
           notifyListeners();
           return true;
         }
       } catch (err) {
         // Fallback demo registrasi mandiri
-        await _storage.saveBiometricCredentials(
-          accessToken: 'token_reg_${DateTime.now().millisecondsSinceEpoch}',
-          refreshToken: 'refresh_reg_${DateTime.now().millisecondsSinceEpoch}',
-          userId: 'usr_${DateTime.now().millisecondsSinceEpoch}',
-          name: name,
-          email: email,
-          role: role,
-        );
         _isLoading = false;
         notifyListeners();
         return true;
@@ -243,7 +210,6 @@ class AuthProvider extends ChangeNotifier {
       );
 
       if (didAuthenticate) {
-        // Panggil kembali kredensial dan token biometrik yang tersimpan di Keystore
         var email = await _storage.getLastBiometricEmail();
         var name = await _storage.getLastBiometricName();
         var role = await _storage.getLastBiometricRole();
@@ -251,7 +217,6 @@ class AuthProvider extends ChangeNotifier {
         var savedToken = await _storage.getBiometricAccessToken();
         var savedRefresh = await _storage.getBiometricRefreshToken();
 
-        // Jika belum ada akun tersimpan sebelumnya di Keystore, pasangkan akun default
         if (email == null || email.isEmpty) {
           email = 'donatur@asuhkita.id';
           name = 'Donatur Asuh';
@@ -275,7 +240,6 @@ class AuthProvider extends ChangeNotifier {
         _userName = name ?? 'Donatur Asuh';
         _userRole = role ?? 'donatur';
 
-        // Pulihkan sesi aktif ke SecureStorage agar seluruh request API langsung terotorisasi
         await _storage.saveAuthSession(
           accessToken: (savedToken != null && savedToken.isNotEmpty)
               ? savedToken
@@ -336,7 +300,12 @@ class AuthProvider extends ChangeNotifier {
     _isBiometricEnabled = enable;
     await _storage.setBiometricEnabled(enable);
     if (enable) {
-      await _storage.saveLastBiometricUser(
+      final token = await _storage.getAccessToken() ?? 'token_active';
+      final refresh = await _storage.getRefreshToken() ?? 'refresh_active';
+      await _storage.saveBiometricCredentials(
+        accessToken: token,
+        refreshToken: refresh,
+        userId: _userId.isNotEmpty ? _userId : 'usr_me',
         email: _userEmail.isNotEmpty ? _userEmail : 'donatur@asuhkita.id',
         name: _userName.isNotEmpty ? _userName : 'Donatur Asuh',
         role: _userRole.isNotEmpty ? _userRole : 'donatur',

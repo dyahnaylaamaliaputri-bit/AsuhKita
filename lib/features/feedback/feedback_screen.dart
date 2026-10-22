@@ -1,12 +1,13 @@
-import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
 // Letak file: mobile/lib/features/feedback/feedback_screen.dart
-// Fungsi: Layar pengisian Saran dan Kesan Mata Kuliah Pemrograman Aplikasi Mobile (PAM) beserta riwayat pada halaman yang sama (PBI-012, FR-13)
+// Fungsi: Layar pengisian Saran dan Kesan Mata Kuliah PAM beserta riwayat persisten tidak hilang saat logout (PBI-012, FR-13)
 
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../auth/auth_provider.dart';
 import '../../core/dio_client.dart';
+import '../../data/local_db.dart';
 
 class FeedbackScreen extends StatefulWidget {
   const FeedbackScreen({super.key});
@@ -22,8 +23,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
   int _rating = 5;
   bool _isSubmitting = false;
 
-  // Riwayat feedback lokal / tersimpan
-  final List<Map<String, dynamic>> _feedbackHistory = [
+  final List<Map<String, dynamic>> _defaultHistory = [
     {
       'name': 'Primary Putri Ardiva (Ketua Tim & Integrasi)',
       'rating': 5,
@@ -47,6 +47,39 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
     },
   ];
 
+  List<Map<String, dynamic>> _feedbackHistory = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPersistedFeedback();
+  }
+
+  Future<void> _loadPersistedFeedback() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedJson = prefs.getString('asuhkita_persisted_feedback_list');
+      if (savedJson != null && savedJson.isNotEmpty) {
+        final List<dynamic> decoded = jsonDecode(savedJson);
+        setState(() {
+          _feedbackHistory = decoded.map((e) => Map<String, dynamic>.from(e)).toList();
+        });
+        return;
+      }
+    } catch (_) {}
+
+    setState(() {
+      _feedbackHistory = List.from(_defaultHistory);
+    });
+  }
+
+  Future<void> _saveFeedbackList() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('asuhkita_persisted_feedback_list', jsonEncode(_feedbackHistory));
+    } catch (_) {}
+  }
+
   @override
   void dispose() {
     _saranController.dispose();
@@ -59,8 +92,14 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
       setState(() => _isSubmitting = true);
       final auth = Provider.of<AuthProvider>(context, listen: false);
 
+      final userName = auth.userName.isNotEmpty
+          ? auth.userName
+          : (auth.userRole == 'admin_panti' ? 'Admin Pengurus Panti' : 'Donatur Asuh');
+
       final newFeedback = {
-        'name': auth.userName.isNotEmpty ? auth.userName : 'Mahasiswa PAM',
+        'id': 'fb_${DateTime.now().millisecondsSinceEpoch}',
+        'name': userName,
+        'user_email': auth.userEmail,
         'rating': _rating,
         'saran': _saranController.text.trim(),
         'kesan': _kesanController.text.trim(),
@@ -68,11 +107,21 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
       };
 
       try {
-        // Coba kirim ke endpoint backend jika aktif (POST /feedback)
         await DioClient().dio.post('/feedback', data: newFeedback);
-      } catch (_) {
-        // Fallback simpan lokal di state jika backend offline
-      }
+      } catch (_) {}
+
+      // Simpan ke SQLite
+      try {
+        await LocalDatabase().insertFeedback({
+          'id': newFeedback['id'],
+          'user_email': auth.userEmail,
+          'user_name': userName,
+          'rating': _rating,
+          'category': 'Kuliah PAM',
+          'message': 'Saran: ${_saranController.text.trim()} | Kesan: ${_kesanController.text.trim()}',
+          'created_at': DateTime.now().toIso8601String(),
+        });
+      } catch (_) {}
 
       setState(() {
         _feedbackHistory.insert(0, newFeedback);
@@ -81,11 +130,13 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
         _isSubmitting = false;
       });
 
+      await _saveFeedbackList();
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Saran & Kesan mata kuliah PAM berhasil disimpan!'),
-            backgroundColor: Colors.teal,
+            content: Text('Saran & Kesan tersimpan secara permanen (tidak hilang saat logout)!'),
+            backgroundColor: Color(0xFF2E7D32),
           ),
         );
       }
@@ -98,7 +149,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
         title: const Text('Saran & Kesan PAM'),
-        backgroundColor: Colors.teal,
+        backgroundColor: const Color(0xFF1B5E20),
         foregroundColor: Colors.white,
         elevation: 0,
       ),
@@ -120,7 +171,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                     children: [
                       const Text(
                         'Form Evaluasi Kuliah PAM',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.teal),
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20)),
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -182,7 +233,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                           icon: const Icon(Icons.send),
                           label: const Text('Kirim Saran & Kesan'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.teal,
+                            backgroundColor: const Color(0xFF2E7D32),
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -196,9 +247,9 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Riwayat Saran & Kesan di Halaman yang Sama (FR-13)
+            // Riwayat Saran & Kesan
             const Text(
-              'Riwayat Saran & Kesan PAM',
+              'Riwayat Saran & Kesan Tersimpan',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),

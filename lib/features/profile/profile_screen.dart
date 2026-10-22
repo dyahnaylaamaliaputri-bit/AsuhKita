@@ -273,48 +273,83 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               const SizedBox(height: 20),
 
-              // Card Badge & Poin Kebaikan Dinamis (FR-48)
-              Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                color: Colors.teal.shade50,
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: const BoxDecoration(
-                          color: Colors.amber,
-                          shape: BoxShape.circle,
+              // Card Badge & Poin Kebaikan Dinamis (Hanya untuk Donatur, dihapus untuk Admin)
+              if (auth.userRole != 'admin_panti')
+                Card(
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  color: Colors.teal.shade50,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: const BoxDecoration(
+                            color: Colors.amber,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.stars, color: Colors.white, size: 28),
                         ),
-                        child: const Icon(Icons.stars, color: Colors.white, size: 28),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _kebaikanPoints >= 500
-                                  ? 'Badge: Sahabat Teladan 🌟'
-                                  : _kebaikanPoints >= 100
-                                      ? 'Badge: Sahabat Mulia ⭐'
-                                      : 'Badge: Sahabat Peduli 🌱',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.teal),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '$_kebaikanPoints Poin Kebaikan dikumpulkan (dari Langkah Pedometer & Mini Game)',
-                              style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-                            ),
-                          ],
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _kebaikanPoints >= 500
+                                    ? 'Badge: Sahabat Teladan 🌟'
+                                    : _kebaikanPoints >= 100
+                                        ? 'Badge: Sahabat Mulia ⭐'
+                                        : 'Badge: Sahabat Peduli 🌱',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.teal),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '$_kebaikanPoints Poin Kebaikan dikumpulkan (dari Langkah Pedometer & Mini Game)',
+                                style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
+                  ),
+                )
+              else
+                Card(
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  color: const Color(0xFF1B5E20).withValues(alpha: 0.08),
+                  child: const Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          backgroundColor: Color(0xFF1B5E20),
+                          child: Icon(Icons.verified_user, color: Colors.white),
+                        ),
+                        SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Identitas Pengurus Panti Asuhan',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1B5E20)),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                'Otoritas verifikasi data anak, penginputan nota belanja, dan transparansi on-chain.',
+                                style: TextStyle(fontSize: 11, color: Colors.black87),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
               const SizedBox(height: 20),
 
               // Form Detail Profil
