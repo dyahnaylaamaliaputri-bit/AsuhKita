@@ -431,4 +431,11 @@ class LocalDatabase {
     );
     return rows.isNotEmpty ? rows.first : null;
   }
+
+  Future<bool> hasAnyChatMessages() async {
+    final db = await database;
+    final res = await db.rawQuery('SELECT COUNT(*) as cnt FROM chat_messages');
+    final count = Sqflite.firstIntValue(res) ?? 0;
+    return count > 0;
+  }
 }
