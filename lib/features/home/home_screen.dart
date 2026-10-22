@@ -19,6 +19,7 @@ import '../admin/donation_tracking_screen.dart';
 import '../admin/finance_dashboard_screen.dart';
 import '../communication/family_room_screen.dart';
 import '../donation/donation_history_screen.dart';
+import '../sponsor/child_detail_screen.dart';
 import 'iot_donation_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -232,7 +233,13 @@ class _HomeScreenState extends State<HomeScreen> {
             else
               Row(
                 children: [
-                  _buildMetricCard('Anak Asuh', '$_sponsoredCount Anak', Icons.face, AppColors.accent3),
+                  _buildMetricCard(
+                    'Anak Asuh',
+                    '$_sponsoredCount Anak',
+                    Icons.face,
+                    AppColors.accent3,
+                    onTap: () => _openMySponsoredChildDetail(context),
+                  ),
                   const SizedBox(width: 10),
                   _buildMetricCard('Transparansi', '100% SHA-256', Icons.security, AppColors.accent1),
                   const SizedBox(width: 10),
@@ -408,6 +415,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     color: AppColors.primary,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DonationHistoryScreen())),
                   ),
+                  _buildFeatureCard(
+                    context,
+                    title: 'Profil Anak Asuh',
+                    subtitle: 'Detail & mimpi anak asuh',
+                    icon: Icons.badge_outlined,
+                    color: AppColors.accent3,
+                    onTap: () => _openMySponsoredChildDetail(context),
+                  ),
                 ],
               ),
           ],
@@ -416,36 +431,196 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildMetricCard(String label, String value, IconData icon, Color color) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey.shade200),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 4, offset: const Offset(0, 2)),
+  Future<void> _openMySponsoredChildDetail(BuildContext context) async {
+    final localDb = LocalDatabase();
+    final localDonations = await localDb.getCachedDonations();
+    final sponsoredAliases = <String>{};
+    for (var d in localDonations) {
+      final alias = (d['child_alias'] ?? '').toString().trim();
+      if (alias.isNotEmpty) {
+        sponsoredAliases.add(alias.toLowerCase());
+      }
+    }
+
+    if (sponsoredAliases.isEmpty) {
+      if (!context.mounted) return;
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: const [
+              Icon(Icons.face_retouching_natural, color: AppColors.primary),
+              SizedBox(width: 8),
+              Text('Belum Ada Anak Asuh'),
+            ],
+          ),
+          content: const Text(
+            'Anda belum memiliki anak asuh yang didampingi saat ini. Kunjungi menu Sponsor untuk melihat daftar anak asuh yang membutuhkan pendampingan.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Nanti Saja'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                if (widget.onNavigateTab != null) {
+                  widget.onNavigateTab!(1);
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+              child: const Text('Pilih Anak Asuh'),
+            ),
           ],
         ),
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 22),
-            const SizedBox(height: 6),
-            Text(
-              value,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.textPrimary),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
+      );
+      return;
+    }
+
+    // Ambil detail anak dari SQLite/API
+    final cachedKids = await localDb.getCachedChildren();
+    final newKids = await localDb.getNewChildren();
+    final all = [...cachedKids, ...newKids];
+
+    final myKids = <Map<String, dynamic>>[];
+    final seen = <String>{};
+    for (var k in all) {
+      final name = (k['alias'] ?? k['name'] ?? '').toString().toLowerCase();
+      if (sponsoredAliases.contains(name) && !seen.contains(name)) {
+        seen.add(name);
+        myKids.add(k);
+      }
+    }
+
+    for (var alias in sponsoredAliases) {
+      if (!seen.contains(alias)) {
+        seen.add(alias);
+        final capName = alias.length > 1 ? '${alias[0].toUpperCase()}${alias.substring(1)}' : alias;
+        myKids.add({
+          'id': 'sp_$alias',
+          'alias': capName,
+          'name': capName,
+          'age': 10,
+          'need_category': 'Pendidikan',
+          'orphanage_name': 'Panti Asuhan Peduli Anak',
+          'orphanage_city': 'Mataram, Lombok',
+          'story': 'Anak asuh yang gigih belajar dan bersemangat menggapai cita-cita.',
+          'avatar': '',
+        });
+      }
+    }
+
+    if (!context.mounted) return;
+
+    if (myKids.length == 1) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => ChildDetailScreen(childData: myKids.first)),
+      );
+    } else {
+      showModalBottomSheet(
+        context: context,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (ctx) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.stars, color: AppColors.primary),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Anak Asuh Saya (${myKids.length})',
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Pilih anak asuh untuk melihat profil detail & perkembangan belajarnya:',
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              ),
+              const Divider(height: 24),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: myKids.length,
+                  itemBuilder: (ctx, idx) {
+                    final child = myKids[idx];
+                    final name = (child['alias'] ?? child['name'] ?? 'Anak').toString();
+                    final city = (child['orphanage_city'] ?? child['city'] ?? 'Mataram').toString();
+                    final category = (child['need_category'] ?? 'Pendidikan').toString();
+                    final avatar = (child['avatar'] ?? '').toString();
+
+                    return ListTile(
+                      contentPadding: const EdgeInsets.symmetric(vertical: 4),
+                      leading: CircleAvatar(
+                        radius: 22,
+                        backgroundColor: AppColors.surfaceLight,
+                        backgroundImage: avatar.startsWith('http') ? NetworkImage(avatar) : null,
+                        child: avatar.startsWith('http') ? null : const Icon(Icons.face, color: AppColors.primary),
+                      ),
+                      title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: Text('$category • $city', style: const TextStyle(fontSize: 12)),
+                      trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: AppColors.primary),
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => ChildDetailScreen(childData: child)),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+  }
+
+  Widget _buildMetricCard(String label, String value, IconData icon, Color color, {VoidCallback? onTap}) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade200),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 4, offset: const Offset(0, 2)),
+            ],
+          ),
+          child: Column(
+            children: [
+              Icon(icon, color: color, size: 22),
+              const SizedBox(height: 6),
+              Text(
+                value,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.textPrimary),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
         ),
       ),
     );
