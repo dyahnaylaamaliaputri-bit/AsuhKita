@@ -176,6 +176,305 @@ class _SponsorScreenState extends State<SponsorScreen> {
     });
   }
 
+    // ============================================================
+  // AI PROFILING: MULTI-CRITERIA MATCHING RECOMMENDATION ENGINE
+  // ============================================================
+  void _showAiProfilingModal() {
+    String selectedAgeRange = 'Semua Usia';
+    String selectedPriorityNeed = 'Semua Kebutuhan';
+    String selectedBudgetRange = 'Fleksibel';
+    bool prioritizeUnfulfilled = true;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) {
+          return Container(
+            height: MediaQuery.of(ctx).size.height * 0.88,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 44,
+                    height: 5,
+                    decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                const Row(
+                  children: [
+                    Icon(Icons.auto_awesome, color: AppColors.primary, size: 24),
+                    SizedBox(width: 8),
+                    Text(
+                      'AI Smart Profiling Donatur',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                    ),
+                  ],
+                ),
+                const Text(
+                  'Model AI menganalisis profil dan preferensi Anda untuk mencocokkan anak asuh yang paling tepat.',
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                ),
+                const Divider(height: 20),
+
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // 1. Rentang Usia
+                        const Text('1. Preferensi Rentang Usia Anak', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 8,
+                          children: ['Semua Usia', 'Balita (1-5 th)', 'Sekolah (6-12 th)', 'Remaja (13-18 th)'].map((opt) {
+                            final sel = selectedAgeRange == opt;
+                            return ChoiceChip(
+                              label: Text(opt, style: TextStyle(fontSize: 12, color: sel ? Colors.white : Colors.black87)),
+                              selected: sel,
+                              selectedColor: AppColors.primary,
+                              onSelected: (v) {
+                                if (v) setModalState(() => selectedAgeRange = opt);
+                              },
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 14),
+
+                        // 2. Kategori Kebutuhan
+                        const Text('2. Prioritas Kebutuhan Pokok', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 8,
+                          children: ['Semua Kebutuhan', 'Pendidikan', 'Kesehatan', 'Pakaian & Sandang', 'Tempat Tinggal'].map((opt) {
+                            final sel = selectedPriorityNeed == opt;
+                            return ChoiceChip(
+                              label: Text(opt, style: TextStyle(fontSize: 12, color: sel ? Colors.white : Colors.black87)),
+                              selected: sel,
+                              selectedColor: AppColors.primary,
+                              onSelected: (v) {
+                                if (v) setModalState(() => selectedPriorityNeed = opt);
+                              },
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 14),
+
+                        // 3. Alokasi Budget Donatur
+                        const Text('3. Rencana Budget / Dana Donasi Bulanan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 8,
+                          children: ['Fleksibel', '< Rp 150rb', 'Rp 150rb - 350rb', 'Rp 350rb - 600rb', '> Rp 600rb'].map((opt) {
+                            final sel = selectedBudgetRange == opt;
+                            return ChoiceChip(
+                              label: Text(opt, style: TextStyle(fontSize: 12, color: sel ? Colors.white : Colors.black87)),
+                              selected: sel,
+                              selectedColor: AppColors.primary,
+                              onSelected: (v) {
+                                if (v) setModalState(() => selectedBudgetRange = opt);
+                              },
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 14),
+
+                        // 4. Kriteria Urgensi
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Prioritaskan yang Belum Terpenuhi', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          subtitle: const Text('Tampilkan anak asuh yang sangat mendesak membutuhkan orang tua asuh', style: TextStyle(fontSize: 11)),
+                          value: prioritizeUnfulfilled,
+                          activeColor: AppColors.primary,
+                          onChanged: (v) => setModalState(() => prioritizeUnfulfilled = v),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _executeAiProfiling(
+                        ageRange: selectedAgeRange,
+                        priorityNeed: selectedPriorityNeed,
+                        budgetRange: selectedBudgetRange,
+                        prioritizeUnfulfilled: prioritizeUnfulfilled,
+                      );
+                    },
+                    icon: const Icon(Icons.psychology, size: 20),
+                    label: const Text('Proses AI Profiling & Tampilkan Hasil'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _executeAiProfiling({
+    required String ageRange,
+    required String priorityNeed,
+    required String budgetRange,
+    required bool prioritizeUnfulfilled,
+  }) {
+    if (_allChildren.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Belum ada data anak asuh untuk di-profiling.')),
+      );
+      return;
+    }
+
+    // Algoritma Scoring Profiling AI
+    List<Map<String, dynamic>> scoredList = [];
+
+    for (var child in _allChildren) {
+      double score = 60.0;
+      final age = int.tryParse((child['age'] ?? '0').toString()) ?? 0;
+      final needs = (child['need_category'] ?? child['urgentNeeds'] ?? '').toString().toLowerCase();
+      final target = (child['target'] is num) ? (child['target'] as num).toDouble() : 500000.0;
+      final alias = (child['alias'] ?? child['name'] ?? '').toString().toLowerCase().trim();
+      final collected = _collectedPerChild[alias] ?? 0;
+      final isFulfilled = collected >= target && target > 0;
+
+      // 1. Usia
+      if (ageRange == 'Balita (1-5 th)' && age >= 1 && age <= 5) {
+        score += 15;
+      } else if (ageRange == 'Sekolah (6-12 th)' && age >= 6 && age <= 12) {
+        score += 15;
+      } else if (ageRange == 'Remaja (13-18 th)' && age >= 13 && age <= 18) {
+        score += 15;
+      } else if (ageRange == 'Semua Usia') {
+        score += 10;
+      }
+
+      // 2. Kebutuhan Pokok
+      if (priorityNeed != 'Semua Kebutuhan' && needs.contains(priorityNeed.toLowerCase())) {
+        score += 15;
+      } else if (priorityNeed == 'Semua Kebutuhan') {
+        score += 8;
+      }
+
+      // 3. Budget Donasi
+      if (budgetRange == '< Rp 150rb' && target <= 200000) {
+        score += 15;
+      } else if (budgetRange == 'Rp 150rb - 350rb' && target >= 150000 && target <= 350000) {
+        score += 15;
+      } else if (budgetRange == 'Rp 350rb - 600rb' && target >= 300000 && target <= 600000) {
+        score += 15;
+      } else if (budgetRange == '> Rp 600rb' && target >= 500000) {
+        score += 15;
+      } else if (budgetRange == 'Fleksibel') {
+        score += 10;
+      }
+
+      // 4. Urgensi
+      if (prioritizeUnfulfilled && !isFulfilled) {
+        score += 10;
+      }
+
+      final finalScore = score.clamp(72.0, 99.0).toInt();
+
+      final scoredChild = Map<String, dynamic>.from(child);
+      scoredChild['ai_match_score'] = finalScore;
+      scoredChild['ai_reason'] =
+          'Kecocokan ' + finalScore.toString() + '%: Usia ' + age.toString() + ' th selaras dengan kriteria, kebutuhan utama ' + (child['need_category'] ?? 'Pendidikan').toString() + ' ' +
+          (!isFulfilled ? 'masih mendesak belum terpenuhi' : 'sudah menerima dukungan') +
+          ', dan alokasi target Rp ' + ((target / 1000).toInt()).toString() + 'rb pas dengan kapasitas dana Anda.';
+      scoredList.add(scoredChild);
+    }
+
+    scoredList.sort((a, b) => (b['ai_match_score'] as int).compareTo(a['ai_match_score'] as int));
+
+    setState(() {
+      _children = scoredList;
+    });
+
+    final topMatch = scoredList.first;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.auto_awesome, color: Colors.amber, size: 26),
+            SizedBox(width: 8),
+            Expanded(child: Text('Rekomendasi Terbaik AI', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.accent2,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                'Kecocokan Tertinggi: ' + topMatch['ai_match_score'].toString() + '% Cocok ✨',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF8B6914)),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Anak Asuh: ' + (topMatch['alias'] ?? topMatch['name']).toString() + ' (' + topMatch['age'].toString() + ' tahun)',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.primary),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              topMatch['ai_reason'] ?? '',
+              style: const TextStyle(fontSize: 12, height: 1.4, color: Colors.black87),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Daftar anak asuh di bawah telah diurutkan berdasarkan skor AI profiling tertinggi untuk Anda.',
+              style: TextStyle(fontSize: 11, color: Colors.grey, fontStyle: FontStyle.italic),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Lihat Semua Hasil'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => ChildDetailScreen(childData: topMatch)),
+              );
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+            child: const Text('Buka Profil Anak'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
