@@ -7,6 +7,7 @@ import '../../core/dio_client.dart';
 import '../../data/local_db.dart';
 import '../sponsor/sponsor_screen.dart';
 import 'finance_dashboard_screen.dart';
+import '../communication/family_room_screen.dart';
 
 class AdminPanelScreen extends StatefulWidget {
   const AdminPanelScreen({super.key});
@@ -286,7 +287,12 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                   Center(
                     child: GestureDetector(
                       onTap: () async {
-                        final XFile? photo = await _picker.pickImage(source: ImageSource.gallery, maxWidth: 600);
+                        final XFile? photo = await _picker.pickImage(
+                          source: ImageSource.gallery,
+                          maxWidth: 500,
+                          maxHeight: 500,
+                          imageQuality: 50,
+                        );
                         if (photo != null) {
                           final bytes = await photo.readAsBytes();
                           setModalState(() {
@@ -726,6 +732,68 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                 // Tutup loading dialog
                                 if (mounted) {
                                   Navigator.of(context, rootNavigator: true).pop();
+                                }
+
+                                // Verifikasi apakah data sebenarnya sudah masuk ke Supabase meskipun terjadi timeout/glitch di klien
+                                bool alreadySavedOnServer = false;
+                                try {
+                                  final checkRes = await DioClient().dio.get('/children', queryParameters: {'search': name}).timeout(const Duration(seconds: 4));
+                                  if (checkRes.statusCode == 200 && checkRes.data != null) {
+                                    final list = (checkRes.data is List) ? checkRes.data : (checkRes.data['data'] is List ? checkRes.data['data'] : []);
+                                    for (var item in list) {
+                                      if ((item['alias'] ?? '').toString().toLowerCase().trim() == name.toLowerCase().trim()) {
+                                        alreadySavedOnServer = true;
+                                        break;
+                                      }
+                                    }
+                                  }
+                                } catch (_) {}
+
+                                if (alreadySavedOnServer) {
+                                  final fallbackKid = {
+                                    'id': 'child_${DateTime.now().millisecondsSinceEpoch}',
+                                    'name': name,
+                                    'alias': name,
+                                    'age': age,
+                                    'gender': selectedGender,
+                                    'city': cityCtrl.text.trim().isEmpty ? 'Peduli Anak Lombok' : cityCtrl.text.trim(),
+                                    'orphanage_city': cityCtrl.text.trim().isEmpty ? 'Peduli Anak Lombok' : cityCtrl.text.trim(),
+                                    'orphanage_name': 'Peduli Anak Foundation',
+                                    'urgentNeeds': selectedNeeds.join(', '),
+                                    'need_category': selectedNeeds.join(', '),
+                                    'category_budgets': jsonEncode(catBudgetsMap),
+                                    'story': story,
+                                    'story_summary': story,
+                                    'photo': base64Image ?? '',
+                                    'avatar': base64Image ?? '',
+                                    'target': totalTarget > 0 ? totalTarget : 500000.0,
+                                    'dream': dreamCtrl.text.trim(),
+                                    'hobby': hobbyCtrl.text.trim(),
+                                    'createdAt': DateTime.now().toIso8601String(),
+                                    'status': 'Tersedia',
+                                  };
+                                  await _localDb.insertChild(fallbackKid);
+                                  SponsorScreen.refreshNotifier.value++;
+                                  await _loadChildren();
+
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Row(
+                                          children: [
+                                            const Icon(Icons.check_circle, color: Colors.white),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text('Data anak "$name" terverifikasi berhasil tersimpan di Supabase!'),
+                                            ),
+                                          ],
+                                        ),
+                                        backgroundColor: Colors.green.shade700,
+                                        duration: const Duration(seconds: 4),
+                                      ),
+                                    );
+                                  }
+                                  return;
                                 }
 
                                 String errorMsg = 'Gagal mengirim data anak.';
@@ -1977,6 +2045,16 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
             icon: const Icon(Icons.account_balance_wallet_outlined),
             onPressed: () {
               Navigator.push(context, MaterialPageRoute(builder: (_) => const FinanceDashboardScreen()));
+            },
+          ),
+          IconButton(
+            tooltip: 'Ruang Kasih (Pesan Donatur)',
+            icon: const Icon(Icons.chat_bubble_outline),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const FamilyRoomScreen()),
+              );
             },
           ),
           IconButton(

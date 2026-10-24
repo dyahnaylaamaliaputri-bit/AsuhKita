@@ -45,6 +45,12 @@ class DioClient {
           return handler.next(options);
         },
         onError: (DioException error, handler) async {
+          // Jangan buang waktu looping ke candidate URLs saat login/register agar proses loading cepat
+          final reqPath = error.requestOptions.path;
+          if (reqPath.contains('/auth/login') || reqPath.contains('/auth/register')) {
+            return handler.next(error);
+          }
+
           // Coba fallback ke kandidat baseUrl lain jika gagal koneksi/timeout
           if (error.type == DioExceptionType.connectionError ||
               error.type == DioExceptionType.connectionTimeout) {

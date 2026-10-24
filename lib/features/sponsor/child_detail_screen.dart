@@ -1,9 +1,12 @@
 // Letak file: mobile/lib/features/sponsor/child_detail_screen.dart
-// Fungsi: Layar Detail Profil Anak Asuh & Pemilihan Paket Sponsorship (PBI-019, FR-17, FR-18)
+// Fungsi: Layar Detail Profil Lengkap Anak Asuh & Pemilihan Paket Sponsorship
 
 import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
+import '../../data/local_db.dart';
+import '../communication/family_room_screen.dart';
 import '../donation/donation_form_screen.dart';
+import '../schedule/schedule_screen.dart';
 
 class ChildDetailScreen extends StatefulWidget {
   final Map<String, dynamic> childData;
@@ -15,8 +18,10 @@ class ChildDetailScreen extends StatefulWidget {
 }
 
 class _ChildDetailScreenState extends State<ChildDetailScreen> {
-  // Pilihan Paket Sponsorship yang tersedia
   int _selectedPackageIndex = 0;
+  bool _isSponsoredByMe = false;
+  int _myTotalDonation = 0;
+  List<Map<String, dynamic>> _myDonations = [];
 
   final List<Map<String, dynamic>> _packages = [
     {
@@ -40,25 +45,95 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _checkSponsorshipStatus();
+  }
+
+  Future<void> _checkSponsorshipStatus() async {
+    try {
+      final childAlias = (widget.childData['alias'] ?? widget.childData['name'] ?? '').toString().trim().toLowerCase();
+      final localDonations = await LocalDatabase().getCachedDonations();
+      int total = 0;
+      final matched = <Map<String, dynamic>>[];
+
+      for (var d in localDonations) {
+        final dAlias = (d['child_alias'] ?? '').toString().trim().toLowerCase();
+        if (dAlias == childAlias) {
+          matched.add(d);
+          final amt = (d['amount_idr'] is num) ? (d['amount_idr'] as num).toInt() : 0;
+          total += amt;
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _isSponsoredByMe = matched.isNotEmpty;
+          _myTotalDonation = total;
+          _myDonations = matched;
+        });
+      }
+    } catch (_) {}
+  }
+
+  String _formatRupiah(num value) {
+    return 'Rp ${value.toInt().toString().replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (m) => "${m[1]}.")}';
+  }
+
+  @override
   Widget build(BuildContext context) {
     final child = widget.childData;
+    final alias = (child['alias'] ?? child['name'] ?? 'Anak Asuh').toString();
+    final age = child['age'] ?? 8;
+    final gender = child['gender'] ?? 'Laki-laki';
+    final city = child['orphanage_city'] ?? child['city'] ?? 'Mataram, NTB';
+    final orphanage = child['orphanage_name'] ?? 'Peduli Anak Foundation';
+    final dream = (child['dream'] != null && child['dream'].toString().isNotEmpty) ? child['dream'].toString() : 'Dokter / Guru';
+    final hobby = (child['hobby'] != null && child['hobby'].toString().isNotEmpty) ? child['hobby'].toString() : 'Membaca buku & Bersepeda';
+    final category = child['need_category'] ?? child['urgentNeeds'] ?? 'Pendidikan';
+    final targetNum = (child['target'] is num) ? (child['target'] as num).toDouble() : 500000.0;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        title: Text('Profil ${child['alias'] ?? child['name'] ?? 'Anak'}'),
+        title: Text('Profil $alias'),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
+        actions: [
+          IconButton(
+            tooltip: 'Kirim Pesan (Ruang Kasih)',
+            icon: const Icon(Icons.chat_outlined),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const FamilyRoomScreen()),
+              );
+            },
+          ),
+          IconButton(
+            tooltip: 'Jadwalkan Video Call',
+            icon: const Icon(Icons.video_call_outlined),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ScheduleScreen()),
+              );
+            },
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Header Ilustrasi & Nama Anak (NFR-06: nama samaran & avatar ilustrasi)
+            // Header Avatar & Informasi Singkat
             Container(
               padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
-              color: AppColors.surfaceLight,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
+              ),
               child: Column(
                 children: [
                   ClipRRect(
@@ -71,12 +146,12 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    '${child['alias'] ?? child['name'] ?? 'Anak Asuh'}',
+                    alias,
                     style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.primaryDark),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Usia: ${child['age'] ?? '-'} Tahun • Fokus: ${child['need_category'] ?? child['urgentNeeds'] ?? ''}',
+                    'Usia: $age Tahun • $gender',
                     style: const TextStyle(fontSize: 14, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
                   ),
                   const SizedBox(height: 6),
@@ -86,7 +161,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                       const Icon(Icons.apartment, size: 16, color: AppColors.primary),
                       const SizedBox(width: 6),
                       Text(
-                        '${child['orphanage_name'] ?? 'Peduli Anak'} (${child['orphanage_city'] ?? child['city'] ?? ''})',
+                        '$orphanage ($city)',
                         style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
                       ),
                     ],
@@ -95,38 +170,214 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
               ),
             ),
 
+            // Banner Status Orang Tua Asuh (Jika anak ini sudah menjadi anak asuh donatur)
+            if (_isSponsoredByMe)
+              Container(
+                margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.amber.shade50, Colors.orange.shade50],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.amber.shade400, width: 1.5),
+                  boxShadow: [
+                    BoxShadow(color: Colors.amber.withValues(alpha: 0.15), blurRadius: 8, offset: const Offset(0, 3)),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: const [
+                        Icon(Icons.workspace_premium, color: Colors.amber, size: 26),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '🌟 Anak Asuh Anda (Aktif Didampingi)',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF8B6914)),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Alhamdulillah! Anda tercatat sebagai Orang Tua Asuh resmi ananda $alias dengan akumulasi kontribusi ${_formatRupiah(_myTotalDonation)} (${_myDonations.length}x transaksi).',
+                      style: const TextStyle(fontSize: 12, color: Colors.black87, height: 1.3),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const FamilyRoomScreen()),
+                              );
+                            },
+                            icon: const Icon(Icons.chat, size: 16),
+                            label: const Text('Ruang Kasih', style: TextStyle(fontSize: 12)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const ScheduleScreen()),
+                              );
+                            },
+                            icon: const Icon(Icons.videocam, size: 16),
+                            label: const Text('Video Call', style: TextStyle(fontSize: 12)),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
             Padding(
-              padding: const EdgeInsets.all(20.0),
+              padding: const EdgeInsets.all(16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Cerita Singkat Anak
-                  const Text(
-                    'Cerita & Aspirasi',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceLight,
-                      borderRadius: BorderRadius.circular(12),
+                  // CARD 1: BIODATA & DATA LENGKAP ANAK
+                  Card(
+                    elevation: 1.5,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: const [
+                              Icon(Icons.badge_outlined, color: AppColors.primary, size: 20),
+                              SizedBox(width: 8),
+                              Text('Data Lengkap & Biodata Anak', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                            ],
+                          ),
+                          const Divider(height: 20),
+                          _buildDataRow(Icons.school_outlined, 'Jenjang Pendidikan', 'Kelas ${(age is int && age > 6) ? (age - 6) : 3} Sekolah Dasar'),
+                          _buildDataRow(Icons.lightbulb_outline, 'Cita-Cita / Impian', dream),
+                          _buildDataRow(Icons.sports_soccer_outlined, 'Hobi & Minat', hobby),
+                          _buildDataRow(Icons.health_and_safety_outlined, 'Kondisi Kesehatan', 'Sehat wal afiat & aktif dalam pembinaan panti'),
+                          _buildDataRow(Icons.supervisor_account_outlined, 'Pengasuh Asrama', 'Ustadz Ahmad (Kepala Asrama Peduli Anak)'),
+                          _buildDataRow(Icons.location_on_outlined, 'Lokasi Panti', city),
+                        ],
+                      ),
                     ),
-                    child: Text(
-                      child['story_summary'] ?? child['story'] ?? 'Anak yang penuh semangat dan rajin beribadah serta belajar di panti asuhan.',
-                      style: const TextStyle(fontSize: 14, height: 1.5, color: AppColors.textPrimary),
-                    ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
 
-                  // Pilihan Paket Sponsorship (FR-18)
+                  // CARD 2: CERITA & ASPIRASI
+                  Card(
+                    elevation: 1.5,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: const [
+                              Icon(Icons.auto_stories_outlined, color: AppColors.primary, size: 20),
+                              SizedBox(width: 8),
+                              Text('Cerita Kehidupan & Harapan', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                            ],
+                          ),
+                          const Divider(height: 20),
+                          Text(
+                            child['story_summary'] ?? child['story'] ?? 'Anak yang rajin belajar, penuh semangat dan gemar menghafal doa serta giat membantu teman-temannya di panti asuhan.',
+                            style: const TextStyle(fontSize: 13, height: 1.5, color: AppColors.textPrimary),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // CARD 3: TARGET PEMENUHAN KEBUTUHAN
+                  Card(
+                    elevation: 1.5,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: const [
+                                  Icon(Icons.pie_chart_outline, color: AppColors.primary, size: 20),
+                                  SizedBox(width: 8),
+                                  Text('Target Pemenuhan Kebutuhan', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                                ],
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: AppColors.surfaceLight,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(category, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primaryDark)),
+                              ),
+                            ],
+                          ),
+                          const Divider(height: 20),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Target Dana Kebutuhan:', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                              Text(_formatRupiah(targetNum), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(6),
+                            child: LinearProgressIndicator(
+                              value: targetNum > 0 ? (_myTotalDonation / targetNum).clamp(0.0, 1.0) : 0.0,
+                              minHeight: 8,
+                              backgroundColor: Colors.grey.shade200,
+                              valueColor: const AlwaysStoppedAnimation<Color>(Colors.green),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Terkumpul: ${_formatRupiah(_myTotalDonation)} (${targetNum > 0 ? ((_myTotalDonation / targetNum) * 100).toInt() : 0}%)',
+                            style: TextStyle(fontSize: 11, color: Colors.grey.shade700, fontWeight: FontWeight.w500),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // CARD 4: PILIH PAKET SPONSORSHIP
                   const Text(
                     'Pilih Paket Sponsorship Orang Tua Asuh',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                   ),
                   const SizedBox(height: 4),
                   const Text(
-                    'Dukungan Anda disalurkan secara transparan dan tercatat di blockchain.',
+                    'Dukungan Anda disalurkan secara transparan dan tercatat di blockchain ledger.',
                     style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                   ),
                   const SizedBox(height: 12),
@@ -181,7 +432,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                                       ),
                                       const SizedBox(height: 6),
                                       Text(
-                                        'Rp ${pkg['monthly_idr'].toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')} / bulan',
+                                        '${_formatRupiah(pkg['monthly_idr'])} / bulan',
                                         style: const TextStyle(
                                           fontWeight: FontWeight.bold,
                                           color: AppColors.primary,
@@ -220,7 +471,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                             );
                           },
                           icon: const Icon(Icons.favorite),
-                          label: const Text('Lanjut ke Form Donasi', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          label: const Text('Lanjut ke Form Donasi & Sertifikat', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,
                             foregroundColor: Colors.white,
@@ -241,6 +492,27 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
     );
   }
 
+  Widget _buildDataRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: AppColors.primary),
+          const SizedBox(width: 10),
+          SizedBox(
+            width: 130,
+            child: Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
+          ),
+          const Text(': ', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+          Expanded(
+            child: Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAvatar(Map<String, dynamic> child) {
     final url = (child['avatar'] ?? child['photo'] ?? '').toString();
     if (url.startsWith('data:image')) {
@@ -253,15 +525,6 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
       return Image.network(
         url,
         fit: BoxFit.cover,
-        loadingBuilder: (context, childWidget, progress) {
-          if (progress == null) return childWidget;
-          return Container(
-            color: Colors.white,
-            child: const Center(
-              child: CircularProgressIndicator(color: AppColors.primary),
-            ),
-          );
-        },
         errorBuilder: (context, error, stackTrace) => Container(
           color: Colors.white,
           child: const Icon(Icons.face, size: 64, color: AppColors.primary),

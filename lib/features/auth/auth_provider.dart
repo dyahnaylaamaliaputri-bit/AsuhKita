@@ -30,6 +30,7 @@ class AuthProvider extends ChangeNotifier {
   String get userName => _userName;
   String get userEmail => _userEmail;
   String get userRole => _userRole;
+  bool get isAdmin => _userRole.toLowerCase().contains('admin');
   String get userId => _userId;
   bool get isBiometricAvailable => _isBiometricAvailable;
   bool get isBiometricEnabled => _isBiometricEnabled;
@@ -86,12 +87,19 @@ class AuthProvider extends ChangeNotifier {
       return false;
     }
 
-    // --- 1. Coba Autentikasi ke Web Service / Online API Supabase ---
+    // --- 1. Coba Autentikasi ke Web Service / Online API Supabase (Timeout Cepat 2 Detik) ---
     try {
-      final response = await _dioClient.dio.post('/auth/login', data: {
-        'email': cleanEmail,
-        'password': password,
-      });
+      final response = await _dioClient.dio.post(
+        '/auth/login',
+        data: {
+          'email': cleanEmail,
+          'password': password,
+        },
+        options: Options(
+          sendTimeout: const Duration(milliseconds: 2000),
+          receiveTimeout: const Duration(milliseconds: 2000),
+        ),
+      );
 
       if (response.statusCode == 200) {
         final resData = (response.data is Map && response.data['data'] != null)
@@ -131,20 +139,31 @@ class AuthProvider extends ChangeNotifier {
         return true;
       }
     } on DioException catch (dioErr) {
-      // JIKA SERVER MERESPONS 401/400 (Kata sandi salah atau kredensial invalid):
-      // JANGAN BYPASS! Langsung tolak login dan infokan bahwa sandi salah!
-      if (dioErr.response?.statusCode == 401 || dioErr.response?.statusCode == 400) {
-        _errorMessage = dioErr.response?.data?['message']?.toString() ??
-            'Kata sandi salah atau email tidak terdaftar. Silakan periksa kembali.';
+      if (dioErr.response?.statusCode == 401 || dioErr.response?.statusCode == 400 || dioErr.response?.statusCode == 404) {
+        final serverMsg = dioErr.response?.data?['message']?.toString() ?? '';
+        final isTaken = await LocalDatabase().isEmailRegistered(cleanEmail);
+        if (!isTaken && (serverMsg.toLowerCase().contains('not found') || serverMsg.toLowerCase().contains('tidak terdaftar') || dioErr.response?.statusCode == 404)) {
+          _errorMessage = 'Akun belum terdaftar di AsuhKita. Silakan daftar akun terlebih dahulu.';
+        } else {
+          _errorMessage = serverMsg.isNotEmpty
+              ? serverMsg
+              : (isTaken ? 'Kata sandi salah. Silakan periksa kembali.' : 'Akun belum terdaftar di AsuhKita. Silakan daftar akun terlebih dahulu.');
+        }
         _isLoading = false;
         notifyListeners();
         return false;
       }
-      // Jika connection error / timeout, lanjutkan ke verifikasi Database Lokal SQLite
     } catch (_) {}
 
     // --- 2. Fallback Verifikasi Database Lokal SQLite Terenkripsi (Offline Mode) ---
-    // HANYA jika kata sandi COCOK PERSIS dengan hash yang tersimpan di SQLite!
+    final isRegisteredLocally = await LocalDatabase().isEmailRegistered(cleanEmail);
+    if (!isRegisteredLocally) {
+      _errorMessage = 'Akun belum terdaftar di AsuhKita. Silakan daftar akun terlebih dahulu.';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+
     final localUser = await LocalDatabase().verifyAuthUser(
       email: cleanEmail,
       password: password,
@@ -175,8 +194,8 @@ class AuthProvider extends ChangeNotifier {
       return true;
     }
 
-    // Jika kata sandi salah atau email tidak ada di database:
-    _errorMessage = 'Kata sandi salah atau akun belum terdaftar.';
+    // Jika akun terdaftar tapi kata sandi salah:
+    _errorMessage = 'Kata sandi salah. Silakan periksa kembali kata sandi Anda.';
     _isLoading = false;
     notifyListeners();
     return false;

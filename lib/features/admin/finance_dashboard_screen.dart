@@ -7,6 +7,7 @@ import '../../core/app_colors.dart';
 import '../../core/dio_client.dart';
 import '../../services/gemini_service.dart';
 import '../../data/local_db.dart';
+import '../schedule/schedule_screen.dart';
 
 class FinanceDashboardScreen extends StatefulWidget {
   const FinanceDashboardScreen({super.key});
@@ -275,6 +276,16 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.alarm_add),
+            tooltip: 'Jadwalkan Pengingat Laporan',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ScheduleScreen()),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh Laporan',

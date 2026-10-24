@@ -54,6 +54,11 @@ dependencies:
   google_generative_ai: ^0.4.6
   # Notifikasi Lokal - Pengingat Donasi & Video Call (PBI-055, FR-40, FR-41)
   flutter_local_notifications: ^22.3.2
+  # LBS: Lokasi GPS Akurat & Izin Lokasi
+  geolocator: ^13.0.2
+  # Sertifikat Digital Donasi PDF & Printing
+  pdf: ^3.11.1
+  printing: ^5.13.2
 
 dev_dependencies:
   flutter_test:

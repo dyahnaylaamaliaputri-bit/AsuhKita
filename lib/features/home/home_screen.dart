@@ -18,12 +18,12 @@ import '../admin/admin_panel_screen.dart';
 import '../admin/donation_tracking_screen.dart';
 import '../admin/finance_dashboard_screen.dart';
 import '../communication/family_room_screen.dart';
-import '../donation/donation_history_screen.dart';
 import '../sponsor/child_detail_screen.dart';
 import 'iot_donation_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final Function(int)? onNavigateTab;
+  static final ValueNotifier<int> refreshNotifier = ValueNotifier<int>(0);
 
   const HomeScreen({super.key, this.onNavigateTab});
 
@@ -41,7 +41,14 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    HomeScreen.refreshNotifier.addListener(_loadData);
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    HomeScreen.refreshNotifier.removeListener(_loadData);
+    super.dispose();
   }
 
   String _formatCompactRupiah(int val) {
@@ -378,9 +385,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   _buildFeatureCard(
                     context,
-                    title: 'Blockchain Ledger',
-                    subtitle: 'Audit nota on-chain',
-                    icon: Icons.link,
+                    title: 'Verifikasi Sertifikat',
+                    subtitle: 'Cek kredensial donasi',
+                    icon: Icons.verified_user,
                     color: AppColors.primaryDark,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LedgerScreen())),
                   ),
@@ -425,9 +432,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   _buildFeatureCard(
                     context,
-                    title: 'Blockchain Ledger',
-                    subtitle: 'Hash chain & verifikasi',
-                    icon: Icons.link,
+                    title: 'Verifikasi Sertifikat',
+                    subtitle: 'Cek kredensial donasi',
+                    icon: Icons.verified_user,
                     color: AppColors.primaryDark,
                     onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LedgerScreen())),
                   ),
@@ -473,11 +480,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   _buildFeatureCard(
                     context,
-                    title: 'Riwayat & Sync',
-                    subtitle: 'Donasi & sinkronisasi',
-                    icon: Icons.history,
+                    title: 'Data Offline & Online',
+                    subtitle: 'Arsitektur data panti',
+                    icon: Icons.cloud_sync,
                     color: AppColors.primary,
-                    onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DonationHistoryScreen())),
+                    onTap: () => _showOfflineOnlineDataModal(context),
                   ),
                   _buildFeatureCard(
                     context,
@@ -491,6 +498,171 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showOfflineOnlineDataModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        height: MediaQuery.of(ctx).size.height * 0.85,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 44,
+                height: 5,
+                decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+            const SizedBox(height: 14),
+            const Row(
+              children: [
+                Icon(Icons.cloud_sync, color: AppColors.primary, size: 24),
+                SizedBox(width: 8),
+                Text(
+                  'Arsitektur Data: Offline vs Online',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Pemisahan peran data lokal (SQLite) dan cloud (Supabase) pada ekosistem AsuhKita.',
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            ),
+            const Divider(height: 20),
+            Expanded(
+              child: ListView(
+                children: [
+                  // 1. DATA OFFLINE (LOKAL SQLITE)
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.shade50,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.amber.shade300, width: 1.5),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: const BoxDecoration(color: Colors.amber, shape: BoxShape.circle),
+                              child: const Icon(Icons.storage, color: Colors.white, size: 18),
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'DATA OFFLINE (Tersimpan di SQLite Lokal)',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF8B6914)),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Data master statis yang tetap dapat diakses tanpa kuota internet kapan saja:',
+                          style: TextStyle(fontSize: 12, color: Colors.black87),
+                        ),
+                        const SizedBox(height: 8),
+                        _buildDataBullet('Data Panti Asuhan & Cabang Yayasan', 'Alamat lengkap, kontak resmi, rekening, dan profil panti.'),
+                        _buildDataBullet('Panduan SOP & Edukasi Orang Tua Asuh', 'Materi dan prosedur perlindungan anak asuh.'),
+                        _buildDataBullet('Cache Histori Percakapan Ruang Kasih', 'Pesan offline yang tersimpan aman di database SQLite lokal.'),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 2. DATA ONLINE (CLOUD SUPABASE)
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.blue.shade300, width: 1.5),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: const BoxDecoration(color: Colors.blue, shape: BoxShape.circle),
+                              child: const Icon(Icons.cloud_done, color: Colors.white, size: 18),
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'DATA ONLINE (Cloud Supabase PostgreSQL)',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0D47A1)),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Data dinamis real-time yang langsung terintegrasi antar-perangkat:',
+                          style: TextStyle(fontSize: 12, color: Colors.black87),
+                        ),
+                        const SizedBox(height: 8),
+                        _buildDataBullet('Daftar Anak Asuh Terkini', 'Nama samaran, kebutuhan mendesak, dan target donasi yang diinput admin.'),
+                        _buildDataBullet('Transaksi & Kuitansi Donasi Real-Time', 'Pencatatan dana masuk dari donatur dan penguncian hash SHA-256.'),
+                        _buildDataBullet('Sinkronisasi Jadwal & Pesan Baru', 'Pembaruan data instan antar-perangkat (Admin <-> Donatur).'),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Tutup Katalog Data'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDataBullet(String title, String desc) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.check_circle_outline, size: 16, color: Colors.black87),
+          const SizedBox(width: 6),
+          Expanded(
+            child: RichText(
+              text: TextSpan(
+                style: const TextStyle(fontSize: 12, color: Colors.black87),
+                children: [
+                  TextSpan(text: '$title: ', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  TextSpan(text: desc),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

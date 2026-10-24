@@ -133,9 +133,13 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
         }
       }
 
-      // KOSONGKAN jika donatur belum memiliki anak asuh (0 anak asuh)
-      // Tidak menggunakan fallback mock dummy data
-      _children = mySponsoredChildren;
+      // JIKA ADMIN: Tampilkan semua katalog anak asuh agar bisa memantau dan membalas semua pesan donatur
+      // JIKA DONATUR: Tampilkan anak asuh yang didampingi
+      if (auth.isAdmin) {
+        _children = allCatalog;
+      } else {
+        _children = mySponsoredChildren;
+      }
 
       // 4. Load last message untuk setiap anak asuh yang dimiliki
       _lastMessages = {};
@@ -705,6 +709,7 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
     final city = (child['orphanage_city'] ?? child['city'] ?? '').toString();
     final category = (child['need_category'] ?? child['urgentNeeds'] ?? '').toString();
 
+    final auth = Provider.of<AuthProvider>(context, listen: false);
     await Navigator.push(
       context,
       MaterialPageRoute(
@@ -713,6 +718,7 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
           childAvatar: avatar,
           childCity: city,
           childCategory: category,
+          isViewerAdmin: auth.isAdmin,
         ),
       ),
     );
@@ -733,12 +739,14 @@ class _ChatRoomScreen extends StatefulWidget {
   final String childAvatar;
   final String childCity;
   final String childCategory;
+  final bool isViewerAdmin;
 
   const _ChatRoomScreen({
     required this.childAlias,
     required this.childAvatar,
     this.childCity = '',
     this.childCategory = '',
+    this.isViewerAdmin = false,
   });
 
   @override
@@ -810,10 +818,11 @@ class _ChatRoomScreenState extends State<_ChatRoomScreen> {
 
     final now = DateTime.now();
     final timeStr = '${now.hour}:${now.minute.toString().padLeft(2, '0')}';
+    final senderRole = widget.isViewerAdmin ? 'admin' : 'donor';
 
     setState(() {
       _messages.add({
-        'sender': 'donor',
+        'sender': senderRole,
         'text': content,
         'time': timeStr,
         'type': type,
@@ -827,7 +836,7 @@ class _ChatRoomScreenState extends State<_ChatRoomScreen> {
     // 1. Simpan permanen ke SQLite
     _localDb.insertChatMessage(
       childAlias: widget.childAlias,
-      sender: 'donor',
+      sender: senderRole,
       text: content,
       type: type,
       fileUrl: fileUrl ?? '',
@@ -838,16 +847,17 @@ class _ChatRoomScreenState extends State<_ChatRoomScreen> {
     try {
       DioClient().dio.post('/letters', data: {
         'child_alias': widget.childAlias,
-        'sender': 'donor',
+        'sender': senderRole,
         'text': content,
         'type': type,
         'file_url': fileUrl ?? '',
       });
     } catch (_) {}
 
-    // 3. Respon otomatis admin panti (simulasi pesan balasan setelah 1.5 detik)
-    Future.delayed(const Duration(milliseconds: 1500), () {
-      if (mounted) {
+    // 3. Jika dikirim oleh DONATUR: Buat respon otomatis panti asuhan jika belum ada admin membalas
+    if (!widget.isViewerAdmin) {
+      Future.delayed(const Duration(milliseconds: 1500), () {
+        if (mounted) {
         final replyTime = DateTime.now();
         final replyTimeStr = '${replyTime.hour}:${replyTime.minute.toString().padLeft(2, '0')}';
 
@@ -886,6 +896,7 @@ class _ChatRoomScreenState extends State<_ChatRoomScreen> {
         );
       }
     });
+    } // end of if (!widget.isViewerAdmin)
   }
 
   Future<void> _pickAndSendFile() async {
@@ -1077,7 +1088,8 @@ class _ChatRoomScreenState extends State<_ChatRoomScreen> {
                           itemCount: _messages.length,
                           itemBuilder: (context, idx) {
                             final msg = _messages[idx];
-                            final isDonor = msg['sender'] == 'donor';
+                            final isMe = widget.isViewerAdmin ? (msg['sender'] == 'admin') : (msg['sender'] == 'donor');
+                            final isDonor = isMe;
                             final isFile = msg['type'] == 'file';
 
                             return Align(
@@ -1135,7 +1147,7 @@ class _ChatRoomScreenState extends State<_ChatRoomScreen> {
                                               Padding(
                                                 padding: const EdgeInsets.only(bottom: 3),
                                                 child: Text(
-                                                  msg['sender'] == 'admin' ? '👨‍💼 Admin Panti' : '🧒 ${widget.childAlias}',
+                                                  widget.isViewerAdmin ? (msg['sender'] == 'admin' ? '👨‍💼 Anda (Admin Panti)' : '🤝 Donatur Peduli') : (msg['sender'] == 'admin' ? '👨‍💼 Admin Panti' : '🧒 ${widget.childAlias}'),
                                                   style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.primaryDark),
                                                 ),
                                               ),

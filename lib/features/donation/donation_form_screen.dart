@@ -1,15 +1,20 @@
 import '../ledger/ledger_screen.dart';
-import '../../services/notification_service.dart';
 import 'dart:convert';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import '../../core/app_colors.dart';
 import '../../core/dio_client.dart';
 import '../../data/local_db.dart';
 import '../auth/auth_provider.dart';
+import '../home/home_screen.dart';
+import '../sponsor/sponsor_screen.dart';
 import '../../services/exchange_rate_service.dart';
 
 class DonationFormScreen extends StatefulWidget {
@@ -28,6 +33,10 @@ class DonationFormScreen extends StatefulWidget {
 
 class _DonationFormScreenState extends State<DonationFormScreen> {
   final _amountController = TextEditingController();
+  final _donorNameController = TextEditingController();
+  final _donorEmailController = TextEditingController();
+  final _donorPhoneController = TextEditingController();
+  final _donorMessageController = TextEditingController();
   final LocalAuthentication _localAuth = LocalAuthentication();
 
   String _selectedCurrency = 'IDR'; // IDR, USD, SGD, EUR, SAR (FR-23)
@@ -52,6 +61,20 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
     // Default nominal sesuai paket pilihan dalam IDR
     final defaultIdr = widget.packageData['monthly_idr'] ?? 250000;
     _amountController.text = defaultIdr.toString();
+
+    // Inisialisasi Identitas Donatur dari Akun Aktif
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      try {
+        final auth = Provider.of<AuthProvider>(context, listen: false);
+        if (_donorNameController.text.isEmpty) {
+          _donorNameController.text = auth.userName.isNotEmpty ? auth.userName : 'Donatur Peduli Asuh';
+        }
+        if (_donorEmailController.text.isEmpty) {
+          _donorEmailController.text = auth.userEmail.isNotEmpty ? auth.userEmail : 'donatur@asuhkita.org';
+        }
+      } catch (_) {}
+    });
+
     // Fetch kurs real-time (FR-43, PBI-048)
     _fetchRealTimeRates();
   }
@@ -69,6 +92,10 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
   @override
   void dispose() {
     _amountController.dispose();
+    _donorNameController.dispose();
+    _donorEmailController.dispose();
+    _donorPhoneController.dispose();
+    _donorMessageController.dispose();
     super.dispose();
   }
 
@@ -84,6 +111,17 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
   }
 
   Future<void> _processDonation() async {
+    final donorName = _donorNameController.text.trim();
+    if (donorName.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Nama Lengkap Donatur wajib diisi untuk penerbitan sertifikat resmi!'),
+          backgroundColor: Colors.deepOrange,
+        ),
+      );
+      return;
+    }
+
     final amountInput = double.tryParse(_amountController.text.replaceAll(',', '.')) ?? 0.0;
     if (amountInput <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -315,6 +353,134 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
     );
   }
 
+  Future<void> _downloadPdfCertificate({
+    required String donorName,
+    required String childAlias,
+    required String packageName,
+    required String amountText,
+    required String certCode,
+    required String hash,
+  }) async {
+    final pdf = pw.Document();
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4.landscape,
+        margin: const pw.EdgeInsets.all(32),
+        build: (pw.Context context) {
+          return pw.Container(
+            decoration: pw.BoxDecoration(
+              border: pw.Border.all(color: PdfColors.amber800, width: 4),
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(16)),
+              color: PdfColors.white,
+            ),
+            padding: const pw.EdgeInsets.all(24),
+            child: pw.Column(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Column(
+                  children: [
+                    pw.Text(
+                      'YAYASAN ASUHKITA INDONESIA',
+                      style: pw.TextStyle(
+                        fontSize: 16,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.blueGrey800,
+                        letterSpacing: 2,
+                      ),
+                    ),
+                    pw.SizedBox(height: 4),
+                    pw.Text(
+                      'SERTIFIKAT PENGHARGAAN ORANG TUA ASUH',
+                      style: pw.TextStyle(
+                        fontSize: 22,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.amber900,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                    pw.Container(
+                      width: 250,
+                      height: 2,
+                      color: PdfColors.amber700,
+                      margin: const pw.EdgeInsets.symmetric(vertical: 8),
+                    ),
+                  ],
+                ),
+                pw.Column(
+                  children: [
+                    pw.Text(
+                      'Sertifikat ini dianugerahkan dengan penuh rasa hormat & terima kasih kepada:',
+                      style: pw.TextStyle(fontSize: 12, color: PdfColors.grey700),
+                    ),
+                    pw.SizedBox(height: 12),
+                    pw.Text(
+                      donorName.toUpperCase(),
+                      style: pw.TextStyle(
+                        fontSize: 24,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.teal900,
+                      ),
+                    ),
+                    pw.SizedBox(height: 8),
+                    pw.Text(
+                      'Sebagai Orang Tua Asuh yang telah berpartisipasi nyata mendampingi masa depan & pemenuhan kebutuhan pendidikan anak asuh:',
+                      textAlign: pw.TextAlign.center,
+                      style: pw.TextStyle(fontSize: 12, color: PdfColors.grey800),
+                    ),
+                    pw.SizedBox(height: 8),
+                    pw.Text(
+                      childAlias,
+                      style: pw.TextStyle(
+                        fontSize: 18,
+                        fontWeight: pw.FontWeight.bold,
+                        color: PdfColors.blue800,
+                      ),
+                    ),
+                    pw.SizedBox(height: 4),
+                    pw.Text(
+                      'Paket: $packageName | Kontribusi: $amountText',
+                      style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: PdfColors.grey700),
+                    ),
+                  ],
+                ),
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: pw.CrossAxisAlignment.end,
+                  children: [
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text('Verifikasi Kredensial Blockchain:', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
+                        pw.Text('No. Sertifikat: $certCode', style: pw.TextStyle(fontSize: 8, color: PdfColors.grey800)),
+                        pw.Text('Ledger Hash: $hash', style: pw.TextStyle(fontSize: 8, color: PdfColors.grey800)),
+                        pw.Text('Link Verifikasi: https://asuhkita.org/verify?cert=$certCode&hash=$hash', style: pw.TextStyle(fontSize: 8, color: PdfColors.blue700)),
+                      ],
+                    ),
+                    pw.Column(
+                      children: [
+                        pw.Text('Diterbitkan: ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}', style: pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
+                        pw.SizedBox(height: 16),
+                        pw.Container(width: 140, height: 1, color: PdfColors.grey600),
+                        pw.SizedBox(height: 4),
+                        pw.Text('Ketua Pengurus AsuhKita', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+
+    await Printing.layoutPdf(
+      onLayout: (PdfPageFormat format) async => pdf.save(),
+      name: 'Sertifikat_AsuhKita_$certCode.pdf',
+    );
+  }
+
   // ============================================================
   // LANGKAH 2: EKSEKUSI PENYIMPANAN & TAMPILKAN SERTIFIKAT RESMI
   // ============================================================
@@ -332,14 +498,16 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
 
     setState(() => _isProcessing = true);
 
-    // Ambil identitas donatur dari AuthProvider / SharedPreferences
-    String donorName = 'Donatur Peduli';
-    String donorEmail = 'donatur@asuhkita.id';
+    // Ambil identitas donatur dari Form Input / AuthProvider
+    String donorName = _donorNameController.text.trim();
+    String donorEmail = _donorEmailController.text.trim();
     try {
       final auth = Provider.of<AuthProvider>(context, listen: false);
-      if (auth.userName.isNotEmpty) donorName = auth.userName;
-      if (auth.userEmail.isNotEmpty) donorEmail = auth.userEmail;
+      if (donorName.isEmpty && auth.userName.isNotEmpty) donorName = auth.userName;
+      if (donorEmail.isEmpty && auth.userEmail.isNotEmpty) donorEmail = auth.userEmail;
     } catch (_) {}
+    if (donorName.isEmpty) donorName = 'Donatur Peduli';
+    if (donorEmail.isEmpty) donorEmail = 'donatur@asuhkita.id';
 
     final needCategory = (widget.packageData['name'] ?? widget.childData['need_category'] ?? widget.childData['urgentNeeds'] ?? 'Pendidikan').toString();
 
@@ -349,6 +517,8 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
       'package_id': widget.packageData['id'],
       'donor_name': donorName,
       'donor_email': donorEmail,
+      'donor_phone': _donorPhoneController.text.trim(),
+      'donor_message': _donorMessageController.text.trim(),
       'need_category': needCategory,
       'amount_original': amountInput,
       'currency': _selectedCurrency,
@@ -382,7 +552,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
       isOnlineSuccess = false;
     }
 
-    // SIMPAN PERSISTEN KE DATABASE LOKAL SQLITE agar riwayat donasi & beranda realtime
+    // SIMPAN PERSISTEN KE DATABASE LOKAL SQLITE
     await LocalDatabase().insertDonation({
       'id': 'don_${DateTime.now().millisecondsSinceEpoch}',
       'sponsorship_id': 'sp_${DateTime.now().millisecondsSinceEpoch}',
@@ -404,14 +574,19 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
       await prefs.setInt('asuhkita_user_sponsored_count', currentSponsored + 1);
     } catch (_) {}
 
+    // UPDATE REAL-TIME: Triger auto-refresh di Dashboard & Sponsor Screen
+    HomeScreen.refreshNotifier.value++;
+    SponsorScreen.refreshNotifier.value++;
+
     setState(() => _isProcessing = false);
 
-    // Tampilkan Sertifikat Resmi Pendanaan Orang Tua Asuh (Permintaan Butir 6)
+    // Tampilkan Sertifikat Resmi Pendanaan Orang Tua Asuh
     if (mounted) {
       _showSuccessCertificateDialog(
         isOnline: isOnlineSuccess,
         certCode: certificateCode,
         hash: blockHash,
+        donorName: donorName,
         amountText: '${amountInput.toStringAsFixed(0)} $_selectedCurrency (${_formatRupiah(_calculatedIdr)})',
       );
     }
@@ -421,8 +596,11 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
     required bool isOnline,
     required String certCode,
     required String hash,
+    required String donorName,
     required String amountText,
   }) {
+    final credentialUrl = 'https://asuhkita.org/verify?cert=$certCode&hash=$hash';
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -478,6 +656,13 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 8),
+                      // Tampilkan Nama Donatur
+                      Text(
+                        donorName.toUpperCase(),
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.indigo),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                         decoration: BoxDecoration(
@@ -498,7 +683,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
                         width: 120,
                         height: 120,
                         child: QrImageView(
-                          data: 'asuhkita://verify?code=$certCode&hash=$hash',
+                          data: credentialUrl,
                           version: QrVersions.auto,
                           size: 120.0,
                         ),
@@ -517,22 +702,88 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
                   style: TextStyle(fontSize: 11, color: isOnline ? Colors.green.shade800 : Colors.orange.shade800),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: 16),
+
+                // TOMBOL UNDUH PDF SERTIFIKAT
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
                     onPressed: () {
-                      Navigator.pop(ctx);
-                      Navigator.pop(context);
+                      _downloadPdfCertificate(
+                        donorName: donorName,
+                        childAlias: widget.childData['alias'] ?? 'Anak Asuh',
+                        packageName: widget.packageData['name'] ?? 'Donasi',
+                        amountText: amountText,
+                        certCode: certCode,
+                        hash: hash,
+                      );
                     },
-                    icon: const Icon(Icons.check, size: 18),
-                    label: const Text('Simpan & Selesai'),
+                    icon: const Icon(Icons.picture_as_pdf, size: 18),
+                    label: const Text('Unduh Sertifikat Resmi (PDF)'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
+                      backgroundColor: Colors.red.shade700,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // TOMBOL SALIN LINK KREDENSIAL & CEK DI BLOCKCHAIN
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: credentialUrl));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Link kredensial berhasil disalin ke clipboard!'),
+                              backgroundColor: Colors.green,
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.copy, size: 16),
+                        label: const Text('Salin Link', style: TextStyle(fontSize: 12)),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const LedgerScreen()),
+                          );
+                        },
+                        icon: const Icon(Icons.verified_outlined, size: 16),
+                        label: const Text('Cek Ledger', style: TextStyle(fontSize: 12)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.indigo,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      Navigator.pop(context);
+                    },
+                    child: const Text('Kembali ke Dashboard'),
                   ),
                 ),
               ],
@@ -585,6 +836,83 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
                             style: const TextStyle(fontSize: 13, color: AppColors.primaryDark),
                           ),
                         ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Card Identitas Donatur (Untuk Tertera di Sertifikat Resmi & Blockchain)
+            Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: const [
+                        Icon(Icons.badge_outlined, color: AppColors.primary, size: 22),
+                        SizedBox(width: 8),
+                        Text(
+                          'Identitas Donatur (Untuk Sertifikat)',
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Nama ini akan dicantumkan secara resmi pada sertifikat digital & link kredensial blockchain.',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                    ),
+                    const Divider(height: 20),
+                    TextField(
+                      controller: _donorNameController,
+                      decoration: InputDecoration(
+                        labelText: 'Nama Lengkap Donatur *',
+                        hintText: 'Contoh: H. Ahmad Fauzi / Hamba Allah',
+                        prefixIcon: const Icon(Icons.person_outline, size: 20),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _donorEmailController,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: InputDecoration(
+                        labelText: 'Email Donatur',
+                        hintText: 'email@example.com',
+                        prefixIcon: const Icon(Icons.email_outlined, size: 20),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _donorPhoneController,
+                      keyboardType: TextInputType.phone,
+                      decoration: InputDecoration(
+                        labelText: 'Nomor WhatsApp / HP',
+                        hintText: '0812xxxxxxxx',
+                        prefixIcon: const Icon(Icons.phone_outlined, size: 20),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _donorMessageController,
+                      maxLines: 2,
+                      decoration: InputDecoration(
+                        labelText: 'Doa & Pesan untuk Anak Asuh (Opsional)',
+                        hintText: 'Semoga menjadi anak berprestasi & sukses...',
+                        prefixIcon: const Icon(Icons.favorite_border, size: 20),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       ),
                     ),
                   ],

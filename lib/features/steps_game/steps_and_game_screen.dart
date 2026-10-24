@@ -50,7 +50,6 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
 
   // ========== STATE GAMIFIKASI & RANKING TIER ==========
   int _totalUserPoints = 0;
-  List<String> _redeemedVouchers = [];
 
   @override
   void initState() {
@@ -66,11 +65,9 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
       final prefs = await SharedPreferences.getInstance();
       final emailKey = _getUserEmailKey();
       final points = prefs.getInt('asuhkita_kebaikan_points_$emailKey') ?? 0;
-      final vouchers = prefs.getStringList('asuhkita_vouchers_$emailKey') ?? [];
       if (mounted) {
         setState(() {
           _totalUserPoints = points;
-          _redeemedVouchers = vouchers;
         });
       }
     } catch (_) {}
@@ -276,85 +273,6 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
     }
   }
 
-  // Tukar Poin Jadi Voucher Subsidi Donasi
-  Future<void> _redeemVoucher({required int costPoints, required int valueRupiah, required String label}) async {
-    if (_totalUserPoints < costPoints) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Poin tidak mencukupi! Anda butuh $costPoints Poin (Poin saat ini: $_totalUserPoints).'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
-      return;
-    }
-
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final emailKey = _getUserEmailKey();
-      final newPoints = _totalUserPoints - costPoints;
-      final voucherCode = 'VCH-${valueRupiah ~/ 1000}K-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}';
-
-      final list = List<String>.from(_redeemedVouchers)..add('$voucherCode: Rp $valueRupiah');
-      await prefs.setInt('asuhkita_kebaikan_points_$emailKey', newPoints);
-      await prefs.setInt('asuhkita_kebaikan_points', newPoints);
-      await prefs.setStringList('asuhkita_vouchers_$emailKey', list);
-
-      setState(() {
-        _totalUserPoints = newPoints;
-        _redeemedVouchers = list;
-      });
-
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: const Row(
-              children: [
-                Icon(Icons.card_giftcard, color: AppColors.primary, size: 26),
-                SizedBox(width: 8),
-                Text('Voucher Berhasil Ditukar!'),
-              ],
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Selamat! Anda berhasil menukar $costPoints Poin dengan Kupon Subsidi Donasi senilai Rp ${valueRupiah.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}.',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 13),
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceLight,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.primary, width: 1.5),
-                  ),
-                  child: Text(
-                    voucherCode,
-                    style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2, color: AppColors.primary),
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              ElevatedButton(
-                onPressed: () => Navigator.pop(ctx),
-                style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
-                child: const Text('Gunakan Saat Donasi'),
-              ),
-            ],
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal menukar voucher: $e')));
-      }
-    }
-  }
 
   // Helper untuk menghitung Ranking Tier
   Map<String, dynamic> _getTierInfo(int points) {
@@ -426,7 +344,7 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
           tabs: const [
             Tab(icon: Icon(Icons.directions_walk), text: 'Langkah'),
             Tab(icon: Icon(Icons.sports_esports), text: 'Mini Game'),
-            Tab(icon: Icon(Icons.military_tech), text: 'Ranking & Reward'),
+            Tab(icon: Icon(Icons.stars), text: 'Poin & Level'),
           ],
         ),
       ),
@@ -766,83 +684,101 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
                 ),
                 const SizedBox(height: 20),
 
-                // Fitur 1: Tukar Poin Menjadi Kupon Subsidi Donasi
-                const Text(
-                  'Tukar Poin Jadi Voucher Donasi',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Poin yang Anda kumpulkan dari langkah kaki & mini game bisa digunakan untuk memotong nominal donasi anak asuh!',
-                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 20),
 
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildRewardCard(
-                        title: 'Subsidi Rp 10.000',
-                        cost: 200,
-                        value: 10000,
-                        icon: Icons.confirmation_number_outlined,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _buildRewardCard(
-                        title: 'Subsidi Rp 25.000',
-                        cost: 500,
-                        value: 25000,
-                        icon: Icons.loyalty,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                _buildRewardCard(
-                  title: 'Subsidi Donasi Spesial Rp 50.000',
-                  cost: 1000,
-                  value: 50000,
-                  icon: Icons.workspace_premium,
-                  isHighlight: true,
-                ),
-
-                const SizedBox(height: 24),
-
-                // Fitur 2: Leaderboard Komunitas Peduli
+                // ==================== TINGKAT LEVEL PENGGUNA ====================
                 const Row(
                   children: [
-                    Icon(Icons.leaderboard, color: AppColors.primary, size: 22),
+                    Icon(Icons.workspace_premium, color: AppColors.primary, size: 22),
                     SizedBox(width: 8),
                     Text(
-                      'Papan Peringkat Sahabat Asuh',
+                      'Tingkat & Keistimewaan Level Donatur',
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                     ),
                   ],
                 ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Tingkatkan level kebaikan Anda dengan konsisten berjalan kaki dan bermain mini game peduli anak.',
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: 12),
+
+                _buildLevelTierCard(
+                  level: 1,
+                  title: 'Pemula Berbagi 🌱',
+                  pointRange: '0 - 999 Poin',
+                  desc: 'Awal mulia mendampingi anak asuh. Akses katalog anak & chat Ruang Kasih.',
+                  color: const Color(0xFF689F38),
+                  isCurrent: tier['level'] == 1,
+                ),
                 const SizedBox(height: 10),
-                Card(
-                  elevation: 1,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                _buildLevelTierCard(
+                  level: 2,
+                  title: 'Sahabat Peduli ⭐',
+                  pointRange: '1.000 - 2.999 Poin',
+                  desc: 'Akses panggilan video call inspirasi bersama anak asuh secara berkala.',
+                  color: const Color(0xFF00796B),
+                  isCurrent: tier['level'] == 2,
+                ),
+                const SizedBox(height: 10),
+                _buildLevelTierCard(
+                  level: 3,
+                  title: 'Pejuang Kebaikan 🌟',
+                  pointRange: '3.000 - 4.999 Poin',
+                  desc: 'Sertifikat digital resmi penghargaan donatur dan badge perak profil.',
+                  color: const Color(0xFFF57C00),
+                  isCurrent: tier['level'] == 3,
+                ),
+                const SizedBox(height: 10),
+                _buildLevelTierCard(
+                  level: 4,
+                  title: 'Duta Asuh Mulia 💎',
+                  pointRange: '5.000 - 9.999 Poin',
+                  desc: 'Laporan perkembangan akademik eksklusif dari wali panti dan badge emas.',
+                  color: const Color(0xFF1976D2),
+                  isCurrent: tier['level'] == 4,
+                ),
+                const SizedBox(height: 10),
+                _buildLevelTierCard(
+                  level: 5,
+                  title: 'Pahlawan Kebaikan Utama 🏆',
+                  pointRange: '10.000+ Poin',
+                  desc: 'Tingkat tertinggi! Piagam pahlawan kebaikan dan undangan temu fisik panti.',
+                  color: const Color(0xFFD32F2F),
+                  isCurrent: tier['level'] == 5,
+                ),
+
+                const SizedBox(height: 20),
+
+                // ==================== CARA MENDAPATKAN POIN ====================
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceLight,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                  ),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildLeaderboardItem(1, 'dr. Hendra Wijaya', '12.450 Poin', 'Pahlawan Kebaikan Utama 🏆', Colors.amber.shade700),
-                      const Divider(height: 1),
-                      _buildLeaderboardItem(2, 'Siti Nurhaliza', '8.320 Poin', 'Duta Asuh Mulia 💎', Colors.grey.shade400),
-                      const Divider(height: 1),
-                      _buildLeaderboardItem(3, 'Budi Pratama', '5.100 Poin', 'Duta Asuh Mulia 💎', Colors.brown.shade400),
-                      const Divider(height: 1),
-                      _buildLeaderboardItem(
-                        4,
-                        'Anda (${tier['title'].split(' ').first})',
-                        '$_totalUserPoints Poin',
-                        tier['title'],
-                        AppColors.primary,
-                        isMe: true,
+                      const Row(
+                        children: [
+                          Icon(Icons.lightbulb_outline, color: AppColors.primary, size: 20),
+                          SizedBox(width: 8),
+                          Text(
+                            'Cara Mengumpulkan Poin Kebaikan',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primaryDark),
+                          ),
+                        ],
                       ),
-                      const Divider(height: 1),
-                      _buildLeaderboardItem(5, 'Maya Anggraini', '2.890 Poin', 'Sahabat Peduli ⭐', Colors.grey.shade600),
+                      const SizedBox(height: 8),
+                      const Text(
+                        '• Berjalan Kaki (Sensor Accelerometer): Setiap 100 langkah bernilai 1 Poin Kebaikan.\n'
+                        '• Mini Game Gyroscope: Setiap bintang yang berhasil ditangkap menghasilkan 5 Poin Kebaikan.\n'
+                        '• Berdonasi Rutin: Setiap kali Anda menyalurkan donasi untuk anak asuh, poin Anda otomatis bertambah.',
+                        style: TextStyle(fontSize: 12, height: 1.5, color: Colors.black87),
+                      ),
                     ],
                   ),
                 ),
@@ -854,111 +790,76 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
     );
   }
 
-  Widget _buildRewardCard({
+  Widget _buildLevelTierCard({
+    required int level,
     required String title,
-    required int cost,
-    required int value,
-    required IconData icon,
-    bool isHighlight = false,
+    required String pointRange,
+    required String desc,
+    required Color color,
+    required bool isCurrent,
   }) {
-    final canAfford = _totalUserPoints >= cost;
-
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: isHighlight ? AppColors.surfaceLight : Colors.white,
+        color: isCurrent ? color.withValues(alpha: 0.08) : Colors.white,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: isHighlight ? AppColors.primary : Colors.grey.shade200,
-          width: isHighlight ? 1.5 : 1,
+          color: isCurrent ? color : Colors.grey.shade200,
+          width: isCurrent ? 2 : 1,
         ),
       ),
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(icon, color: AppColors.primary, size: 24),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                '$cost Poin',
-                style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary, fontSize: 13),
-              ),
-              ElevatedButton(
-                onPressed: canAfford ? () => _redeemVoucher(costPoints: cost, valueRupiah: value, label: title) : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: Text(canAfford ? 'Tukar' : 'Poin Kurang', style: const TextStyle(fontSize: 11)),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLeaderboardItem(int rank, String name, String points, String tierTitle, Color rankColor, {bool isMe = false}) {
-    return Container(
-      color: isMe ? AppColors.surfaceLight.withValues(alpha: 0.6) : Colors.transparent,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
           Container(
-            width: 28,
-            height: 28,
-            alignment: Alignment.center,
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: rankColor.withValues(alpha: 0.2),
+              color: color.withValues(alpha: 0.15),
               shape: BoxShape.circle,
             ),
             child: Text(
-              '$rank',
-              style: TextStyle(fontWeight: FontWeight.bold, color: rankColor, fontSize: 13),
+              'L$level',
+              style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 13),
             ),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  name,
-                  style: TextStyle(
-                    fontWeight: isMe ? FontWeight.bold : FontWeight.w600,
-                    fontSize: 13,
-                    color: isMe ? AppColors.primaryDark : AppColors.textPrimary,
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: isCurrent ? color : AppColors.textPrimary,
+                      ),
+                    ),
+                    if (isCurrent)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: color,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text('Level Anda', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                      ),
+                  ],
                 ),
+                const SizedBox(height: 2),
                 Text(
-                  tierTitle,
-                  style: TextStyle(fontSize: 11, color: isMe ? AppColors.primary : Colors.grey.shade600),
+                  pointRange,
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.grey.shade700),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  desc,
+                  style: const TextStyle(fontSize: 11, color: AppColors.textSecondary, height: 1.3),
                 ),
               ],
-            ),
-          ),
-          Text(
-            points,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 13,
-              color: isMe ? AppColors.primary : AppColors.textPrimary,
             ),
           ),
         ],

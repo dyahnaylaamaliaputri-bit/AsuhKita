@@ -55,21 +55,27 @@ class NotificationService {
       onDidReceiveNotificationResponse: _onNotificationTapped,
     );
 
-    // Minta izin notifikasi di Android 13+
+    // Minta izin notifikasi & exact alarms di Android
     if (Platform.isAndroid) {
-      await _flutterLocalNotificationsPlugin
+      final androidPlugin = _flutterLocalNotificationsPlugin
           .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>()
-          ?.requestNotificationsPermission();
+              AndroidFlutterLocalNotificationsPlugin>();
+      await androidPlugin?.requestNotificationsPermission();
+      try {
+        await androidPlugin?.requestExactAlarmsPermission();
+      } catch (_) {}
     }
 
     _initialized = true;
     debugPrint('[NotificationService] Initialized successfully.');
   }
 
+  Future<AndroidScheduleMode> _getScheduleMode() async {
+    return AndroidScheduleMode.exactAllowWhileIdle;
+  }
+
   void _onNotificationTapped(NotificationResponse response) {
     debugPrint('[NotificationService] Notification tapped: ${response.payload}');
-    // Navigasi tambahan bisa dihandle lewat payload di sini
   }
 
   // Detail channel Android
@@ -81,6 +87,7 @@ class NotificationService {
     importance: Importance.max,
     priority: Priority.high,
     playSound: true,
+    enableVibration: true,
     icon: '@mipmap/ic_launcher',
   );
 
@@ -118,7 +125,7 @@ class NotificationService {
 
   // -----------------------------------------------------------------
   // FR-41 | PBI-055 - Pengingat Jadwal Video Call (Scheduled)
-  // Dipicu H-1 dan H-0 (30 menit sebelum panggilan)
+  // Berfungsi meskipun aplikasi ditutup / background
   // -----------------------------------------------------------------
   Future<void> scheduleVideoCallReminder({
     required int id,
@@ -126,27 +133,64 @@ class NotificationService {
     required DateTime scheduledDateTime,
   }) async {
     if (kIsWeb) return;
-    final tz.TZDateTime scheduledTz = tz.TZDateTime.from(
-      scheduledDateTime.subtract(const Duration(minutes: 30)),
-      tz.local,
-    );
 
-    if (scheduledTz.isBefore(tz.TZDateTime.now(tz.local))) {
-      debugPrint('[NotificationService] scheduledTz sudah lewat, skip.');
-      return;
+    DateTime targetTime = scheduledDateTime;
+    final now = DateTime.now();
+
+    // Jika jadwal lebih dari 30 menit ke depan, ingatkan 30 menit sebelum acara.
+    // Jika kurang dari 30 menit, ingatkan tepat pada jam yang dijadwalkan (atau 10 detik lagi jika sudah lewat).
+    if (scheduledDateTime.difference(now).inMinutes >= 35) {
+      targetTime = scheduledDateTime.subtract(const Duration(minutes: 30));
+    } else if (scheduledDateTime.isBefore(now)) {
+      targetTime = now.add(const Duration(seconds: 10));
     }
+
+    final tz.TZDateTime scheduledTz = tz.TZDateTime.from(targetTime, tz.local);
+    final mode = await _getScheduleMode();
 
     await _flutterLocalNotificationsPlugin.zonedSchedule(
       id: id,
-      title: 'Pengingat Video Call AsuhKita',
-      body: '30 menit lagi: sesi video call dengan $childAlias akan dimulai!',
+      title: '📞 Pengingat Video Call AsuhKita',
+      body: 'Sesi video call bersama $childAlias akan segera dimulai! Silakan buka aplikasi.',
       scheduledDate: scheduledTz,
       notificationDetails: _notifDetails,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      androidScheduleMode: mode,
       payload: 'video_call_$id',
     );
-    debugPrint(
-        '[NotificationService] Video call reminder scheduled: $scheduledTz');
+    debugPrint('[NotificationService] Video call reminder scheduled for $scheduledTz (mode: $mode)');
+  }
+
+  // -----------------------------------------------------------------
+  // PBI-055 - Pengingat Tenggat Laporan Keuangan (Admin)
+  // Berfungsi meskipun aplikasi ditutup / background
+  // -----------------------------------------------------------------
+  Future<void> scheduleFinanceReportReminder({
+    required int id,
+    required String reportCategory,
+    required String target,
+    required DateTime scheduledDateTime,
+  }) async {
+    if (kIsWeb) return;
+
+    DateTime targetTime = scheduledDateTime;
+    final now = DateTime.now();
+    if (scheduledDateTime.isBefore(now)) {
+      targetTime = now.add(const Duration(seconds: 10));
+    }
+
+    final tz.TZDateTime scheduledTz = tz.TZDateTime.from(targetTime, tz.local);
+    final mode = await _getScheduleMode();
+
+    await _flutterLocalNotificationsPlugin.zonedSchedule(
+      id: id,
+      title: '📊 Pengingat Tenggat Laporan Keuangan',
+      body: 'Waktunya menyelesaikan $reportCategory ($target). Mohon rekonsiliasi data kas!',
+      scheduledDate: scheduledTz,
+      notificationDetails: _notifDetails,
+      androidScheduleMode: mode,
+      payload: 'finance_report_$id',
+    );
+    debugPrint('[NotificationService] Finance report reminder scheduled for $scheduledTz (mode: $mode)');
   }
 
   // -----------------------------------------------------------------
@@ -163,6 +207,7 @@ class NotificationService {
     final now = DateTime.now();
     var nextMonth = DateTime(now.year, now.month + 1, 1, 8, 0);
     final scheduledTz = tz.TZDateTime.from(nextMonth, tz.local);
+    final mode = await _getScheduleMode();
 
     await _flutterLocalNotificationsPlugin.zonedSchedule(
       id: notifId,
@@ -170,12 +215,11 @@ class NotificationService {
       body: 'Halo $donatorName! Donasi bulanan Anda untuk anak asuh belum dilakukan bulan ini.',
       scheduledDate: scheduledTz,
       notificationDetails: _notifDetails,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      androidScheduleMode: mode,
       matchDateTimeComponents: DateTimeComponents.dayOfMonthAndTime,
       payload: 'monthly_donation_reminder',
     );
-    debugPrint(
-        '[NotificationService] Monthly donation reminder scheduled: $scheduledTz');
+    debugPrint('[NotificationService] Monthly donation reminder scheduled: $scheduledTz');
   }
 
   // -----------------------------------------------------------------

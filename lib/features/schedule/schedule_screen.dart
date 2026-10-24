@@ -170,11 +170,21 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           ? _topicController.text.trim()
           : 'Penyusunan nota belanja seragam, gizi, & rekonsiliasi kas masuk';
 
-      // 1. Kirim notifikasi pengingat
+      final notifId = _selectedDateTime.millisecondsSinceEpoch ~/ 1000 % 100000;
+
+      // 1. Jadwalkan notifikasi sistem latar belakang (tetap aktif saat app keluar)
+      await NotificationService().scheduleFinanceReportReminder(
+        id: notifId,
+        reportCategory: _reportCategory,
+        target: _reportTarget,
+        scheduledDateTime: _selectedDateTime,
+      );
+
+      // Notifikasi konfirmasi instan di status bar
       await NotificationService().showInstantNotification(
-        id: DateTime.now().millisecondsSinceEpoch ~/ 1000 % 100000,
-        title: '🔔 Tenggat Laporan Keuangan Ditetapkan!',
-        body: 'Agenda: $_reportCategory target $_reportTarget pada ${DateFormat('dd MMM HH:mm').format(_selectedDateTime)} WIB.',
+        id: notifId + 1,
+        title: '✅ Jadwal Pengingat Laporan Berhasil Disetel!',
+        body: 'Agenda: $_reportCategory target $_reportTarget pada ${DateFormat('dd MMM yyyy, HH:mm').format(_selectedDateTime)} WIB.',
       );
 
       // 2. Tampilkan Pop-Up Konfirmasi Laporan Keuangan
@@ -198,11 +208,32 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Tenggat waktu pembuatan dan audit laporan keuangan telah berhasil disinkronkan ke 4 zona waktu.',
-                    style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.green.shade300),
+                    ),
+                    child: Row(
+                      children: const [
+                        Icon(Icons.check_circle, color: Colors.green, size: 18),
+                        SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Berhasil membuat jadwal pengingat notifikasi!',
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.green),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Pengingat telah disetel sesuai jadwal yang dipilih. Notifikasi akan tetap berbunyi tepat waktu meskipun aplikasi keluar/ditutup.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade700, height: 1.3),
+                  ),
+                  const SizedBox(height: 12),
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
@@ -253,11 +284,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                   const SizedBox(height: 12),
                   Row(
                     children: const [
-                      Icon(Icons.check_circle_outline, color: Colors.green, size: 16),
+                      Icon(Icons.alarm_on, color: AppColors.primary, size: 16),
                       SizedBox(width: 6),
                       Expanded(
                         child: Text(
-                          'Pengingat deadline audit akan aktif otomatis menjelang tenggat waktu.',
+                          'Sistem alarm background Android aktif untuk jadwal ini.',
                           style: TextStyle(fontSize: 11, color: Colors.black87),
                         ),
                       ),
@@ -347,9 +378,30 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.green.shade300),
+                  ),
+                  child: Row(
+                    children: const [
+                      Icon(Icons.check_circle, color: Colors.green, size: 18),
+                      SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Berhasil membuat jadwal pengingat video call!',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.green),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
                 Text(
-                  'Jadwal panggilan video ramah anak telah berhasil dikonfirmasi dan disinkronkan ke 4 zona waktu.',
-                  style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+                  'Pengingat telah disetel sesuai jadwal yang dipilih. Notifikasi akan tetap berbunyi tepat waktu meskipun aplikasi keluar/ditutup.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade700, height: 1.3),
                 ),
                 const SizedBox(height: 14),
                 Container(
@@ -390,11 +442,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                 const SizedBox(height: 12),
                 Row(
                   children: const [
-                    Icon(Icons.check_circle_outline, color: Colors.green, size: 16),
+                    Icon(Icons.alarm_on, color: AppColors.primary, size: 16),
                     SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        'Pop-up & notifikasi pengingat akan aktif sebelum panggilan dimulai.',
+                        'Notifikasi alarm sistem Android akan berdering sebelum video call dimulai walau app tertutup.',
                         style: TextStyle(fontSize: 11, color: Colors.black87),
                       ),
                     ),
