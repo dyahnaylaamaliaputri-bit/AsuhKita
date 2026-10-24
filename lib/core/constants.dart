@@ -3,10 +3,11 @@
 
 class AppConstants {
   // Endpoint backend API (mendukung USB adb reverse, Wi-Fi LAN, dan Android Emulator)
-  static const String baseUrl = 'http://127.0.0.1:3000/api';
+  static const String baseUrl = 'http://192.168.100.135:3000/api';
   static const List<String> candidateBaseUrls = [
+    'http://192.168.100.135:3000/api', // Wi-Fi LAN Laptop saat ini (Cepat untuk HP fisik via Wi-Fi)
     'http://127.0.0.1:3000/api', // USB via adb reverse
-    'http://10.200.64.122:3000/api', // Wi-Fi LAN HP Infinix & Laptop
+    'http://10.200.64.122:3000/api', // Wi-Fi LAN alternatif
     'http://172.16.97.193:3000/api',
     'http://10.0.2.2:3000/api', // Android Emulator
   ];

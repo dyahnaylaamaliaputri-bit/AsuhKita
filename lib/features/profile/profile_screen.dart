@@ -13,6 +13,7 @@ import '../../core/app_colors.dart';
 import '../../core/dio_client.dart';
 import '../../data/local_db.dart';
 import '../admin/admin_panel_screen.dart';
+import '../sponsor/sponsor_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -515,9 +516,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       onPressed: () async {
-                        if (nameCtrl.text.trim().isEmpty) {
+                        final name = nameCtrl.text.trim();
+                        final ageStr = ageCtrl.text.trim();
+                        final age = int.tryParse(ageStr);
+                        final story = storyCtrl.text.trim();
+
+                        if (name.isEmpty) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Nama anak wajib diisi')),
+                            const SnackBar(content: Text('Nama samaran anak wajib diisi!'), backgroundColor: Colors.redAccent),
+                          );
+                          return;
+                        }
+
+                        if (age == null || age <= 0) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Usia anak wajib diisi dengan angka valid (> 0)!'), backgroundColor: Colors.redAccent),
+                          );
+                          return;
+                        }
+
+                        if (selectedNeeds.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Paling sedikit 1 kategori kebutuhan wajib dipilih!'), backgroundColor: Colors.redAccent),
+                          );
+                          return;
+                        }
+
+                        if (story.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Cerita singkat anak wajib diisi!'), backgroundColor: Colors.redAccent),
                           );
                           return;
                         }
@@ -530,52 +557,95 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         }
                         final totalTarget = catBudgetsMap.values.fold<double>(0.0, (sum, val) => sum + val);
 
-                        final newKid = {
-                          'id': 'child_${DateTime.now().millisecondsSinceEpoch}',
-                          'name': nameCtrl.text.trim(),
-                          'age': int.tryParse(ageCtrl.text) ?? 8,
-                          'gender': selectedGender,
-                          'city': cityCtrl.text.trim().isEmpty ? 'Peduli Anak Lombok' : cityCtrl.text.trim(),
-                          'urgentNeeds': selectedNeeds.join(', '),
-                          'category_budgets': jsonEncode(catBudgetsMap),
-                          'story': storyCtrl.text.isEmpty ? 'Anak asuh bersemangat untuk menempuh masa depan.' : storyCtrl.text,
-                          'photo': base64Image ?? '',
-                          'target': totalTarget > 0 ? totalTarget : 500000.0,
-                          'dream': dreamCtrl.text,
-                          'hobby': hobbyCtrl.text,
-                          'createdAt': DateTime.now().toIso8601String(),
-                        };
-
-                        // Simpan ke SQLite lokal
-                        await LocalDatabase().insertChild(newKid);
-
-                        // Sync ke Supabase Cloud
                         try {
-                          await DioClient().dio.post('/children', data: {
-                            'alias': newKid['name'],
-                            'age': newKid['age'],
-                            'gender': newKid['gender'],
-                            'need_category': newKid['urgentNeeds'],
-                            'story_summary': newKid['story'],
-                            'avatar': newKid['photo'],
-                            'orphanage_city': newKid['city'],
-                            'target': newKid['target'],
-                            'dream': newKid['dream'],
-                            'hobby': newKid['hobby'],
-                            'category_budgets': newKid['category_budgets'],
+                          final res = await DioClient().dio.post('/children', data: {
+                            'alias': name,
+                            'age': age,
+                            'gender': selectedGender == 'Perempuan' ? 'P' : 'L',
+                            'need_category': selectedNeeds.join(', '),
+                            'story_summary': story,
+                            'avatar': base64Image ?? '',
+                            'orphanage_city': cityCtrl.text.trim().isEmpty ? 'Peduli Anak Lombok' : cityCtrl.text.trim(),
+                            'orphanage_name': 'Peduli Anak Foundation',
+                            'target': totalTarget > 0 ? totalTarget : 500000.0,
+                            'dream': dreamCtrl.text.trim(),
+                            'hobby': hobbyCtrl.text.trim(),
+                            'category_budgets': jsonEncode(catBudgetsMap),
                           });
-                        } catch (_) {}
 
-                        if (ctx.mounted) Navigator.pop(ctx);
-                        if (!mounted || !context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Anak asuh "${nameCtrl.text}" berhasil disimpan ke Supabase & SQLite secara realtime!'),
-                            backgroundColor: AppColors.primary,
-                          ),
-                        );
+                          String serverChildId = 'child_${DateTime.now().millisecondsSinceEpoch}';
+                          if (res.data is Map && res.data['data'] != null && res.data['data']['id'] != null) {
+                            serverChildId = res.data['data']['id'].toString();
+                          }
+
+                          final newKid = {
+                            'id': serverChildId,
+                            'name': name,
+                            'alias': name,
+                            'age': age,
+                            'gender': selectedGender,
+                            'city': cityCtrl.text.trim().isEmpty ? 'Peduli Anak Lombok' : cityCtrl.text.trim(),
+                            'orphanage_city': cityCtrl.text.trim().isEmpty ? 'Peduli Anak Lombok' : cityCtrl.text.trim(),
+                            'urgentNeeds': selectedNeeds.join(', '),
+                            'need_category': selectedNeeds.join(', '),
+                            'category_budgets': jsonEncode(catBudgetsMap),
+                            'story': story,
+                            'story_summary': story,
+                            'photo': base64Image ?? '',
+                            'avatar': base64Image ?? '',
+                            'target': totalTarget > 0 ? totalTarget : 500000.0,
+                            'dream': dreamCtrl.text.trim(),
+                            'hobby': hobbyCtrl.text.trim(),
+                            'createdAt': DateTime.now().toIso8601String(),
+                            'status': 'Tersedia',
+                          };
+
+                          await LocalDatabase().insertChild(newKid);
+                          SponsorScreen.refreshNotifier.value++;
+
+                          if (ctx.mounted) Navigator.pop(ctx);
+                          if (!mounted || !context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Anak asuh "$name" berhasil disimpan ke Supabase & langsung tersedia untuk donatur!'),
+                              backgroundColor: Colors.green.shade700,
+                            ),
+                          );
+                        } catch (err) {
+                          final offlineKid = {
+                            'id': 'child_${DateTime.now().millisecondsSinceEpoch}',
+                            'name': name,
+                            'alias': name,
+                            'age': age,
+                            'gender': selectedGender,
+                            'city': cityCtrl.text.trim().isEmpty ? 'Peduli Anak Lombok' : cityCtrl.text.trim(),
+                            'urgentNeeds': selectedNeeds.join(', '),
+                            'need_category': selectedNeeds.join(', '),
+                            'category_budgets': jsonEncode(catBudgetsMap),
+                            'story': story,
+                            'story_summary': story,
+                            'photo': base64Image ?? '',
+                            'avatar': base64Image ?? '',
+                            'target': totalTarget > 0 ? totalTarget : 500000.0,
+                            'dream': dreamCtrl.text.trim(),
+                            'hobby': hobbyCtrl.text.trim(),
+                            'createdAt': DateTime.now().toIso8601String(),
+                            'status': 'Tersedia',
+                          };
+                          await LocalDatabase().insertChild(offlineKid);
+                          SponsorScreen.refreshNotifier.value++;
+
+                          if (ctx.mounted) Navigator.pop(ctx);
+                          if (!mounted || !context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Gagal koneksi ke server, data anak "$name" disimpan secara offline di SQLite.'),
+                              backgroundColor: Colors.orange.shade800,
+                            ),
+                          );
+                        }
                       },
-                      child: const Text('Simpan & Sinkronkan Anak ke Donatur', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      child: const Text('Submit Data Anak Asuh', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                     ),
                   ),
                 ],

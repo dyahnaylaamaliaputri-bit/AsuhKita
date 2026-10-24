@@ -49,8 +49,8 @@ class ExchangeRateService {
     // 2. Fetch dari API
     try {
       final dio = Dio(BaseOptions(
-        connectTimeout: const Duration(seconds: 8),
-        receiveTimeout: const Duration(seconds: 8),
+        connectTimeout: const Duration(milliseconds: 2500),
+        receiveTimeout: const Duration(milliseconds: 2500),
       ));
 
       // API mengembalikan nilai 1 IDR = X mata uang, kita balik ke X = 1 IDR

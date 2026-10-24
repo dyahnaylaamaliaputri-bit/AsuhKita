@@ -178,106 +178,137 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: const [
-            Icon(Icons.qr_code_scanner, color: AppColors.primary, size: 28),
-            SizedBox(width: 8),
-            Text('QRIS Pembayaran Donasi', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceLight,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
+        backgroundColor: Colors.white,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
                   children: [
-                    const Icon(Icons.face, size: 16, color: AppColors.primary),
-                    const SizedBox(width: 6),
+                    const Icon(Icons.qr_code_scanner, color: AppColors.primary, size: 28),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text('QRIS Pembayaran Donasi', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20, color: Colors.grey),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceLight,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.face, size: 16, color: AppColors.primary),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Anak Asuh: ${widget.childData['alias']} (${widget.packageData['name']})',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Total Tagihan Donasi:',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _formatRupiah(_calculatedIdr),
+                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.primary),
+                ),
+                const SizedBox(height: 14),
+
+                // Tampilan QR Code Dinamis
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.grey.shade300),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 6),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      SizedBox(
+                        width: 170,
+                        height: 170,
+                        child: QrImageView(
+                          data: qrisPayload,
+                          version: QrVersions.auto,
+                          size: 170.0,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'QRIS Standar Bank Indonesia (NMID: ID1020030040506)',
+                        style: TextStyle(fontSize: 9, color: Colors.grey, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Pindai QR di atas via BCA, Mandiri, BRI, BNI, GoPay, OVO, Dana, atau ShopeePay.\nSetelah transfer berhasil, tekan tombol di bawah untuk verifikasi & cetak sertifikat.',
+                  style: TextStyle(fontSize: 11, color: Colors.black87),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
                     Expanded(
-                      child: Text(
-                        'Anak Asuh: ${widget.childData['alias']} (${widget.packageData['name']})',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        child: const Text('Batal'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _finalizeDonationAndShowCertificate(amountInput);
+                        },
+                        icon: const Icon(Icons.check_circle_outline, size: 18),
+                        label: const Text('Saya Sudah Bayar'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
                       ),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Total Nominal Tagihan:',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-              ),
-              Text(
-                _formatRupiah(_calculatedIdr),
-                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.primary),
-              ),
-              const SizedBox(height: 14),
-
-              // Tampilan QR Code Dinamis
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.grey.shade300),
-                  boxShadow: [
-                    BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 6),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    QrImageView(
-                      data: qrisPayload,
-                      version: QrVersions.auto,
-                      size: 160.0,
-                    ),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'QRIS Standar Bank Indonesia (NMID: ID1020030040506)',
-                      style: TextStyle(fontSize: 9, color: Colors.grey, fontWeight: FontWeight.w600),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'Pindai QR di atas via BCA, Mandiri, BRI, BNI, GoPay, OVO, Dana, atau ShopeePay. Setelah bayar, tekan tombol di bawah untuk verifikasi & cetak sertifikat.',
-                style: TextStyle(fontSize: 11, color: Colors.black87),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Batal'),
-          ),
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _finalizeDonationAndShowCertificate(amountInput);
-            },
-            icon: const Icon(Icons.check_circle_outline, size: 18),
-            label: const Text('Saya Sudah Membayar'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -393,105 +424,119 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: const [
-            Icon(Icons.workspace_premium, color: Colors.amber, size: 28),
-            SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Sertifikat Resmi Pendanaan',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Bingkai Sertifikat Digital Ornamen Emas (FR-29)
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.amber.shade50.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.amber.shade400, width: 2),
-                  boxShadow: [
-                    BoxShadow(color: Colors.amber.withValues(alpha: 0.1), blurRadius: 8),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    const Icon(Icons.stars, color: Colors.amber, size: 36),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'SERTIFIKAT PENDANAAN ORANG TUA ASUH',
-                      style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF8B6914), fontSize: 13, letterSpacing: 0.5),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 4),
-                    const Text(
-                      'Diberikan sebagai bukti sah telah menjadi orang tua asuh yang mendampingi masa depan & pendidikan:',
-                      style: TextStyle(fontSize: 10, color: Colors.black87),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.amber.shade300),
-                      ),
+        backgroundColor: Colors.white,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: const [
+                    Icon(Icons.workspace_premium, color: Colors.amber, size: 28),
+                    SizedBox(width: 8),
+                    Expanded(
                       child: Text(
-                        widget.childData['alias'] ?? 'Anak Asuh',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.primary),
+                        'Sertifikat Resmi Pendanaan',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    Text('Paket: ${widget.packageData['name']}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-                    Text('Nominal: $amountText', style: const TextStyle(fontSize: 12, color: Colors.green, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 12),
-                    QrImageView(
-                      data: 'asuhkita://verify?code=$certCode&hash=$hash',
-                      version: QrVersions.auto,
-                      size: 120.0,
-                    ),
-                    const SizedBox(height: 6),
-                    Text('No. Sertifikat: $certCode', style: const TextStyle(fontSize: 10, fontFamily: 'monospace', fontWeight: FontWeight.bold)),
-                    Text('SHA-256 Ledger: ${hash.substring(0, 16)}...', style: TextStyle(fontSize: 9, color: Colors.grey.shade600)),
                   ],
                 ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                isOnline
-                    ? '✅ Transaksi berhasil terverifikasi dan dicatat pada blockchain ledger!'
-                    : '⏳ Transaksi tersimpan di antrean offline SQLite dan akan otomatis tersinkron saat internet tersambung.',
-                style: TextStyle(fontSize: 11, color: isOnline ? Colors.green.shade800 : Colors.orange.shade800),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.pop(ctx);
-              Navigator.pop(context);
-            },
-            icon: const Icon(Icons.check, size: 18),
-            label: const Text('Simpan & Selesai'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                const SizedBox(height: 14),
+
+                // Bingkai Sertifikat Digital Ornamen Emas (FR-29)
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.shade50.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.amber.shade400, width: 2),
+                    boxShadow: [
+                      BoxShadow(color: Colors.amber.withValues(alpha: 0.1), blurRadius: 8),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      const Icon(Icons.stars, color: Colors.amber, size: 36),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'SERTIFIKAT PENDANAAN ORANG TUA ASUH',
+                        style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF8B6914), fontSize: 13, letterSpacing: 0.5),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Diberikan sebagai bukti sah telah menjadi orang tua asuh yang mendampingi masa depan & pendidikan:',
+                        style: TextStyle(fontSize: 10, color: Colors.black87),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.amber.shade300),
+                        ),
+                        child: Text(
+                          widget.childData['alias'] ?? 'Anak Asuh',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.primary),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text('Paket: ${widget.packageData['name']}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                      Text('Nominal: $amountText', style: const TextStyle(fontSize: 12, color: Colors.green, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: 120,
+                        height: 120,
+                        child: QrImageView(
+                          data: 'asuhkita://verify?code=$certCode&hash=$hash',
+                          version: QrVersions.auto,
+                          size: 120.0,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text('No. Sertifikat: $certCode', style: const TextStyle(fontSize: 10, fontFamily: 'monospace', fontWeight: FontWeight.bold)),
+                      Text('SHA-256 Ledger: ${hash.substring(0, 16)}...', style: TextStyle(fontSize: 9, color: Colors.grey.shade600)),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  isOnline
+                      ? '✅ Transaksi berhasil terverifikasi dan dicatat pada blockchain ledger!'
+                      : '⏳ Transaksi tersimpan di antrean offline SQLite dan akan otomatis tersinkron saat internet tersambung.',
+                  style: TextStyle(fontSize: 11, color: isOnline ? Colors.green.shade800 : Colors.orange.shade800),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 18),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      Navigator.pop(context);
+                    },
+                    icon: const Icon(Icons.check, size: 18),
+                    label: const Text('Simpan & Selesai'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -775,10 +820,10 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Tombol Konfirmasi Pembayaran Simulasi & Biometrik
+            // Tombol Konfirmasi Pembayaran QRIS
             ElevatedButton.icon(
               onPressed: _isProcessing ? null : _processDonation,
-              icon: const Icon(Icons.fingerprint, size: 24),
+              icon: const Icon(Icons.qr_code_2_rounded, size: 24),
               label: _isProcessing
                   ? const SizedBox(
                       height: 20,
@@ -786,7 +831,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                     )
                   : const Text(
-                      'Konfirmasi & Donasi (Biometrik)',
+                      'Konfirmasi & Dapatkan QRIS Donasi',
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                     ),
               style: ElevatedButton.styleFrom(

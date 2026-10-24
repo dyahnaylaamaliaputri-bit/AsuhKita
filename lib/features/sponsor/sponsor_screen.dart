@@ -14,6 +14,9 @@ import 'child_detail_screen.dart';
 class SponsorScreen extends StatefulWidget {
   const SponsorScreen({super.key});
 
+  /// Notifier realtime: jika admin menambah/mengubah data anak, layar donatur langsung ter-update otomatis
+  static final ValueNotifier<int> refreshNotifier = ValueNotifier<int>(0);
+
   @override
   State<SponsorScreen> createState() => _SponsorScreenState();
 }
@@ -38,12 +41,14 @@ class _SponsorScreenState extends State<SponsorScreen> {
   @override
   void initState() {
     super.initState();
+    SponsorScreen.refreshNotifier.addListener(_fetchChildren);
     _fetchChildren();
     _initShakeDetector();
   }
 
   @override
   void dispose() {
+    SponsorScreen.refreshNotifier.removeListener(_fetchChildren);
     _searchController.dispose();
     _accelerometerSubscription?.cancel();
     super.dispose();
@@ -92,20 +97,18 @@ class _SponsorScreenState extends State<SponsorScreen> {
         final res = await DioClient().dio.get('/children');
         List<Map<String, dynamic>> apiData = [];
         if (res.statusCode == 200) {
-          if (res.data is List && (res.data as List).isNotEmpty) {
+          if (res.data is List) {
             apiData = List<Map<String, dynamic>>.from(res.data);
           } else if (res.data is Map && res.data['data'] is List) {
             apiData = List<Map<String, dynamic>>.from(res.data['data']);
           }
-        }
 
-        if (apiData.isNotEmpty) {
-          // Simpan ke SQLite cache untuk offline mode (PBI-020, FR-19)
+          // Sinkronkan ke SQLite cache lokal (otomatis kosongkan cache jika di Supabase belum ada data)
           await LocalDatabase().cacheChildren(apiData);
-          _allChildren = apiData;
+          _allChildren = List<Map<String, dynamic>>.from(apiData);
           _isOffline = false;
         } else {
-          throw Exception('Data kosong atau gagal');
+          throw Exception('Gagal memuat data dari server');
         }
       } catch (e) {
         // 2. Jika offline/gagal, baca dari SQLite cache lokal (FR-19, NFR-03)
@@ -117,20 +120,6 @@ class _SponsorScreenState extends State<SponsorScreen> {
         _allChildren = cached;
       }
     }
-
-    // Juga ambil anak yang di-input admin lokal
-    try {
-      final newKids = await LocalDatabase().getNewChildren();
-      if (newKids.isNotEmpty) {
-        final existingIds = _allChildren.map((c) => (c['name'] ?? c['alias'] ?? '').toString().toLowerCase()).toSet();
-        for (var k in newKids) {
-          final name = (k['name'] ?? k['alias'] ?? '').toString().toLowerCase();
-          if (name.isNotEmpty && !existingIds.contains(name)) {
-            _allChildren.add(k);
-          }
-        }
-      }
-    } catch (_) {}
 
     // Hitung total donasi per anak untuk status terpenuhi / belum terpenuhi
     await _loadDonationStats();

@@ -175,21 +175,28 @@ class LocalDatabase {
     final db = await database;
     final batch = db.batch();
     batch.delete('cached_children');
+    batch.delete('new_children');
     for (var child in childrenList) {
       batch.insert('cached_children', {
         'id': child['id']?.toString() ?? '',
         'orphanage_id': child['orphanage_id']?.toString() ?? '',
-        'alias': child['alias']?.toString() ?? '',
+        'alias': child['alias']?.toString() ?? child['name']?.toString() ?? '',
         'age': child['age'] is int ? child['age'] : int.tryParse(child['age']?.toString() ?? '0') ?? 0,
-        'need_category': child['need_category']?.toString() ?? '',
-        'story_summary': child['story_summary']?.toString() ?? '',
-        'avatar': child['avatar']?.toString() ?? '',
+        'need_category': child['need_category']?.toString() ?? child['urgentNeeds']?.toString() ?? '',
+        'story_summary': child['story_summary']?.toString() ?? child['story']?.toString() ?? '',
+        'avatar': child['avatar']?.toString() ?? child['photo']?.toString() ?? '',
         'status': child['status']?.toString() ?? 'Tersedia',
         'orphanage_name': child['orphanage_name']?.toString() ?? '',
-        'orphanage_city': child['orphanage_city']?.toString() ?? '',
+        'orphanage_city': child['orphanage_city']?.toString() ?? child['city']?.toString() ?? '',
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
     await batch.commit(noResult: true);
+  }
+
+  Future<void> clearAllChildrenCache() async {
+    final db = await database;
+    await db.delete('cached_children');
+    await db.delete('new_children');
   }
 
   Future<List<Map<String, dynamic>>> getCachedChildren({String query = '', String category = ''}) async {
