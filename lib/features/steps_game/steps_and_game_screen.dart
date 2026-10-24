@@ -1,5 +1,5 @@
 // Letak file: mobile/lib/features/steps_game/steps_and_game_screen.dart
-// Fungsi: Deteksi Langkah Sensor Accelerometer (Donasi Langkah) & Mini Game Gyroscope "Tangkap Bintang Harapan" (PBI-051, PBI-053, FR-44, FR-46, FR-47, FR-48)
+// Fungsi: Deteksi Langkah Sensor Accelerometer (Donasi Langkah), Mini Game Gyroscope, & Sistem Ranking/Tukar Reward Poin Kebaikan (PBI-051, PBI-053, FR-44, FR-46, FR-47, FR-48)
 
 import 'dart:async';
 import 'dart:math';
@@ -48,12 +48,32 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
   double _canvasWidth = 320.0;
   double _canvasHeight = 400.0;
 
+  // ========== STATE GAMIFIKASI & RANKING TIER ==========
+  int _totalUserPoints = 0;
+  List<String> _redeemedVouchers = [];
+
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _loadSavedSteps();
+    _loadUserPoints();
     _startPedometer();
+  }
+
+  Future<void> _loadUserPoints() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final emailKey = _getUserEmailKey();
+      final points = prefs.getInt('asuhkita_kebaikan_points_$emailKey') ?? 0;
+      final vouchers = prefs.getStringList('asuhkita_vouchers_$emailKey') ?? [];
+      if (mounted) {
+        setState(() {
+          _totalUserPoints = points;
+          _redeemedVouchers = vouchers;
+        });
+      }
+    } catch (_) {}
   }
 
   // Muat perhitungan langkah: jika hari baru atau akun baru, otomatis dari 0
@@ -202,9 +222,9 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
         final newTotal = currentPoin + earnedScore;
         await prefs.setInt('asuhkita_kebaikan_points_$emailKey', newTotal);
         await prefs.setInt('asuhkita_game_score_$emailKey', newTotal);
-        // Fallback backward compatibility
         await prefs.setInt('asuhkita_kebaikan_points', newTotal);
         await prefs.setInt('asuhkita_game_score', newTotal);
+        _loadUserPoints();
       } catch (_) {}
     }
 
@@ -225,7 +245,7 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
             children: [
               Container(
                 padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   color: AppColors.surfaceLight,
                   shape: BoxShape.circle,
                 ),
@@ -238,7 +258,7 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
               ),
               const SizedBox(height: 8),
               const Text(
-                'Poin mini game Anda langsung tersimpan dan terintegrasi ke Profil Donatur untuk memperbarui tingkatan Badge Sahabat Asuh!',
+                'Poin mini game Anda langsung tersimpan dan meningkatkan Peringkat Donatur (Ranking Tier)!',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 12, color: Colors.black87),
               ),
@@ -256,24 +276,157 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
     }
   }
 
+  // Tukar Poin Jadi Voucher Subsidi Donasi
+  Future<void> _redeemVoucher({required int costPoints, required int valueRupiah, required String label}) async {
+    if (_totalUserPoints < costPoints) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Poin tidak mencukupi! Anda butuh $costPoints Poin (Poin saat ini: $_totalUserPoints).'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final emailKey = _getUserEmailKey();
+      final newPoints = _totalUserPoints - costPoints;
+      final voucherCode = 'VCH-${valueRupiah ~/ 1000}K-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}';
+
+      final list = List<String>.from(_redeemedVouchers)..add('$voucherCode: Rp $valueRupiah');
+      await prefs.setInt('asuhkita_kebaikan_points_$emailKey', newPoints);
+      await prefs.setInt('asuhkita_kebaikan_points', newPoints);
+      await prefs.setStringList('asuhkita_vouchers_$emailKey', list);
+
+      setState(() {
+        _totalUserPoints = newPoints;
+        _redeemedVouchers = list;
+      });
+
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Row(
+              children: [
+                Icon(Icons.card_giftcard, color: AppColors.primary, size: 26),
+                SizedBox(width: 8),
+                Text('Voucher Berhasil Ditukar!'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Selamat! Anda berhasil menukar $costPoints Poin dengan Kupon Subsidi Donasi senilai Rp ${valueRupiah.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 13),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceLight,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.primary, width: 1.5),
+                  ),
+                  child: Text(
+                    voucherCode,
+                    style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2, color: AppColors.primary),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+                child: const Text('Gunakan Saat Donasi'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal menukar voucher: $e')));
+      }
+    }
+  }
+
+  // Helper untuk menghitung Ranking Tier
+  Map<String, dynamic> _getTierInfo(int points) {
+    if (points >= 10000) {
+      return {
+        'title': 'Pahlawan Kebaikan Utama 🏆',
+        'level': 5,
+        'badgeColor': const Color(0xFFD32F2F),
+        'nextThreshold': 10000,
+        'progress': 1.0,
+        'desc': 'Tingkat tertinggi! Anda adalah pilar kebaikan bagi masa depan anak asuh.',
+      };
+    } else if (points >= 5000) {
+      return {
+        'title': 'Duta Asuh Mulia 💎',
+        'level': 4,
+        'badgeColor': const Color(0xFF1976D2),
+        'nextThreshold': 10000,
+        'progress': points / 10000,
+        'desc': 'Luar biasa! Menginspirasi donatur lain dengan kontribusi nyata.',
+      };
+    } else if (points >= 3000) {
+      return {
+        'title': 'Pejuang Kebaikan 🌟',
+        'level': 3,
+        'badgeColor': const Color(0xFFF57C00),
+        'nextThreshold': 5000,
+        'progress': points / 5000,
+        'desc': 'Sangat aktif berbagi kebaikan dan mengumpulkan langkah harian.',
+      };
+    } else if (points >= 1000) {
+      return {
+        'title': 'Sahabat Peduli ⭐',
+        'level': 2,
+        'badgeColor': const Color(0xFF00796B),
+        'nextThreshold': 3000,
+        'progress': points / 3000,
+        'desc': 'Konsisten mendampingi dan mendukung kegiatan anak panti.',
+      };
+    } else {
+      return {
+        'title': 'Pemula Berbagi 🌱',
+        'level': 1,
+        'badgeColor': const Color(0xFF689F38),
+        'nextThreshold': 1000,
+        'progress': points / 1000,
+        'desc': 'Awal dari langkah mulia Anda untuk mendampingi masa depan anak bangsa.',
+      };
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final tier = _getTierInfo(_totalUserPoints);
+
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Sensor & Mini Game Gamifikasi'),
+        title: const Text('Gamifikasi & Ranking Peduli'),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
         bottom: TabBar(
           controller: _tabController,
-          indicatorColor: Colors.amberAccent,
+          indicatorColor: AppColors.accent2,
           indicatorWeight: 3,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white70,
           tabs: const [
-            Tab(icon: Icon(Icons.directions_walk), text: 'Donasi Langkah'),
-            Tab(icon: Icon(Icons.sports_esports), text: 'Mini Game Gyroscope'),
+            Tab(icon: Icon(Icons.directions_walk), text: 'Langkah'),
+            Tab(icon: Icon(Icons.sports_esports), text: 'Mini Game'),
+            Tab(icon: Icon(Icons.military_tech), text: 'Ranking & Reward'),
           ],
         ),
       ),
@@ -294,7 +447,7 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
                       children: [
                         Container(
                           padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
+                          decoration: const BoxDecoration(
                             color: AppColors.surfaceLight,
                             shape: BoxShape.circle,
                           ),
@@ -349,7 +502,7 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
                   ),
                 ),
                 const SizedBox(height: 20),
-                                ElevatedButton.icon(
+                ElevatedButton.icon(
                   onPressed: () async {
                     final points = (_stepCount / 20).floor();
                     if (points <= 0) {
@@ -377,6 +530,7 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
 
                       setState(() {
                         _stepCount = remainingSteps;
+                        _totalUserPoints = newTotalPoin;
                       });
                       await _persistSteps(remainingSteps);
 
@@ -384,7 +538,7 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(
-                            '🎉 Sukses! $claimedSteps langkah berhasil diklaim menjadi $points Poin Kebaikan! Total Poin Anda: $newTotalPoin Poin (Cek tab Profil).',
+                            '🎉 Sukses! $claimedSteps langkah berhasil diklaim menjadi $points Poin Kebaikan! Total Poin Anda: $newTotalPoin Poin.',
                           ),
                           backgroundColor: AppColors.primary,
                           duration: const Duration(seconds: 4),
@@ -487,7 +641,7 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
                       return Container(
                         width: double.infinity,
                         decoration: BoxDecoration(
-                          color: Colors.indigo.shade900,
+                          color: const Color(0xFF14241E),
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(color: AppColors.primary.withValues(alpha: 0.5), width: 2),
                         ),
@@ -523,6 +677,288 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
                   ),
                 ),
               ],
+            ),
+          ),
+
+          // ========== TAB 3: SISTEM RANKING & TUKAR REWARD (GAMIFIKASI) ==========
+          SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Kartu Level & Tier Pengguna
+                Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [AppColors.primaryDark, AppColors.primary],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(18),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withValues(alpha: 0.3),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              'LEVEL ${tier['level']}',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                            ),
+                          ),
+                          Row(
+                            children: [
+                              const Icon(Icons.stars, color: Colors.amberAccent, size: 20),
+                              const SizedBox(width: 4),
+                              Text(
+                                '$_totalUserPoints Poin',
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        tier['title'],
+                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        tier['desc'],
+                        style: const TextStyle(fontSize: 12, color: Colors.white70),
+                      ),
+                      const SizedBox(height: 16),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: LinearProgressIndicator(
+                          value: (tier['progress'] as double).clamp(0.0, 1.0),
+                          backgroundColor: Colors.white.withValues(alpha: 0.2),
+                          valueColor: const AlwaysStoppedAnimation<Color>(AppColors.accent2),
+                          minHeight: 8,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          '${_totalUserPoints} / ${tier['nextThreshold']} Poin menuju tier berikutnya',
+                          style: const TextStyle(fontSize: 11, color: Colors.white70),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Fitur 1: Tukar Poin Menjadi Kupon Subsidi Donasi
+                const Text(
+                  'Tukar Poin Jadi Voucher Donasi',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Poin yang Anda kumpulkan dari langkah kaki & mini game bisa digunakan untuk memotong nominal donasi anak asuh!',
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: 12),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildRewardCard(
+                        title: 'Subsidi Rp 10.000',
+                        cost: 200,
+                        value: 10000,
+                        icon: Icons.confirmation_number_outlined,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _buildRewardCard(
+                        title: 'Subsidi Rp 25.000',
+                        cost: 500,
+                        value: 25000,
+                        icon: Icons.loyalty,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                _buildRewardCard(
+                  title: 'Subsidi Donasi Spesial Rp 50.000',
+                  cost: 1000,
+                  value: 50000,
+                  icon: Icons.workspace_premium,
+                  isHighlight: true,
+                ),
+
+                const SizedBox(height: 24),
+
+                // Fitur 2: Leaderboard Komunitas Peduli
+                const Row(
+                  children: [
+                    Icon(Icons.leaderboard, color: AppColors.primary, size: 22),
+                    SizedBox(width: 8),
+                    Text(
+                      'Papan Peringkat Sahabat Asuh',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Card(
+                  elevation: 1,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  child: Column(
+                    children: [
+                      _buildLeaderboardItem(1, 'dr. Hendra Wijaya', '12.450 Poin', 'Pahlawan Kebaikan Utama 🏆', Colors.amber.shade700),
+                      const Divider(height: 1),
+                      _buildLeaderboardItem(2, 'Siti Nurhaliza', '8.320 Poin', 'Duta Asuh Mulia 💎', Colors.grey.shade400),
+                      const Divider(height: 1),
+                      _buildLeaderboardItem(3, 'Budi Pratama', '5.100 Poin', 'Duta Asuh Mulia 💎', Colors.brown.shade400),
+                      const Divider(height: 1),
+                      _buildLeaderboardItem(
+                        4,
+                        'Anda (${tier['title'].split(' ').first})',
+                        '$_totalUserPoints Poin',
+                        tier['title'],
+                        AppColors.primary,
+                        isMe: true,
+                      ),
+                      const Divider(height: 1),
+                      _buildLeaderboardItem(5, 'Maya Anggraini', '2.890 Poin', 'Sahabat Peduli ⭐', Colors.grey.shade600),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRewardCard({
+    required String title,
+    required int cost,
+    required int value,
+    required IconData icon,
+    bool isHighlight = false,
+  }) {
+    final canAfford = _totalUserPoints >= cost;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isHighlight ? AppColors.surfaceLight : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isHighlight ? AppColors.primary : Colors.grey.shade200,
+          width: isHighlight ? 1.5 : 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: AppColors.primary, size: 24),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '$cost Poin',
+                style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary, fontSize: 13),
+              ),
+              ElevatedButton(
+                onPressed: canAfford ? () => _redeemVoucher(costPoints: cost, valueRupiah: value, label: title) : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(canAfford ? 'Tukar' : 'Poin Kurang', style: const TextStyle(fontSize: 11)),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLeaderboardItem(int rank, String name, String points, String tierTitle, Color rankColor, {bool isMe = false}) {
+    return Container(
+      color: isMe ? AppColors.surfaceLight.withValues(alpha: 0.6) : Colors.transparent,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          Container(
+            width: 28,
+            height: 28,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: rankColor.withValues(alpha: 0.2),
+              shape: BoxShape.circle,
+            ),
+            child: Text(
+              '$rank',
+              style: TextStyle(fontWeight: FontWeight.bold, color: rankColor, fontSize: 13),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: TextStyle(
+                    fontWeight: isMe ? FontWeight.bold : FontWeight.w600,
+                    fontSize: 13,
+                    color: isMe ? AppColors.primaryDark : AppColors.textPrimary,
+                  ),
+                ),
+                Text(
+                  tierTitle,
+                  style: TextStyle(fontSize: 11, color: isMe ? AppColors.primary : Colors.grey.shade600),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            points,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              color: isMe ? AppColors.primary : AppColors.textPrimary,
             ),
           ),
         ],

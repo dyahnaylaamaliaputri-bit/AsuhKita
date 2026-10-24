@@ -1,6 +1,8 @@
 // Letak file: mobile/lib/data/local_db.dart
-// Fungsi: Pengelolaan database lokal SQLite (sqflite) untuk offline cache, antrean donasi offline, nota transparansi, feedback, dan profil terenkripsi AES-256 (PBI-020, PBI-029, PBI-030)
+// Fungsi: Pengelolaan database lokal SQLite (sqflite) untuk offline cache, antrean donasi offline, nota transparansi, feedback, chat, dan autentikasi lokal terenkripsi SHA-256 (PBI-020, PBI-029, PBI-030)
 
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../core/aes_helper.dart';
@@ -24,17 +26,31 @@ class LocalDatabase {
 
     return await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: (db, version) async {
         await _createTables(db);
+        await _seedDefaultAuthUsers(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         await _createTables(db);
+        await _seedDefaultAuthUsers(db);
       },
     );
   }
 
   Future<void> _createTables(Database db) async {
+    // Tabel Autentikasi Pengguna Lokal Terenkripsi SHA-256
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS auth_users (
+        email TEXT PRIMARY KEY,
+        password_hash TEXT NOT NULL,
+        name TEXT NOT NULL,
+        role TEXT NOT NULL,
+        phone TEXT,
+        created_at TEXT
+      )
+    ''');
+
     // Tabel Cache Daftar Anak (FR-19, NFR-03)
     await db.execute('''
       CREATE TABLE IF NOT EXISTS cached_children (
@@ -64,6 +80,7 @@ class LocalDatabase {
         created_at TEXT,
         status TEXT,
         donor_name TEXT,
+        donor_email TEXT,
         need_category TEXT
       )
     ''');
@@ -168,6 +185,109 @@ class LocalDatabase {
         created_at TEXT
       )
     ''');
+  }
+
+  // ==================== OPERASI HASHING & AUTENTIKASI LOKAL ====================
+  static String hashPassword(String password) {
+    const salt = 'asuhkita_secure_salt_2026_xyz';
+    final bytes = utf8.encode('$salt$password');
+    return sha256.convert(bytes).toString();
+  }
+
+  Future<void> _seedDefaultAuthUsers(Database db) async {
+    // Akun default Donatur: donatur@asuhkita.id / donatur123
+    await db.insert(
+      'auth_users',
+      {
+        'email': 'donatur@asuhkita.id',
+        'password_hash': hashPassword('donatur123'),
+        'name': 'Donatur Asuh',
+        'role': 'donatur',
+        'phone': '081234567890',
+        'created_at': DateTime.now().toIso8601String(),
+      },
+      conflictAlgorithm: ConflictAlgorithm.ignore,
+    );
+
+    // Akun default Admin: admin@asuhkita.id / admin123!
+    await db.insert(
+      'auth_users',
+      {
+        'email': 'admin@asuhkita.id',
+        'password_hash': hashPassword('admin123!'),
+        'name': 'Admin Pengurus Panti',
+        'role': 'admin_panti',
+        'phone': '081987654321',
+        'created_at': DateTime.now().toIso8601String(),
+      },
+      conflictAlgorithm: ConflictAlgorithm.ignore,
+    );
+  }
+
+  Future<void> saveAuthUser({
+    required String email,
+    required String password,
+    required String name,
+    required String role,
+    String phone = '',
+  }) async {
+    final db = await database;
+    final cleanEmail = email.toLowerCase().trim();
+    await db.insert(
+      'auth_users',
+      {
+        'email': cleanEmail,
+        'password_hash': hashPassword(password),
+        'name': name.trim(),
+        'role': role,
+        'phone': phone.trim(),
+        'created_at': DateTime.now().toIso8601String(),
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<Map<String, dynamic>?> verifyAuthUser({
+    required String email,
+    required String password,
+  }) async {
+    final db = await database;
+    final cleanEmail = email.toLowerCase().trim();
+    final rows = await db.query(
+      'auth_users',
+      where: 'LOWER(email) = ?',
+      whereArgs: [cleanEmail],
+      limit: 1,
+    );
+
+    if (rows.isEmpty) return null;
+
+    final user = rows.first;
+    final storedHash = user['password_hash']?.toString() ?? '';
+    final inputHash = hashPassword(password);
+
+    if (storedHash == inputHash) {
+      return {
+        'id': 'usr_${user['email'].hashCode.abs()}',
+        'name': user['name']?.toString() ?? cleanEmail.split('@').first,
+        'email': cleanEmail,
+        'role': user['role']?.toString() ?? (cleanEmail.contains('admin') ? 'admin_panti' : 'donatur'),
+        'phone': user['phone']?.toString() ?? '',
+      };
+    }
+    return null;
+  }
+
+  Future<bool> isEmailRegistered(String email) async {
+    final db = await database;
+    final cleanEmail = email.toLowerCase().trim();
+    final rows = await db.query(
+      'auth_users',
+      where: 'LOWER(email) = ?',
+      whereArgs: [cleanEmail],
+      limit: 1,
+    );
+    return rows.isNotEmpty;
   }
 
   // ==================== OPERASI CACHE ANAK (PBI-020) ====================

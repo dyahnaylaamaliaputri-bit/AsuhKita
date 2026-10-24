@@ -322,6 +322,57 @@ class _SponsorScreenState extends State<SponsorScreen> {
             ),
           ),
 
+          // Banner Tombol AI Profiling Rekomendasi Khusus
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            child: InkWell(
+              onTap: _showAiProfilingModal,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      AppColors.primary.withValues(alpha: 0.12),
+                      AppColors.secondary.withValues(alpha: 0.18),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.35)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.auto_awesome, color: Colors.white, size: 18),
+                    ),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'AI Profiling: Rekomendasi Khusus Anak ✨',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primaryDark),
+                          ),
+                          Text(
+                            'Cocokkan umur, kebutuhan & budget donasi Anda',
+                            style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.arrow_forward_ios, size: 13, color: AppColors.primary),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
           // Daftar Kartu Anak Asuh (PBI-018, FR-17)
           Expanded(
             child: _isLoading

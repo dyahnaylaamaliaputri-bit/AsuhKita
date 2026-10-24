@@ -14,6 +14,7 @@ import '../../core/dio_client.dart';
 import '../../data/local_db.dart';
 import '../admin/admin_panel_screen.dart';
 import '../sponsor/sponsor_screen.dart';
+import '../steps_game/steps_and_game_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -757,17 +758,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                _kebaikanPoints >= 500
-                                    ? 'Badge: Sahabat Teladan 🌟'
-                                    : _kebaikanPoints >= 100
-                                        ? 'Badge: Sahabat Mulia ⭐'
-                                        : 'Badge: Sahabat Peduli 🌱',
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.primary),
+                                _kebaikanPoints >= 10000
+                                    ? 'Ranking: Pahlawan Kebaikan Utama 🏆'
+                                    : _kebaikanPoints >= 5000
+                                        ? 'Ranking: Duta Asuh Mulia 💎'
+                                        : _kebaikanPoints >= 3000
+                                            ? 'Ranking: Pejuang Kebaikan 🌟'
+                                            : _kebaikanPoints >= 1000
+                                                ? 'Ranking: Sahabat Peduli ⭐'
+                                                : 'Ranking: Pemula Berbagi 🌱',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.primary),
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                '$_kebaikanPoints Poin Kebaikan dikumpulkan (dari Langkah Pedometer & Mini Game)',
-                                style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                                '$_kebaikanPoints Poin Kebaikan • Level ${_kebaikanPoints >= 10000 ? 5 : _kebaikanPoints >= 5000 ? 4 : _kebaikanPoints >= 3000 ? 3 : _kebaikanPoints >= 1000 ? 2 : 1}',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade800),
+                              ),
+                              const SizedBox(height: 6),
+                              InkWell(
+                                onTap: () {
+                                  Navigator.push(context, MaterialPageRoute(builder: (_) => const StepsAndGameScreen()));
+                                },
+                                child: const Row(
+                                  children: [
+                                    Text('Lihat Peringkat & Hadiah', style: TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.bold)),
+                                    SizedBox(width: 4),
+                                    Icon(Icons.arrow_forward_ios, size: 10, color: AppColors.primary),
+                                  ],
+                                ),
+                              ),
                               ),
                             ],
                           ),

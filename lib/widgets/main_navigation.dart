@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../core/app_colors.dart';
 import '../features/auth/auth_provider.dart';
 import '../features/home/home_screen.dart';
 import '../features/sponsor/sponsor_screen.dart';
@@ -148,7 +149,7 @@ class _MainNavigationState extends State<MainNavigation> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         type: BottomNavigationBarType.fixed,
-        selectedItemColor: const Color(0xFFB7A6F0),
+        selectedItemColor: AppColors.primary,
         unselectedItemColor: Colors.grey.shade600,
         selectedFontSize: 12,
         unselectedFontSize: 11,
