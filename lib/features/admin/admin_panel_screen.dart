@@ -1456,6 +1456,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
             'Terkumpul: ${_formatRupiah(totalDonations)}',
                                   style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
                                 ),
+                                  ),
                                 Text(
                                   'Target: ${_formatRupiah(totalTarget)}',
                                   style: const TextStyle(color: Colors.white70, fontSize: 12),

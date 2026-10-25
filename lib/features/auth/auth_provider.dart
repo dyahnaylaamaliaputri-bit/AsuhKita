@@ -499,7 +499,7 @@ class AuthProvider extends ChangeNotifier {
       unawaited(
         _dioClient.dio
             .post('/auth/logout')
-            .timeout(const Duration(milliseconds: 600), onTimeout: (_) => Response(requestOptions: RequestOptions(path: '/auth/logout'))),
+            .timeout(const Duration(milliseconds: 600), onTimeout: () => Response(requestOptions: RequestOptions(path: '/auth/logout'))),
       );
     }
     // Hapus seluruh token sesi di SecureStorage seketika

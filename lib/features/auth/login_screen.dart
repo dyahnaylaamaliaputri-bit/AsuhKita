@@ -72,6 +72,7 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
     }
+  }
 
   void _handleBiometricLogin() async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
