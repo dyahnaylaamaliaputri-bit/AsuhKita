@@ -651,8 +651,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           ? const Center(
               child: CircularProgressIndicator(color: AppColors.primary),
             )
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
+          : SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 48.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -847,7 +848,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                       color: AppColors.primary,
                                     ),
                                     const SizedBox(width: 10),
-                                    Column(
+                                    Expanded(
+                                      child: Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
                                       children: [
@@ -869,7 +871,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                         ),
                                       ],
                                     ),
-                                    const Spacer(),
+                                    ),
+                                    const SizedBox(width: 8),
                                     const Chip(
                                       label: Text(
                                         '1 Anak Asuh',
@@ -1084,8 +1087,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                  ),
+                    ),
+                    const SizedBox(height: 32),
                 ],
+              ),
               ),
             ),
     );

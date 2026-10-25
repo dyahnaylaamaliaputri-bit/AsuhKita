@@ -104,9 +104,17 @@ class _SponsorScreenState extends State<SponsorScreen> {
           }
 
           // Sinkronkan ke SQLite cache lokal (otomatis kosongkan cache jika di Supabase belum ada data)
-          await LocalDatabase().cacheChildren(apiData);
-          _allChildren = List<Map<String, dynamic>>.from(apiData);
-          _isOffline = false;
+          if (apiData.isNotEmpty) {
+            await LocalDatabase().cacheChildren(apiData);
+            _allChildren = List<Map<String, dynamic>>.from(apiData);
+            _isOffline = false;
+          } else {
+            final cached = await LocalDatabase().getCachedChildren(
+              query: _searchController.text.trim(),
+              category: _selectedCategory,
+            );
+            _allChildren = cached;
+          }
         } else {
           throw Exception('Gagal memuat data dari server');
         }

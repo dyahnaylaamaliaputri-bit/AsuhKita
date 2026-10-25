@@ -295,8 +295,9 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
-          : ListView(
-              padding: const EdgeInsets.all(16.0),
+          : SafeArea(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 36.0),
               children: [
                 // ==================== KARTU RINGKASAN KEUANGAN KESELURUHAN ====================
                 Card(
@@ -332,29 +333,41 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
                         ),
                         const Divider(color: Colors.white24, height: 26),
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('Total Donasi Masuk', style: TextStyle(color: Colors.white60, fontSize: 11)),
-                                const SizedBox(height: 2),
-                                Text(
-                                  _formatRupiah(_totalDonasiMasuk),
-                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-                                ),
-                              ],
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Total Donasi Masuk', style: TextStyle(color: Colors.white60, fontSize: 11)),
+                                  const SizedBox(height: 2),
+                                  FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      _formatRupiah(_totalDonasiMasuk),
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                const Text('Total Tersalurkan (Nota)', style: TextStyle(color: Colors.white60, fontSize: 11)),
-                                const SizedBox(height: 2),
-                                Text(
-                                  _formatRupiah(_totalDanaDigunakan),
-                                  style: const TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold, fontSize: 14),
-                                ),
-                              ],
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  const Text('Total Tersalurkan (Nota)', style: TextStyle(color: Colors.white60, fontSize: 11)),
+                                  const SizedBox(height: 2),
+                                  FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerRight,
+                                    child: Text(
+                                      _formatRupiah(_totalDanaDigunakan),
+                                      style: const TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold, fontSize: 14),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ],
                         ),
@@ -421,10 +434,13 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Laporan Keuangan Per Masing-Masing Anak',
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                    Expanded(
+                      child: const Text(
+                        'Laporan Keuangan Per Masing-Masing Anak',
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                      ),
                     ),
+                    const SizedBox(width: 8),
                     Text(
                       '${_childrenFinances.length} Anak',
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary),
@@ -502,13 +518,20 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Text(
-                                    'Diterima: ${_formatRupiah(totalDonations)}',
-                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.green),
+                                  Flexible(
+                                    child: Text(
+                                      'Diterima: ${_formatRupiah(totalDonations)}',
+                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.green),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
-                                  Text(
-                                    'Budget: ${_formatRupiah(target)}',
-                                    style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                                  const SizedBox(width: 6),
+                                  Flexible(
+                                    child: Text(
+                                      'Budget: ${_formatRupiah(target)}',
+                                      style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -584,7 +607,10 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
                                         child: Row(
                                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                           children: [
-                                            Text('• $dName', style: const TextStyle(fontSize: 11, color: AppColors.textPrimary)),
+                                            Expanded(
+                                              child: Text('• $dName', style: const TextStyle(fontSize: 11, color: AppColors.textPrimary), overflow: TextOverflow.ellipsis),
+                                            ),
+                                            const SizedBox(width: 8),
                                             Text(_formatRupiah(amt), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.green)),
                                           ],
                                         ),
@@ -627,6 +653,7 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
                   }),
               ],
             ),
+          ),
     );
   }
 }

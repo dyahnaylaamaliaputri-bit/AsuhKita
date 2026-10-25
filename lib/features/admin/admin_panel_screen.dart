@@ -77,7 +77,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       // Gabungkan data: Supabase online sebagai acuan tunggal
       final Map<String, Map<String, dynamic>> map = {};
 
-      if (isApiConnected) {
+      if (isApiConnected && apiChildren.isNotEmpty) {
         for (var k in apiChildren) {
           final name = (k['alias'] ?? k['name'] ?? '').toString();
           if (name.isNotEmpty) {
