@@ -63,7 +63,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadData() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
       final localDb = LocalDatabase();
       final localDonations = await localDb.getCachedDonations();
 

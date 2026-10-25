@@ -6,7 +6,6 @@ import 'package:crypto/crypto.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../core/aes_helper.dart';
-import 'dummy_children_data.dart';
 
 class LocalDatabase {
   static final LocalDatabase _instance = LocalDatabase._internal();
@@ -31,15 +30,15 @@ class LocalDatabase {
       onCreate: (db, version) async {
         await _createTables(db);
         await _seedDefaultAuthUsers(db);
-        await seed20DummyChildren(db);
+        await clearDummyChildren(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         await _createTables(db);
         await _seedDefaultAuthUsers(db);
-        await seed20DummyChildren(db);
+        await clearDummyChildren(db);
       },
     );
-    await seed20DummyChildren(db);
+    await clearDummyChildren(db);
     return db;
   }
 
@@ -228,41 +227,25 @@ class LocalDatabase {
       conflictAlgorithm: ConflictAlgorithm.ignore,
     );
   }
-  Future<void> seed20DummyChildren([Database? targetDb]) async {
+  Future<void> clearDummyChildren([Database? targetDb]) async {
     final db = targetDb ?? await database;
-    final count = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM cached_children')) ?? 0;
-    if (count >= 20) return;
-    final batch = db.batch();
-    for (var child in dummy20Children) {
-      batch.insert('cached_children', {
-        'id': child['id'],
-        'orphanage_id': 'panti_peduli_anak',
-        'alias': child['alias'] ?? child['name'],
-        'age': child['age'],
-        'need_category': child['need_category'] ?? child['urgentNeeds'],
-        'story_summary': child['story_summary'] ?? child['story'],
-        'avatar': child['avatar'] ?? child['photo'],
-        'status': 'Tersedia',
-        'orphanage_name': child['orphanage_name'] ?? 'Peduli Anak Foundation',
-        'orphanage_city': child['orphanage_city'] ?? child['city'],
-      }, conflictAlgorithm: ConflictAlgorithm.replace);
-      batch.insert('new_children', {
-        'id': child['id'],
-        'name': child['name'],
-        'age': child['age'],
-        'gender': child['gender'],
-        'city': child['city'] ?? child['orphanage_city'],
-        'urgent_needs': child['urgent_needs'] ?? child['need_category'],
-        'story': child['story'] ?? child['story_summary'],
-        'photo': child['photo'] ?? child['avatar'],
-        'target': (child['target'] as num).toDouble(),
-        'dream': child['dream'] ?? '',
-        'hobby': child['hobby'] ?? '',
-        'category_budgets': child['category_budgets'] ?? '',
-        'created_at': child['created_at'] ?? DateTime.now().toIso8601String(),
-      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    await db.delete('cached_children', where: "id LIKE 'child_dummy_%'");
+    await db.delete('new_children', where: "id LIKE 'child_dummy_%'");
+    const dummyNames = [
+      'Arfa Pratama', 'Ayra Humaira', 'Bintang Ramadhan', 'Citra Kirana', 'Dimas Anggara',
+      'Elsa Safitri', 'Fahri Ramdani', 'Gita Gutawa', 'Hafiz Al-Fatih', 'Intan Permata',
+      'Joko Susilo', 'Khadijah Az-Zahra', 'Luki Hermawan', 'Manda Cantika', 'Noval Kurniawan',
+      'Olivia Zahrani', 'Putra Perkasa', 'Qiana Azzahra', 'Rafi Ahmad Fauzi', 'Siti Nurhaliza'
+    ];
+    for (var name in dummyNames) {
+      await db.delete('cached_children', where: 'alias = ?', whereArgs: [name]);
+      await db.delete('new_children', where: 'name = ?', whereArgs: [name]);
     }
-    await batch.commit(noResult: true);
+  }
+
+  Future<void> seed20DummyChildren([Database? targetDb]) async {
+    // Dihapus sesuai permintaan: data anak asuh dikelola manual dari admin
+    await clearDummyChildren(targetDb);
   }
 
   Future<void> saveAuthUser({
@@ -363,8 +346,6 @@ class LocalDatabase {
 
   Future<List<Map<String, dynamic>>> getCachedChildren({String query = '', String category = ''}) async {
     final db = await database;
-    final count = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM cached_children')) ?? 0;
-    if (count < 20) { await seed20DummyChildren(db); }
     String whereClause = '';
     List<dynamic> whereArgs = [];
 
@@ -462,8 +443,6 @@ class LocalDatabase {
 
   Future<List<Map<String, dynamic>>> getNewChildren() async {
     final db = await database;
-    final count = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM new_children')) ?? 0;
-    if (count < 20) { await seed20DummyChildren(db); }
     final rows = await db.query('new_children', orderBy: 'created_at DESC');
     return rows.map((r) => {
       'id': r['id'],
