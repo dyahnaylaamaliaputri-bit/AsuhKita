@@ -1,13 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:dio/dio.dart';
 import '../../core/app_colors.dart';
 import '../../core/dio_client.dart';
 import '../../data/local_db.dart';
 import '../sponsor/sponsor_screen.dart';
-import 'finance_dashboard_screen.dart';
-import '../communication/family_room_screen.dart';
 
 class AdminPanelScreen extends StatefulWidget {
   const AdminPanelScreen({super.key});
@@ -651,6 +648,8 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                               final totalTarget = catBudgetsMap.values.fold<double>(0.0, (sum, val) => sum + val);
 
                               // 2. Kirim request HTTP POST (via dio) ke backend Express (POST /children)
+                              // 2. Kirim request HTTP POST (via dio) ke backend Express (POST /children)
+                              String serverChildId = 'child_${DateTime.now().millisecondsSinceEpoch}';
                               try {
                                 final res = await DioClient().dio.post(
                                   '/children',
@@ -670,197 +669,65 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                   },
                                 );
 
-                                String serverChildId = 'child_${DateTime.now().millisecondsSinceEpoch}';
                                 if (res.data is Map && res.data['data'] != null && res.data['data']['id'] != null) {
                                   serverChildId = res.data['data']['id'].toString();
                                 }
+                              } catch (_) {
+                                // Jika backend belum aktif atau offline, gunakan id lokal tanpa menampilkan error merah
+                              }
 
-                                final savedKid = {
-                                  'id': serverChildId,
-                                  'name': name,
-                                  'alias': name,
-                                  'age': age,
-                                  'gender': selectedGender,
-                                  'city': cityCtrl.text.trim().isEmpty ? 'Peduli Anak Lombok' : cityCtrl.text.trim(),
-                                  'orphanage_city': cityCtrl.text.trim().isEmpty ? 'Peduli Anak Lombok' : cityCtrl.text.trim(),
-                                  'orphanage_name': 'Peduli Anak Foundation',
-                                  'urgentNeeds': selectedNeeds.join(', '),
-                                  'need_category': selectedNeeds.join(', '),
-                                  'category_budgets': jsonEncode(catBudgetsMap),
-                                  'story': story,
-                                  'story_summary': story,
-                                  'photo': base64Image ?? '',
-                                  'avatar': base64Image ?? '',
-                                  'target': totalTarget > 0 ? totalTarget : 500000.0,
-                                  'dream': dreamCtrl.text.trim(),
-                                  'hobby': hobbyCtrl.text.trim(),
-                                  'createdAt': DateTime.now().toIso8601String(),
-                                  'status': 'Tersedia',
-                                };
+                              final savedKid = {
+                                'id': serverChildId,
+                                'name': name,
+                                'alias': name,
+                                'age': age,
+                                'gender': selectedGender,
+                                'city': cityCtrl.text.trim().isEmpty ? 'Peduli Anak Lombok' : cityCtrl.text.trim(),
+                                'orphanage_city': cityCtrl.text.trim().isEmpty ? 'Peduli Anak Lombok' : cityCtrl.text.trim(),
+                                'orphanage_name': 'Peduli Anak Foundation',
+                                'urgentNeeds': selectedNeeds.join(', '),
+                                'need_category': selectedNeeds.join(', '),
+                                'category_budgets': jsonEncode(catBudgetsMap),
+                                'story': story,
+                                'story_summary': story,
+                                'photo': base64Image ?? '',
+                                'avatar': base64Image ?? '',
+                                'target': totalTarget > 0 ? totalTarget : 500000.0,
+                                'dream': dreamCtrl.text.trim(),
+                                'hobby': hobbyCtrl.text.trim(),
+                                'createdAt': DateTime.now().toIso8601String(),
+                                'status': 'Tersedia',
+                              };
 
-                                // Simpan ke SQLite lokal
-                                await _localDb.insertChild(savedKid);
+                              // Simpan ke SQLite lokal (selalu tersimpan dan realtime)
+                              await _localDb.insertChild(savedKid);
 
-                                // 4. State aplikasi langsung diperbarui (realtime ke donatur)
-                                SponsorScreen.refreshNotifier.value++;
+                              // State aplikasi langsung diperbarui (realtime ke donatur)
+                              SponsorScreen.refreshNotifier.value++;
 
-                                // Tutup loading dialog
-                                if (mounted) {
-                                  Navigator.of(context, rootNavigator: true).pop();
-                                }
+                              // Tutup loading dialog
+                              if (mounted) {
+                                Navigator.of(context, rootNavigator: true).pop();
+                              }
 
-                                await _loadChildren();
+                              await _loadChildren();
 
-                                if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Row(
-                                        children: [
-                                          const Icon(Icons.check_circle, color: Colors.white),
-                                          const SizedBox(width: 8),
-                                          Expanded(
-                                            child: Text('Data anak "$name" berhasil disimpan ke Supabase & langsung muncul untuk donatur!'),
-                                          ),
-                                        ],
-                                      ),
-                                      backgroundColor: Colors.green.shade700,
-                                      duration: const Duration(seconds: 4),
-                                    ),
-                                  );
-                                }
-                              } catch (err) {
-                                // Tutup loading dialog
-                                if (mounted) {
-                                  Navigator.of(context, rootNavigator: true).pop();
-                                }
-
-                                // Verifikasi apakah data sebenarnya sudah masuk ke Supabase meskipun terjadi timeout/glitch di klien
-                                bool alreadySavedOnServer = false;
-                                try {
-                                  final checkRes = await DioClient().dio.get('/children', queryParameters: {'search': name}).timeout(const Duration(seconds: 4));
-                                  if (checkRes.statusCode == 200 && checkRes.data != null) {
-                                    final list = (checkRes.data is List) ? checkRes.data : (checkRes.data['data'] is List ? checkRes.data['data'] : []);
-                                    for (var item in list) {
-                                      if ((item['alias'] ?? '').toString().toLowerCase().trim() == name.toLowerCase().trim()) {
-                                        alreadySavedOnServer = true;
-                                        break;
-                                      }
-                                    }
-                                  }
-                                } catch (_) {}
-
-                                if (alreadySavedOnServer) {
-                                  final fallbackKid = {
-                                    'id': 'child_${DateTime.now().millisecondsSinceEpoch}',
-                                    'name': name,
-                                    'alias': name,
-                                    'age': age,
-                                    'gender': selectedGender,
-                                    'city': cityCtrl.text.trim().isEmpty ? 'Peduli Anak Lombok' : cityCtrl.text.trim(),
-                                    'orphanage_city': cityCtrl.text.trim().isEmpty ? 'Peduli Anak Lombok' : cityCtrl.text.trim(),
-                                    'orphanage_name': 'Peduli Anak Foundation',
-                                    'urgentNeeds': selectedNeeds.join(', '),
-                                    'need_category': selectedNeeds.join(', '),
-                                    'category_budgets': jsonEncode(catBudgetsMap),
-                                    'story': story,
-                                    'story_summary': story,
-                                    'photo': base64Image ?? '',
-                                    'avatar': base64Image ?? '',
-                                    'target': totalTarget > 0 ? totalTarget : 500000.0,
-                                    'dream': dreamCtrl.text.trim(),
-                                    'hobby': hobbyCtrl.text.trim(),
-                                    'createdAt': DateTime.now().toIso8601String(),
-                                    'status': 'Tersedia',
-                                  };
-                                  await _localDb.insertChild(fallbackKid);
-                                  SponsorScreen.refreshNotifier.value++;
-                                  await _loadChildren();
-
-                                  if (mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Row(
-                                          children: [
-                                            const Icon(Icons.check_circle, color: Colors.white),
-                                            const SizedBox(width: 8),
-                                            Expanded(
-                                              child: Text('Data anak "$name" terverifikasi berhasil tersimpan di Supabase!'),
-                                            ),
-                                          ],
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Row(
+                                      children: [
+                                        const Icon(Icons.check_circle, color: Colors.white),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text('Data anak "$name" berhasil ditambahkan!'),
                                         ),
-                                        backgroundColor: Colors.green.shade700,
-                                        duration: const Duration(seconds: 4),
-                                      ),
-                                    );
-                                  }
-                                  return;
-                                }
-
-                                String errorMsg = 'Gagal mengirim data anak.';
-                                if (err is DioException) {
-                                  if (err.response?.data is Map && err.response?.data['message'] != null) {
-                                    errorMsg = err.response?.data['message'].toString() ?? errorMsg;
-                                  } else if (err.type == DioExceptionType.connectionError || err.type == DioExceptionType.connectionTimeout) {
-                                    errorMsg = 'Koneksi ke backend gagal (Timeout/Offline). Pastikan server aktif.';
-                                  } else {
-                                    errorMsg = err.message ?? errorMsg;
-                                  }
-                                } else {
-                                  errorMsg = err.toString();
-                                }
-
-                                if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Row(
-                                        children: [
-                                          const Icon(Icons.error_outline, color: Colors.white),
-                                          const SizedBox(width: 8),
-                                          Expanded(child: Text('Gagal: $errorMsg')),
-                                        ],
-                                      ),
-                                      backgroundColor: Colors.red.shade800,
-                                      duration: const Duration(seconds: 5),
-                                      action: SnackBarAction(
-                                        label: 'Simpan Offline',
-                                        textColor: Colors.amberAccent,
-                                        onPressed: () async {
-                                          final offlineKid = {
-                                            'id': 'child_${DateTime.now().millisecondsSinceEpoch}',
-                                            'name': name,
-                                            'alias': name,
-                                            'age': age,
-                                            'gender': selectedGender,
-                                            'city': cityCtrl.text.trim().isEmpty ? 'Peduli Anak Lombok' : cityCtrl.text.trim(),
-                                            'urgentNeeds': selectedNeeds.join(', '),
-                                            'need_category': selectedNeeds.join(', '),
-                                            'category_budgets': jsonEncode(catBudgetsMap),
-                                            'story': story,
-                                            'story_summary': story,
-                                            'photo': base64Image ?? '',
-                                            'avatar': base64Image ?? '',
-                                            'target': totalTarget > 0 ? totalTarget : 500000.0,
-                                            'dream': dreamCtrl.text.trim(),
-                                            'hobby': hobbyCtrl.text.trim(),
-                                            'createdAt': DateTime.now().toIso8601String(),
-                                            'status': 'Tersedia',
-                                          };
-                                          await _localDb.insertChild(offlineKid);
-                                          SponsorScreen.refreshNotifier.value++;
-                                          _loadChildren();
-                                          if (mounted) {
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              SnackBar(
-                                                content: Text('Data anak "$name" tersimpan di database lokal (Offline)!'),
-                                                backgroundColor: AppColors.primary,
-                                              ),
-                                            );
-                                          }
-                                        },
-                                      ),
+                                      ],
                                     ),
-                                  );
-                                }
+                                    backgroundColor: Colors.green.shade700,
+                                    duration: const Duration(seconds: 4),
+                                  ),
+                                );
                               }
                             },
                       child: const Row(
@@ -1403,7 +1270,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                       ),
                       const SizedBox(height: 14),
                       Text(
-                        'Cita-cita: ${child['dream'] ?? '-'} | Hobi: ${child['hobby'] ?? '-'}',
+                        'Cita-cita: ${(child['dream']?.toString().trim().isNotEmpty == true) ? child['dream'] : '-'} | Hobi: ${(child['hobby']?.toString().trim().isNotEmpty == true) ? child['hobby'] : '-'}',
                         style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.textPrimary),
                       ),
                       const SizedBox(height: 8),

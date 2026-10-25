@@ -88,8 +88,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
     final gender = child['gender'] ?? 'Laki-laki';
     final city = child['orphanage_city'] ?? child['city'] ?? 'Mataram, NTB';
     final orphanage = child['orphanage_name'] ?? 'Peduli Anak Foundation';
-    final dream = (child['dream'] != null && child['dream'].toString().isNotEmpty) ? child['dream'].toString() : 'Dokter / Guru';
-    final hobby = (child['hobby'] != null && child['hobby'].toString().isNotEmpty) ? child['hobby'].toString() : 'Membaca buku & Bersepeda';
+    final dream = (child['dream'] != null && child['dream'].toString().trim().isNotEmpty) ? child['dream'].toString().trim() : '-';
+    final hobby = (child['hobby'] != null && child['hobby'].toString().trim().isNotEmpty) ? child['hobby'].toString().trim() : '-';
     final category = child['need_category'] ?? child['urgentNeeds'] ?? 'Pendidikan';
     final targetNum = (child['target'] is num) ? (child['target'] as num).toDouble() : 500000.0;
 

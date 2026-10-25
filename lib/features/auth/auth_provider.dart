@@ -175,17 +175,18 @@ class AuthProvider extends ChangeNotifier {
         }
 
         final isTaken = await LocalDatabase().isEmailRegistered(cleanEmail);
-        if (!isTaken &&
-            (serverMsg.toLowerCase().contains('not found') ||
-                serverMsg.toLowerCase().contains('tidak terdaftar') ||
-                dioErr.response?.statusCode == 404)) {
+        final errCode = dioErr.response?.data?['error']?.toString() ?? '';
+        if (dioErr.response?.statusCode == 404 ||
+            errCode == 'USER_NOT_FOUND' ||
+            serverMsg.toLowerCase().contains('belum terdaftar') ||
+            serverMsg.toLowerCase().contains('tidak terdaftar') ||
+            serverMsg.toLowerCase().contains('not found') ||
+            !isTaken) {
           _errorMessage = 'Akun belum terdaftar di AsuhKita. Silakan daftar akun terlebih dahulu.';
         } else {
           _errorMessage = serverMsg.isNotEmpty
               ? serverMsg
-              : (isTaken
-                    ? 'Kata sandi salah. Silakan periksa kembali.'
-                    : 'Akun belum terdaftar di AsuhKita. Silakan daftar akun terlebih dahulu.');
+              : 'Kata sandi salah. Silakan periksa kembali.';
         }
         _isLoading = false;
         notifyListeners();

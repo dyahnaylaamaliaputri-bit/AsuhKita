@@ -134,20 +134,31 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
       }
 
       // JIKA ADMIN: Tampilkan semua katalog anak asuh agar bisa memantau dan membalas semua pesan donatur
-      // JIKA DONATUR: Tampilkan anak asuh yang didampingi
-      if (auth.isAdmin) {
-        _children = allCatalog;
-      } else {
-        _children = mySponsoredChildren;
-      }
+      // JIKA DONATUR: Tampilkan anak asuh yang didampingi (atau katalog jika belum ada sponsorship)
+      final rawList = auth.isAdmin
+          ? allCatalog
+          : (mySponsoredChildren.isNotEmpty ? mySponsoredChildren : allCatalog);
 
-      // 4. Load last message untuk setiap anak asuh yang dimiliki
+      // DEDUKLIKASI KETAT: 1 Akun/Nama Anak = Tepat 1 Entri Room Chat Tunggal
+      final Map<String, Map<String, dynamic>> uniqueMap = {};
+      for (var c in rawList) {
+        final name = (c['alias'] ?? c['name'] ?? '').toString().trim();
+        if (name.isNotEmpty) {
+          final key = name.toLowerCase();
+          if (!uniqueMap.containsKey(key)) {
+            uniqueMap[key] = c;
+          }
+        }
+      }
+      _children = uniqueMap.values.toList();
+
+      // 4. Load last message untuk setiap anak asuh (dengan key normalized lowercase)
       _lastMessages = {};
       for (var child in _children) {
-        final alias = (child['alias'] ?? child['name'] ?? '').toString();
+        final alias = (child['alias'] ?? child['name'] ?? '').toString().trim();
         if (alias.isNotEmpty) {
           final lastMsg = await LocalDatabase().getLastChatMessage(alias);
-          _lastMessages[alias] = lastMsg;
+          _lastMessages[alias.toLowerCase()] = lastMsg;
         }
       }
     } catch (_) {}
@@ -182,18 +193,21 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
       return name.contains(_searchQuery.toLowerCase()) || city.contains(_searchQuery.toLowerCase());
     }).toList();
 
-    // Pisahkan anak yang sudah ada riwayat obrolan vs anak yang dimulai dari awal
-    final activeChats = <Map<String, dynamic>>[];
-    final newChats = <Map<String, dynamic>>[];
-
-    for (var child in filtered) {
-      final name = (child['alias'] ?? child['name'] ?? '').toString();
-      if (_lastMessages[name] != null) {
-        activeChats.add(child);
-      } else {
-        newChats.add(child);
+    // Urutkan kontak/room: Yang memiliki pesan terbaru di urutan teratas
+    filtered.sort((a, b) {
+      final nameA = (a['alias'] ?? a['name'] ?? '').toString().trim().toLowerCase();
+      final nameB = (b['alias'] ?? b['name'] ?? '').toString().trim().toLowerCase();
+      final msgA = _lastMessages[nameA];
+      final msgB = _lastMessages[nameB];
+      if (msgA != null && msgB != null) {
+        final dateA = msgA['created_at']?.toString() ?? '';
+        final dateB = msgB['created_at']?.toString() ?? '';
+        return dateB.compareTo(dateA);
       }
-    }
+      if (msgA != null) return -1;
+      if (msgB != null) return 1;
+      return nameA.compareTo(nameB);
+    });
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -267,7 +281,7 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
                         final name = (child['alias'] ?? child['name'] ?? 'Anak').toString();
                         final avatar = (child['avatar'] ?? child['photo'] ?? '').toString();
                         final note = _childNotes[name] ?? 'Semangat belajar 🎒';
-                        final hasChat = _lastMessages[name] != null;
+                        final hasChat = _lastMessages[name.trim().toLowerCase()] != null;
 
                         return InkWell(
                           onTap: () => _openChatRoom(child),
@@ -334,73 +348,40 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
                   child: Divider(height: 1, thickness: 0.8, color: Color(0xFFEEEEEE)),
                 ),
 
-                // 3. Section Header: Obrolan Aktif (Dengan Riwayat)
-                if (activeChats.isNotEmpty) ...[
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.forum_outlined, size: 16, color: AppColors.primary),
-                          const SizedBox(width: 6),
-                          const Text(
-                            'Pesan Langsung (Riwayat Percakapan)',
-                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textSecondary),
-                          ),
-                          const Spacer(),
-                          Text(
-                            '${activeChats.length} obrolan',
-                            style: const TextStyle(fontSize: 11, color: AppColors.textHint),
-                          ),
-                        ],
-                      ),
+                // 3. Section: Daftar Percakapan Ruang Kasih
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.forum_outlined, size: 16, color: AppColors.primary),
+                        const SizedBox(width: 6),
+                        const Text(
+                          'Percakapan Ruang Kasih',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textSecondary),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '${filtered.length} ruang obrolan',
+                          style: const TextStyle(fontSize: 11, color: AppColors.textHint),
+                        ),
+                      ],
                     ),
                   ),
-                  SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, idx) {
-                        final child = activeChats[idx];
-                        return _buildChatListItem(child, hasExistingHistory: true);
-                      },
-                      childCount: activeChats.length,
-                    ),
+                ),
+                SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, idx) {
+                      final child = filtered[idx];
+                      final name = (child['alias'] ?? child['name'] ?? '').toString().trim().toLowerCase();
+                      final hasHistory = _lastMessages[name] != null;
+                      return _buildChatListItem(child, hasExistingHistory: hasHistory);
+                    },
+                    childCount: filtered.length,
                   ),
-                ],
+                ),
 
-                // 4. Section Header: Mulai Obrolan Baru (Dimulai dari awal)
-                if (newChats.isNotEmpty) ...[
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 18, 16, 6),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.chat_bubble_outline, size: 16, color: AppColors.accent1),
-                          const SizedBox(width: 6),
-                          const Text(
-                            'Mulai Obrolan Baru (Mulai Dari Awal)',
-                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textSecondary),
-                          ),
-                          const Spacer(),
-                          Text(
-                            '${newChats.length} anak',
-                            style: const TextStyle(fontSize: 11, color: AppColors.textHint),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, idx) {
-                        final child = newChats[idx];
-                        return _buildChatListItem(child, hasExistingHistory: false);
-                      },
-                      childCount: newChats.length,
-                    ),
-                  ),
-                ],
-
-                if (activeChats.isEmpty && newChats.isEmpty && _searchQuery.isNotEmpty)
+                if (filtered.isEmpty && _searchQuery.isNotEmpty)
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
@@ -582,7 +563,7 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
     final avatar = (child['avatar'] ?? child['photo'] ?? '').toString();
     final city = (child['orphanage_city'] ?? child['city'] ?? 'PeduliAnak').toString();
     final category = (child['need_category'] ?? child['urgentNeeds'] ?? 'Pendidikan').toString();
-    final lastMsg = _lastMessages[name];
+    final lastMsg = _lastMessages[name.trim().toLowerCase()];
 
     String subtitleText = '';
     String timeText = '';
@@ -726,7 +707,7 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
     // Refresh last messages setelah kembali dari room chat
     final updated = await LocalDatabase().getLastChatMessage(name);
     if (mounted) {
-      setState(() => _lastMessages[name] = updated);
+      setState(() => _lastMessages[name.trim().toLowerCase()] = updated);
     }
   }
 }

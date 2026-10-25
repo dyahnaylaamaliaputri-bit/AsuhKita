@@ -118,11 +118,10 @@ const login = async (req, res, next) => {
     );
 
     if (result.rows.length === 0) {
-      // JANGAN beri tahu "email tidak ditemukan" — lebih aman pakai pesan generik
-      return res.status(401).json({
+      return res.status(404).json({
         success: false,
-        message: 'Email atau password salah.',
-        error: 'INVALID_CREDENTIALS',
+        message: 'Akun belum terdaftar di AsuhKita. Silakan daftar terlebih dahulu.',
+        error: 'USER_NOT_FOUND',
       });
     }
 

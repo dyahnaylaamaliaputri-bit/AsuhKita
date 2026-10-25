@@ -603,7 +603,7 @@ class LocalDatabase {
     final db = await database;
     final now = DateTime.now();
     await db.insert('chat_messages', {
-      'child_alias': childAlias,
+      'child_alias': childAlias.trim(),
       'sender': sender,
       'text': text,
       'type': type,
@@ -615,20 +615,22 @@ class LocalDatabase {
 
   Future<List<Map<String, dynamic>>> getChatMessages(String childAlias) async {
     final db = await database;
+    final clean = childAlias.trim().toLowerCase();
     return await db.query(
       'chat_messages',
-      where: 'child_alias = ?',
-      whereArgs: [childAlias],
+      where: 'LOWER(TRIM(child_alias)) = ?',
+      whereArgs: [clean],
       orderBy: 'id ASC',
     );
   }
 
   Future<Map<String, dynamic>?> getLastChatMessage(String childAlias) async {
     final db = await database;
+    final clean = childAlias.trim().toLowerCase();
     final rows = await db.query(
       'chat_messages',
-      where: 'child_alias = ?',
-      whereArgs: [childAlias],
+      where: 'LOWER(TRIM(child_alias)) = ?',
+      whereArgs: [clean],
       orderBy: 'id DESC',
       limit: 1,
     );

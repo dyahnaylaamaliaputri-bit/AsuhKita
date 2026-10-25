@@ -32,7 +32,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  bool _isNotificationActive = true;
   int _sponsoredCount = 0;
   int _totalPlatformChildren = 0;
   int _totalPlatformDonors = 0;
@@ -67,7 +66,6 @@ class _HomeScreenState extends State<HomeScreen> {
       final prefs = await SharedPreferences.getInstance();
       final localDb = LocalDatabase();
       final localDonations = await localDb.getCachedDonations();
-      final notifActive = prefs.getBool('asuhkita_notif_active') ?? true;
 
       // ============================================================
       // INTEGRASI: Ambil jumlah anak dari sumber SAMA seperti Ruang Kasih & Sponsor
@@ -181,7 +179,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (mounted) {
         setState(() {
-          _isNotificationActive = notifActive;
           // Donatur: jumlah anak asuh donatur ini (0 jika belum mendampingi anak asuh)
           _sponsoredCount = sponsoredKidSet.length;
           _totalPlatformChildren = totalKids;
@@ -190,29 +187,6 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
     } catch (_) {}
-  }
-
-  Future<void> _toggleNotification() async {
-    final newState = !_isNotificationActive;
-    setState(() => _isNotificationActive = newState);
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('asuhkita_notif_active', newState);
-    } catch (_) {}
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            newState
-                ? '🔔 Notifikasi Lokal DIAKTIFKAN: Pengingat & pembaruan aktif!'
-                : '🔕 Notifikasi Lokal DINONAKTIFKAN.',
-          ),
-          backgroundColor: newState ? AppColors.primary : Colors.grey.shade700,
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    }
   }
 
   @override
@@ -241,16 +215,6 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
-        actions: [
-          IconButton(
-            icon: Icon(
-              _isNotificationActive ? Icons.notifications_active : Icons.notifications_off_outlined,
-              color: _isNotificationActive ? AppColors.accent2 : Colors.white60,
-            ),
-            tooltip: _isNotificationActive ? 'Notifikasi Aktif' : 'Notifikasi Mati',
-            onPressed: _toggleNotification,
-          ),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
