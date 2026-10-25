@@ -2,12 +2,17 @@
 // Fungsi: Provider state management untuk Login, Register, Sesi Token Terenkripsi, dan Biometrik (PBI-005, PBI-006, PBI-056)
 
 import 'package:dio/dio.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+
+import 'dart:async';
+
 import 'package:local_auth/local_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../../core/secure_storage.dart';
 import '../../core/dio_client.dart';
 import '../../data/local_db.dart';
+import '../../services/notification_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   final SecureStorageService _storage = SecureStorageService();
@@ -63,8 +68,10 @@ class AuthProvider extends ChangeNotifier {
       _userName = await _storage.getUserName() ?? 'Donatur Asuh';
       _userEmail = await _storage.getUserEmail() ?? '';
       _userRole = await _storage.getUserRole() ?? 'donatur';
-      _userId = await _storage.getUserId() ?? 'usr_${_userEmail.hashCode.abs()}';
+      _userId =
+          await _storage.getUserId() ?? 'usr_${_userEmail.hashCode.abs()}';
       _isAuthenticated = true;
+      unawaited(NotificationService().registerDeviceToken());
     }
     notifyListeners();
   }
@@ -91,10 +98,7 @@ class AuthProvider extends ChangeNotifier {
     try {
       final response = await _dioClient.dio.post(
         '/auth/login',
-        data: {
-          'email': cleanEmail,
-          'password': password,
-        },
+        data: {'email': cleanEmail, 'password': password},
         options: Options(
           sendTimeout: const Duration(milliseconds: 2000),
           receiveTimeout: const Duration(milliseconds: 2000),
@@ -105,14 +109,30 @@ class AuthProvider extends ChangeNotifier {
         final resData = (response.data is Map && response.data['data'] != null)
             ? response.data['data']
             : response.data;
-        final user = (resData is Map && resData['user'] != null) ? resData['user'] : {};
-        _userId = user['id']?.toString() ?? 'usr_${DateTime.now().millisecondsSinceEpoch}';
-        _userName = user['name']?.toString() ?? (cleanEmail.contains('admin') ? 'Admin Pengurus Panti' : 'Donatur Asuh');
+        final user = (resData is Map && resData['user'] != null)
+            ? resData['user']
+            : {};
+        _userId =
+            user['id']?.toString() ??
+            'usr_${DateTime.now().millisecondsSinceEpoch}';
+        _userName =
+            user['name']?.toString() ??
+            (cleanEmail.contains('admin')
+                ? 'Admin Pengurus Panti'
+                : 'Donatur Asuh');
         _userEmail = cleanEmail;
-        _userRole = user['role']?.toString() ?? (cleanEmail.contains('admin') ? 'admin_panti' : 'donatur');
+        _userRole =
+            user['role']?.toString() ??
+            (cleanEmail.contains('admin') ? 'admin_panti' : 'donatur');
 
-        final token = resData['access'] ?? resData['accessToken'] ?? 'token_${DateTime.now().millisecondsSinceEpoch}';
-        final refreshToken = resData['refresh'] ?? resData['refreshToken'] ?? 'refresh_${DateTime.now().millisecondsSinceEpoch}';
+        final token =
+            resData['access'] ??
+            resData['accessToken'] ??
+            'token_${DateTime.now().millisecondsSinceEpoch}';
+        final refreshToken =
+            resData['refresh'] ??
+            resData['refreshToken'] ??
+            'refresh_${DateTime.now().millisecondsSinceEpoch}';
 
         // Simpan sesi terenkripsi di SecureStorage
         await _storage.saveAuthSession(
@@ -124,30 +144,48 @@ class AuthProvider extends ChangeNotifier {
           role: _userRole,
         );
 
-        // Simpan juga ke Database Lokal SQLite (offline cache) dengan password hash
-        await LocalDatabase().saveAuthUser(
-          email: _userEmail,
-          password: password,
-          name: _userName,
-          role: _userRole,
-        );
+        if (!kIsWeb) {
+          await LocalDatabase().saveAuthUser(
+            email: _userEmail,
+            password: password,
+            name: _userName,
+            role: _userRole,
+          );
+        }
 
         _isBiometricEnabled = await _storage.isBiometricEnabled();
         _isAuthenticated = true;
         _isLoading = false;
         notifyListeners();
+        unawaited(NotificationService().registerDeviceToken());
         return true;
       }
     } on DioException catch (dioErr) {
-      if (dioErr.response?.statusCode == 401 || dioErr.response?.statusCode == 400 || dioErr.response?.statusCode == 404) {
+      if (dioErr.response?.statusCode == 401 ||
+          dioErr.response?.statusCode == 400 ||
+          dioErr.response?.statusCode == 404) {
         final serverMsg = dioErr.response?.data?['message']?.toString() ?? '';
+        if (kIsWeb) {
+          _errorMessage = serverMsg.isNotEmpty
+              ? serverMsg
+              : 'Email atau kata sandi tidak valid.';
+          _isLoading = false;
+          notifyListeners();
+          return false;
+        }
+
         final isTaken = await LocalDatabase().isEmailRegistered(cleanEmail);
-        if (!isTaken && (serverMsg.toLowerCase().contains('not found') || serverMsg.toLowerCase().contains('tidak terdaftar') || dioErr.response?.statusCode == 404)) {
+        if (!isTaken &&
+            (serverMsg.toLowerCase().contains('not found') ||
+                serverMsg.toLowerCase().contains('tidak terdaftar') ||
+                dioErr.response?.statusCode == 404)) {
           _errorMessage = 'Akun belum terdaftar di AsuhKita. Silakan daftar akun terlebih dahulu.';
         } else {
           _errorMessage = serverMsg.isNotEmpty
               ? serverMsg
-              : (isTaken ? 'Kata sandi salah. Silakan periksa kembali.' : 'Akun belum terdaftar di AsuhKita. Silakan daftar akun terlebih dahulu.');
+              : (isTaken
+                    ? 'Kata sandi salah. Silakan periksa kembali.'
+                    : 'Akun belum terdaftar di AsuhKita. Silakan daftar akun terlebih dahulu.');
         }
         _isLoading = false;
         notifyListeners();
@@ -155,8 +193,18 @@ class AuthProvider extends ChangeNotifier {
       }
     } catch (_) {}
 
+    if (kIsWeb) {
+      _errorMessage =
+          'Login offline tidak tersedia di web. Periksa koneksi internet Anda.';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+
     // --- 2. Fallback Verifikasi Database Lokal SQLite Terenkripsi (Offline Mode) ---
-    final isRegisteredLocally = await LocalDatabase().isEmailRegistered(cleanEmail);
+    final isRegisteredLocally = await LocalDatabase().isEmailRegistered(
+      cleanEmail,
+    );
     if (!isRegisteredLocally) {
       _errorMessage = 'Akun belum terdaftar di AsuhKita. Silakan daftar akun terlebih dahulu.';
       _isLoading = false;
@@ -170,13 +218,21 @@ class AuthProvider extends ChangeNotifier {
     );
 
     if (localUser != null) {
-      _userId = localUser['id']?.toString() ?? 'usr_${cleanEmail.hashCode.abs()}';
-      _userName = localUser['name']?.toString() ?? (cleanEmail.contains('admin') ? 'Admin Pengurus Panti' : 'Donatur Asuh');
+      _userId =
+          localUser['id']?.toString() ?? 'usr_${cleanEmail.hashCode.abs()}';
+      _userName =
+          localUser['name']?.toString() ??
+          (cleanEmail.contains('admin')
+              ? 'Admin Pengurus Panti'
+              : 'Donatur Asuh');
       _userEmail = cleanEmail;
-      _userRole = localUser['role']?.toString() ?? (cleanEmail.contains('admin') ? 'admin_panti' : 'donatur');
+      _userRole =
+          localUser['role']?.toString() ??
+          (cleanEmail.contains('admin') ? 'admin_panti' : 'donatur');
 
       final token = 'token_local_${DateTime.now().millisecondsSinceEpoch}';
-      final refreshToken = 'refresh_local_${DateTime.now().millisecondsSinceEpoch}';
+      final refreshToken =
+          'refresh_local_${DateTime.now().millisecondsSinceEpoch}';
 
       await _storage.saveAuthSession(
         accessToken: token,
@@ -195,7 +251,8 @@ class AuthProvider extends ChangeNotifier {
     }
 
     // Jika akun terdaftar tapi kata sandi salah:
-    _errorMessage = 'Kata sandi salah. Silakan periksa kembali kata sandi Anda.';
+    _errorMessage =
+        'Kata sandi salah. Silakan periksa kembali kata sandi Anda.';
     _isLoading = false;
     notifyListeners();
     return false;
@@ -217,16 +274,17 @@ class AuthProvider extends ChangeNotifier {
 
     final cleanEmail = email.trim().toLowerCase();
 
-    // 1. Cek apakah email sudah terdaftar di database lokal SQLite
-    final isTakenLocally = await LocalDatabase().isEmailRegistered(cleanEmail);
-    if (isTakenLocally) {
-      _errorMessage = 'Email "$cleanEmail" sudah terdaftar. Silakan gunakan email lain atau langsung masuk.';
+    // 1. Cek email di cache SQLite pada platform native
+    if (!kIsWeb && await LocalDatabase().isEmailRegistered(cleanEmail)) {
+      _errorMessage =
+          'Email "$cleanEmail" sudah terdaftar. Silakan gunakan email lain atau langsung masuk.';
       _isLoading = false;
       notifyListeners();
       return false;
     }
 
     // 2. Bersihkan cache profil lama untuk email ini
+    var registeredOnline = false;
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('asuhkita_kebaikan_points_$cleanEmail');
@@ -239,35 +297,50 @@ class AuthProvider extends ChangeNotifier {
 
     // 3. Coba kirim pendaftaran ke Online Web Service / Backend Supabase
     try {
-      final res = await _dioClient.dio.post('/auth/register', data: {
-        'name': name.trim(),
-        'email': cleanEmail,
-        'password': password,
-        'role': role,
-        'phone': phone.trim(),
-      });
+      final res = await _dioClient.dio.post(
+        '/auth/register',
+        data: {
+          'name': name.trim(),
+          'email': cleanEmail,
+          'password': password,
+          'role': role,
+          'phone': phone.trim(),
+        },
+      );
 
       if (res.statusCode == 201 || res.statusCode == 200) {
-        // Berhasil di online
+        registeredOnline = true;
       }
     } on DioException catch (dioErr) {
       if (dioErr.response?.statusCode == 409) {
-        _errorMessage = dioErr.response?.data?['message']?.toString() ??
+        _errorMessage =
+            dioErr.response?.data?['message']?.toString() ??
             'Email "$cleanEmail" sudah terdaftar di server database. Gunakan email lain.';
         _isLoading = false;
         notifyListeners();
         return false;
       }
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('[Auth] Gagal mendaftarkan akun ke server: $error');
+    }
 
-    // 4. Simpan akun ke Database Lokal SQLite dengan Hash SHA-256 + Salt
-    await LocalDatabase().saveAuthUser(
-      email: cleanEmail,
-      password: password,
-      name: name.trim(),
-      role: role,
-      phone: phone.trim(),
-    );
+    if (kIsWeb && !registeredOnline) {
+      _errorMessage =
+          'Pendaftaran membutuhkan koneksi ke server. Coba lagi saat online.';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+
+    if (!kIsWeb) {
+      await LocalDatabase().saveAuthUser(
+        email: cleanEmail,
+        password: password,
+        name: name.trim(),
+        role: role,
+        phone: phone.trim(),
+      );
+    }
 
     _isLoading = false;
     notifyListeners();
@@ -316,7 +389,8 @@ class AuthProvider extends ChangeNotifier {
           );
         }
 
-        _userId = savedUserId ?? 'usr_bio_${DateTime.now().millisecondsSinceEpoch}';
+        _userId =
+            savedUserId ?? 'usr_bio_${DateTime.now().millisecondsSinceEpoch}';
         _userEmail = email;
         _userName = name ?? 'Donatur Asuh';
         _userRole = role ?? 'donatur';
@@ -338,6 +412,7 @@ class AuthProvider extends ChangeNotifier {
         _isAuthenticated = true;
         _errorMessage = null;
         notifyListeners();
+        unawaited(NotificationService().registerDeviceToken());
         return true;
       }
       return false;
@@ -396,7 +471,10 @@ class AuthProvider extends ChangeNotifier {
   }
 
   // Update Nama & Nomor HP profil (PBI-010, FR-11)
-  Future<bool> updateProfile({required String newName, required String newPhone}) async {
+  Future<bool> updateProfile({
+    required String newName,
+    required String newPhone,
+  }) async {
     _userName = newName;
     await LocalDatabase().saveUserProfile(
       id: _userId.isNotEmpty ? _userId : 'usr_me',
@@ -412,6 +490,7 @@ class AuthProvider extends ChangeNotifier {
   // LOGOUT & CABUT SESI (Sesi Dihapus Bersih)
   // =========================================================================
   Future<void> logout({bool notifyServer = true}) async {
+    await NotificationService().unregisterDeviceToken();
     if (notifyServer) {
       try {
         await _dioClient.dio.post('/auth/logout');

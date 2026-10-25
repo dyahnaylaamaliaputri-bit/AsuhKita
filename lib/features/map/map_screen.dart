@@ -119,8 +119,10 @@ class _MapScreenState extends State<MapScreen> {
 
         // Dapatkan koordinat nyata GPS perangkat
         final position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
-          timeLimit: const Duration(seconds: 7),
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            timeLimit: Duration(seconds: 7),
+          ),
         );
 
         _userLocation = LatLng(position.latitude, position.longitude);

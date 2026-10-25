@@ -4,7 +4,6 @@
 //         - summarizeReport : Ringkas Laporan Perkembangan Anak (PBI-062, FR-50)
 //         - askFaq          : Chatbot FAQ Sahabat Asuh Cerdas, Sesuai Konteks & Peringatan Jika Di Luar Konteks (PBI-062, FR-51)
 
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import '../core/dio_client.dart';
@@ -16,15 +15,12 @@ class GeminiService {
   GeminiService._internal();
 
   static const String _envKey = String.fromEnvironment('GEMINI_KEY');
-  static final String _defaultKey = utf8.decode(
-    base64Decode('QVEuQWI4Uk42THJjbC1JcFdraUZHRVRVdVNFeXE0SkhEY3YxS1htemNqemlSem9GSHdCRXc='),
-  );
 
-  static String get _apiKey => _envKey.isNotEmpty ? _envKey : _defaultKey;
+  static String get _apiKey => _envKey.trim();
   GenerativeModel? _model;
 
   GenerativeModel? get _gemini {
-    if (_apiKey.isEmpty || _apiKey == 'MASUKKAN_API_KEY_GEMINI') return null;
+    if (_apiKey.isEmpty) return null;
     _model ??= GenerativeModel(
       model: 'gemini-1.5-flash',
       apiKey: _apiKey,

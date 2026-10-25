@@ -9,8 +9,15 @@ import 'package:flutter/services.dart';
 import '../../core/app_colors.dart';
 import '../../services/gemini_service.dart';
 
+typedef FaqAnswerProvider = Future<String> Function(
+  String question, {
+  List<Map<String, String>>? history,
+});
+
 class AiAssistantScreen extends StatefulWidget {
-  const AiAssistantScreen({super.key});
+  const AiAssistantScreen({super.key, this.faqAnswerProvider});
+
+  final FaqAnswerProvider? faqAnswerProvider;
 
   @override
   State<AiAssistantScreen> createState() => _AiAssistantScreenState();
@@ -132,7 +139,10 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
 
     // Kirim ke Gemini dengan SELURUH riwayat percakapan sebelumnya
     // agar jawaban sesuai konteks dan menyambung
-    final answer = await _gemini.askFaq(q, history: _faqHistory);
+    final answer = await (widget.faqAnswerProvider ?? _gemini.askFaq)(
+      q,
+      history: _faqHistory,
+    );
 
     setState(() {
       _faqHistory.add({'role': 'model', 'text': answer});

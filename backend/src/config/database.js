@@ -85,6 +85,7 @@ const mockDb = {
     },
   ],
   feedback: [],
+  push_tokens: [],
   game_scores: [],
   step_logs: [],
   iot_devices: [
@@ -340,7 +341,20 @@ const executeMockQuery = (text, params = []) => {
     return { rows: [block], rowCount: 1 };
   }
 
-  // SELECT FROM feedback
+  // SELECT all donor feedback for donors, or all feedback for admins.
+  if (sql.includes('FROM FEEDBACK F') && sql.includes('JOIN USERS')) {
+    const rows = mockDb.feedback
+      .filter(f => mockDb.users.some(u => u.id === f.user_id && u.role === 'donatur'))
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    return { rows, rowCount: rows.length };
+  }
+
+  if (sql.includes('FROM FEEDBACK') && !sql.includes('USER_ID =')) {
+    const rows = [...mockDb.feedback].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    return { rows, rowCount: rows.length };
+  }
+
+  // Legacy per-user feedback query.
   if (sql.includes('FROM FEEDBACK') && sql.includes('USER_ID =')) {
     const userId = params[0];
     const rows = mockDb.feedback.filter(f => f.user_id === userId).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -349,9 +363,68 @@ const executeMockQuery = (text, params = []) => {
 
   // INSERT INTO feedback
   if (sql.includes('INSERT INTO FEEDBACK')) {
-    const f = { id: generateMockId(), user_id: params[0], suggestion: params[1], impression: params[2], created_at: new Date().toISOString() };
+    const f = {
+      id: generateMockId(),
+      user_id: params[0],
+      suggestion: params[1],
+      impression: params[2],
+      rating: params[3] ?? 5,
+      category: params[4] ?? 'Kuliah PAM',
+      user_name: params[5] ?? '',
+      user_email: params[6] ?? '',
+      created_at: new Date().toISOString(),
+    };
     mockDb.feedback.push(f);
     return { rows: [f], rowCount: 1 };
+  }
+
+  if (sql.includes('UPDATE FEEDBACK')) {
+    const [suggestion, impression, rating, feedbackId] = params;
+    const feedback = mockDb.feedback.find(f => f.id === feedbackId);
+    if (!feedback) return { rows: [], rowCount: 0 };
+    Object.assign(feedback, {
+      suggestion,
+      impression,
+      saran: suggestion,
+      kesan: impression,
+      rating,
+    });
+    return { rows: [feedback], rowCount: 1 };
+  }
+
+  if (sql.includes('DELETE FROM FEEDBACK')) {
+    const index = mockDb.feedback.findIndex(f => f.id === params[0]);
+    if (index < 0) return { rows: [], rowCount: 0 };
+    const [deleted] = mockDb.feedback.splice(index, 1);
+    return { rows: [{ id: deleted.id }], rowCount: 1 };
+  }
+
+  if (sql.includes('INSERT INTO PUSH_TOKENS')) {
+    const [user_id, token] = params;
+    const existing = mockDb.push_tokens.find(entry => entry.token === token);
+    if (existing) existing.user_id = user_id;
+    else mockDb.push_tokens.push({ user_id, token, updated_at: new Date().toISOString() });
+    return { rows: [{ token }], rowCount: 1 };
+  }
+
+  if (sql.includes('DELETE FROM PUSH_TOKENS') && sql.includes('TOKEN = ANY')) {
+    const invalidTokens = params[0];
+    const before = mockDb.push_tokens.length;
+    mockDb.push_tokens = mockDb.push_tokens.filter(entry => !invalidTokens.includes(entry.token));
+    return { rows: [], rowCount: before - mockDb.push_tokens.length };
+  }
+
+  if (sql.includes('DELETE FROM PUSH_TOKENS')) {
+    const [user_id, token] = params;
+    const before = mockDb.push_tokens.length;
+    mockDb.push_tokens = mockDb.push_tokens.filter(
+      entry => entry.user_id !== user_id || entry.token !== token,
+    );
+    return { rows: [], rowCount: before - mockDb.push_tokens.length };
+  }
+
+  if (sql.includes('FROM PUSH_TOKENS')) {
+    return { rows: mockDb.push_tokens.map(({ token }) => ({ token })), rowCount: mockDb.push_tokens.length };
   }
 
   // SELECT FROM game_scores

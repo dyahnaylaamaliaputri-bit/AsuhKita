@@ -293,7 +293,7 @@ class _SponsorScreenState extends State<SponsorScreen> {
                           title: const Text('Prioritaskan yang Belum Terpenuhi', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                           subtitle: const Text('Tampilkan anak asuh yang sangat mendesak membutuhkan orang tua asuh', style: TextStyle(fontSize: 11)),
                           value: prioritizeUnfulfilled,
-                          activeColor: AppColors.primary,
+                          activeThumbColor: AppColors.primary,
                           onChanged: (v) => setModalState(() => prioritizeUnfulfilled = v),
                         ),
                       ],

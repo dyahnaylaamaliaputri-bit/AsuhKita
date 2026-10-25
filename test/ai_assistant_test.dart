@@ -9,7 +9,9 @@ import 'package:mobile/features/ai_assistant/ai_assistant_screen.dart';
 
 void main() {
   group('FR-49, FR-50, FR-51 | AI Assistant Screen Widget Tests', () {
-    Widget makeTestable() => const MaterialApp(home: AiAssistantScreen());
+    Widget makeTestable({FaqAnswerProvider? faqAnswerProvider}) => MaterialApp(
+      home: AiAssistantScreen(faqAnswerProvider: faqAnswerProvider),
+    );
 
     testWidgets('Tampil AppBar "Sahabat Asuh (Asisten AI)"', (tester) async {
       await tester.pumpWidget(makeTestable());
@@ -30,8 +32,11 @@ void main() {
 
     testWidgets('FR-49 | Input nama anak dan topik surat ada', (tester) async {
       await tester.pumpWidget(makeTestable());
-      expect(find.text('Nama Samaran Anak'), findsOneWidget);
-      expect(find.text('Topik atau Harapan Anda'), findsOneWidget);
+      expect(find.text('Nama Anak / Pengirim di Panti'), findsOneWidget);
+      expect(
+        find.text('Kabar Perkembangan / Ungkapan Terima Kasih'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('FR-49 | Tombol "Buat Draf Surat dengan Gemini" ada', (tester) async {
@@ -76,7 +81,12 @@ void main() {
     });
 
     testWidgets('FR-51 | Input teks FAQ dan tap send menambah bubble user', (tester) async {
-      await tester.pumpWidget(makeTestable());
+      await tester.pumpWidget(
+        makeTestable(
+          faqAnswerProvider: (question, {history}) async =>
+              'Jawaban uji untuk $question.',
+        ),
+      );
       await tester.tap(find.text('Tanya FAQ'));
       await tester.pumpAndSettle();
 

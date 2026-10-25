@@ -244,6 +244,32 @@ CREATE TABLE IF NOT EXISTS feedback (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+ALTER TABLE feedback ADD COLUMN IF NOT EXISTS user_name TEXT;
+ALTER TABLE feedback ADD COLUMN IF NOT EXISTS user_email TEXT;
+ALTER TABLE feedback ADD COLUMN IF NOT EXISTS saran TEXT;
+ALTER TABLE feedback ADD COLUMN IF NOT EXISTS kesan TEXT;
+ALTER TABLE feedback ADD COLUMN IF NOT EXISTS rating INTEGER NOT NULL DEFAULT 5
+  CHECK (rating BETWEEN 1 AND 5);
+ALTER TABLE feedback ADD COLUMN IF NOT EXISTS category TEXT NOT NULL DEFAULT 'Kuliah PAM';
+
+CREATE INDEX IF NOT EXISTS idx_feedback_created_at
+  ON feedback (created_at DESC);
+
+UPDATE feedback
+SET saran = COALESCE(saran, suggestion, ''),
+    kesan = COALESCE(kesan, impression, '')
+WHERE saran IS NULL OR kesan IS NULL;
+
+-- ==================== TABEL: push_tokens ====================
+-- Token FCM per perangkat untuk notifikasi yang dikirim backend.
+CREATE TABLE IF NOT EXISTS push_tokens (
+  token      TEXT PRIMARY KEY,
+  user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_push_tokens_user ON push_tokens(user_id);
+
 
 -- ==================== DATA SEED: orphanages ====================
 INSERT INTO orphanages (id, name, city, address, latitude, longitude, phone, description) VALUES

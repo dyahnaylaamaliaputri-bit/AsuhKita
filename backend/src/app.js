@@ -12,6 +12,7 @@ const rateLimit = require('express-rate-limit');
 const authRoutes       = require('./routes/auth.routes');
 const profileRoutes    = require('./routes/profile.routes');
 const feedbackRoutes   = require('./routes/feedback.routes');
+const notificationRoutes = require('./routes/notification.routes');
 const childrenRoutes   = require('./routes/children.routes');
 const donationsRoutes  = require('./routes/donations.routes');
 const ledgerRoutes     = require('./routes/ledger.routes');
@@ -111,6 +112,7 @@ app.use('/uploads', require('express').static(path.join(__dirname, '../uploads')
 app.use('/api/auth',        authLimiter, authRoutes);    // PBI-001..004 (Sprint 1)
 app.use('/api/users/profile', profileRoutes);            // PBI-010, PBI-011 (Sprint 1)
 app.use('/api/feedback',    feedbackRoutes);             // PBI-012 (Sprint 1)
+app.use('/api/notifications', notificationRoutes);
 app.use('/api/children',    childrenRoutes);             // PBI-016, PBI-017 (Sprint 2)
 app.use('/api/donations',   donationsRoutes);            // PBI-023..026, PBI-029..030 (Sprint 2)
 app.use('/api/ledger',      ledgerRoutes);               // PBI-032..037 (Sprint 3)
