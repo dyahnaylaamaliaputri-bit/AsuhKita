@@ -255,6 +255,20 @@ class _LedgerScreenState extends State<LedgerScreen> {
                           _verifyCertificateCredential();
                         },
                       ),
+                      ActionChip(
+                        avatar: const Icon(Icons.warning_amber_rounded, size: 14, color: Colors.red),
+                        backgroundColor: const Color(0xFFFFEBEE),
+                        side: const BorderSide(color: Color(0xFFEF9A9A)),
+                        label: const Text(
+                          "🚨 Sertifikat Rekayasa/Palsu (Demo Dosen)",
+                          style: TextStyle(fontSize: 11, color: Colors.red, fontWeight: FontWeight.bold),
+                        ),
+                        onPressed: () {
+                          _credentialController.text =
+                              "https://asuhkita.id/verify?cert=CERT-REKAYASA-9981&hash=forged_d41d8cd98f00b204e9800998ecf8427e_unauthorized_party&donor=Pihak%20Luar%20Tak%20Dikenal&child=Rizky&amount=100000000";
+                          _verifyCertificateCredential();
+                        },
+                      ),
                     ],
                   ),
                 ],

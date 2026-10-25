@@ -853,6 +853,9 @@ class _SponsorScreenState extends State<SponsorScreen> {
         return Image.memory(bytes, fit: BoxFit.cover);
       } catch (_) {}
     }
+    if (avatarUrl.startsWith('assets/')) {
+      return Image.asset(avatarUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: AppColors.surfaceLight, child: const Icon(Icons.face, size: 40, color: AppColors.primary)));
+    }
     if (avatarUrl.startsWith('http')) {
       return Image.network(
         avatarUrl,

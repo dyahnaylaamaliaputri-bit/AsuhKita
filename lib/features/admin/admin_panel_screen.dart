@@ -1922,6 +1922,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
         return Image.memory(bytes, width: width, height: height, fit: BoxFit.cover);
       } catch (_) {}
     }
+    if (url.startsWith('assets/')) {
+      return Image.asset(url, width: width, height: height, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(width: width, height: height, color: AppColors.surfaceLight, child: const Icon(Icons.person, color: AppColors.primary)));
+    }
     if (url.startsWith('http')) {
       return Image.network(
         url,

@@ -519,6 +519,9 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
         if (bytes != null) return Image.memory(bytes, fit: BoxFit.cover);
       } catch (_) {}
     }
+    if (url.startsWith('assets/')) {
+      return Image.asset(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: Colors.white, child: const Icon(Icons.face, size: 64, color: AppColors.primary)));
+    }
     if (url.startsWith('http')) {
       return Image.network(
         url,
