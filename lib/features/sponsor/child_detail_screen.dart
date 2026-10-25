@@ -276,8 +276,6 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                           _buildDataRow(Icons.school_outlined, 'Jenjang Pendidikan', 'Kelas ${(age is int && age > 6) ? (age - 6) : 3} Sekolah Dasar'),
                           _buildDataRow(Icons.lightbulb_outline, 'Cita-Cita / Impian', dream),
                           _buildDataRow(Icons.sports_soccer_outlined, 'Hobi & Minat', hobby),
-                          _buildDataRow(Icons.health_and_safety_outlined, 'Kondisi Kesehatan', 'Sehat wal afiat & aktif dalam pembinaan panti'),
-                          _buildDataRow(Icons.supervisor_account_outlined, 'Pengasuh Asrama', 'Ustadz Ahmad (Kepala Asrama Peduli Anak)'),
                           _buildDataRow(Icons.location_on_outlined, 'Lokasi Panti', city),
                         ],
                       ),

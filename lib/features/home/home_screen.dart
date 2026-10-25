@@ -223,6 +223,20 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 12.0, top: 10.0, bottom: 10.0),
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.volunteer_activism,
+              size: 20,
+              color: AppColors.primary,
+            ),
+          ),
+        ),
         title: Text(isAdmin ? 'AsuhKita • Pengurus Panti' : 'AsuhKita'),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
@@ -842,11 +856,12 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               Icon(icon, color: color, size: 22),
               const SizedBox(height: 6),
-              Text(
-                value,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.textPrimary),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  value,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.textPrimary),
+                ),
               ),
               const SizedBox(height: 2),
               Text(

@@ -56,63 +56,22 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (!success && mounted) {
-        final errorMsg = auth.errorMessage ?? 'Login gagal.';
-        final isNotRegistered = errorMsg.toLowerCase().contains('belum terdaftar');
-
-        if (isNotRegistered) {
-          showDialog(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              title: Row(
-                children: const [
-                  Icon(Icons.person_add_alt_1, color: AppColors.primary, size: 26),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text('Akun Belum Terdaftar', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                  ),
-                ],
-              ),
-              content: Text(
-                'Email "${_emailController.text.trim()}" belum terdaftar di AsuhKita.\n\nSilakan mendaftar akun terlebih dahulu untuk mulai mendampingi masa depan anak asuh.',
-                style: const TextStyle(fontSize: 13, height: 1.4),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Batal'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const RegisterScreen(),
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  child: const Text('Daftar Sekarang'),
-                ),
+        final errorMsg = auth.errorMessage ?? 'Login gagal: Email belum terdaftar atau kata sandi salah.';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Expanded(child: Text(errorMsg)),
               ],
             ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(errorMsg),
-              backgroundColor: Colors.redAccent,
-            ),
-          );
-        }
+            backgroundColor: Colors.redAccent,
+            duration: const Duration(seconds: 3),
+          ),
+        );
       }
     }
-  }
 
   void _handleBiometricLogin() async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
@@ -140,6 +99,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     return Scaffold(
       backgroundColor: Colors.white,
+      resizeToAvoidBottomInset: true,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(

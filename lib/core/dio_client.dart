@@ -21,8 +21,8 @@ class DioClient {
     dio = Dio(
       BaseOptions(
         baseUrl: AppConstants.baseUrl,
-        connectTimeout: const Duration(seconds: 4),
-        receiveTimeout: const Duration(seconds: 6),
+        connectTimeout: const Duration(milliseconds: 1500), // Respons cepat (1.5s) agar tidak lag/muter-muter
+        receiveTimeout: const Duration(milliseconds: 2500),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -45,47 +45,10 @@ class DioClient {
           return handler.next(options);
         },
         onError: (DioException error, handler) async {
-          // Jangan buang waktu looping ke candidate URLs saat login/register agar proses loading cepat
-          final reqPath = error.requestOptions.path;
-          if (reqPath.contains('/auth/login') || reqPath.contains('/auth/register')) {
-            return handler.next(error);
-          }
-
-          // Coba fallback ke kandidat baseUrl lain jika gagal koneksi/timeout
-          if (error.type == DioExceptionType.connectionError ||
-              error.type == DioExceptionType.connectionTimeout) {
-            for (final candidate in AppConstants.candidateBaseUrls) {
-              if (candidate != dio.options.baseUrl) {
-                try {
-                  final retryOptions = Options(
-                    method: error.requestOptions.method,
-                    headers: error.requestOptions.headers,
-                    responseType: error.requestOptions.responseType,
-                    contentType: error.requestOptions.contentType,
-                  );
-                  final path = error.requestOptions.path;
-                  final newUrl = candidate + (path.startsWith('/') ? path : '/$path');
-                  final fallbackDio = Dio(BaseOptions(
-                    connectTimeout: const Duration(seconds: 3),
-                    receiveTimeout: const Duration(seconds: 3),
-                  ));
-                  final response = await fallbackDio.request(
-                    newUrl,
-                    data: error.requestOptions.data,
-                    queryParameters: error.requestOptions.queryParameters,
-                    options: retryOptions,
-                  );
-                  dio.options.baseUrl = candidate;
-                  return handler.resolve(response);
-                } catch (_) {}
-              }
-            }
-          }
-
           // Tangani jika terjadi 401 Unauthorized (token kedaluwarsa)
           if (error.response?.statusCode == 401) {
             final path = error.requestOptions.path;
-            // Jika 401 terjadi saat login atau register, teruskan error ke UI tanpa auto-logout
+            // Jika 401 terjadi saat login atau register, langsung teruskan error ke UI tanpa buang waktu
             if (path.contains('/auth/login') || path.contains('/auth/register')) {
               return handler.next(error);
             }
@@ -97,8 +60,11 @@ class DioClient {
                 !refreshToken.startsWith('refresh_demo_') &&
                 !refreshToken.startsWith('refresh_bio_')) {
               try {
-                // Buat client terpisah agar tidak loop interceptor
-                final refreshDio = Dio(BaseOptions(baseUrl: dio.options.baseUrl));
+                final refreshDio = Dio(BaseOptions(
+                  baseUrl: dio.options.baseUrl,
+                  connectTimeout: const Duration(milliseconds: 1500),
+                  receiveTimeout: const Duration(milliseconds: 2000),
+                ));
                 final response = await refreshDio.post(
                   '/auth/refresh',
                   data: {'refreshToken': refreshToken},
@@ -119,33 +85,28 @@ class DioClient {
                   await _storage.saveAuthSession(
                     accessToken: newAccessToken,
                     refreshToken: newRefreshToken,
-                    userId: resData['userId'] ?? '',
+                    userId: await _storage.getUserId() ?? 'usr_active',
                     name: name,
                     email: email,
                     role: role,
                   );
 
-                  // Ulangi request sebelumnya dengan token baru
-                  final opts = error.requestOptions;
-                  opts.headers['Authorization'] = 'Bearer $newAccessToken';
-
-                  final clonedRequest = await dio.request(
-                    opts.path,
-                    options: Options(
-                      method: opts.method,
-                      headers: opts.headers,
-                    ),
-                    data: opts.data,
-                    queryParameters: opts.queryParameters,
-                  );
-
-                  return handler.resolve(clonedRequest);
+                  // Ulangi request asli dengan token baru
+                  error.requestOptions.headers['Authorization'] = 'Bearer $newAccessToken';
+                  final retryResponse = await dio.fetch(error.requestOptions);
+                  return handler.resolve(retryResponse);
                 }
               } catch (_) {
-                // Jangan tendang keluar paksa jika masih bisa fallback ke mode offline
+                // Refresh token gagal/expired: bersihkan sesi dan navigasi kembali
+                await _storage.clearAuthSession();
+                onSessionExpired?.call();
               }
+            } else {
+              await _storage.clearAuthSession();
+              onSessionExpired?.call();
             }
           }
+
           return handler.next(error);
         },
       ),

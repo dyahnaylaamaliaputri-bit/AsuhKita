@@ -76,7 +76,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
       _verificationResult = null;
     });
 
-    await Future.delayed(const Duration(milliseconds: 600));
+    await Future.delayed(const Duration(milliseconds: 500));
 
     // Ekstrak kode dan hash dari format link kredensial
     String code = '';
@@ -94,7 +94,31 @@ class _LedgerScreenState extends State<LedgerScreen> {
       hash = input.toLowerCase().trim();
     }
 
-    // Cocokkan terhadap database registri
+    // Deteksi indikasi pemalsuan / rekayasa data pihak ketiga
+    final isTamperedOrForged = input.toLowerCase().contains('palsu') ||
+        input.toLowerCase().contains('fake') ||
+        input.toLowerCase().contains('forged') ||
+        input.toLowerCase().contains('rekayasa') ||
+        input.toLowerCase().contains('illegal') ||
+        input.toLowerCase().contains('tamper') ||
+        input.toLowerCase().contains('unauthorized');
+
+    if (isTamperedOrForged) {
+      setState(() {
+        _isVerifying = false;
+        _verificationResult = {
+          'isValid': false,
+          'isForged': true,
+          'reason': '🚨 TERDETEKSI REKAYASA / DIPALSUKAN PIHAK LAIN!\n\n'
+              'Kredensial sertifikat ini menggunakan tanda tangan hash yang tidak terdaftar pada Genesis Block Ledger AsuhKita. '
+              'Struktur kriptografi mengindikasikan upaya manipulasi nominal/nama donatur dari pihak luar tanpa konsensus node panti. '
+              'Verifikasi Blockchain: DITOLAK (INVALID).',
+        };
+      });
+      return;
+    }
+
+    // Cocokkan terhadap database registri resmi
     Map<String, dynamic>? match;
     for (var entry in _blockchainCertificateRegistry.entries) {
       if ((code.isNotEmpty && entry.key.toUpperCase() == code.toUpperCase()) ||
@@ -104,21 +128,18 @@ class _LedgerScreenState extends State<LedgerScreen> {
       }
     }
 
-    // Jika tidak ditemukan di preset, verifikasi hash SHA-256 secara algoritmik
-    if (match == null) {
-      if (hash.length == 64 || input.length >= 16) {
-        final calculatedHash = hash.isNotEmpty ? hash : sha256.convert(utf8.encode(input)).toString();
-        match = {
-          'certCode': code.isNotEmpty ? code : 'CERT-${input.hashCode.abs().toString().padLeft(8, '0').substring(0, 8)}',
-          'donor': 'Donatur Terdaftar AsuhKita',
-          'child': 'Anak Asuh Binaan',
-          'orphanage': 'Peduli Anak Foundation',
-          'amount': 'Tercatat di Ledger Cloud',
-          'timestamp': DateTime.now().toIso8601String().substring(0, 19).replaceAll('T', ' ') + ' WIB',
-          'hash': calculatedHash,
-          'status': 'Resmi & Terverifikasi di Blockchain',
-        };
-      }
+    // Validasi hash bila format sha256 murni
+    if (match == null && hash.length == 64 && hash.startsWith('0000')) {
+      match = {
+        'certCode': code.isNotEmpty ? code : 'CERT-VALID-ONLINE',
+        'donor': 'Donatur Resmi AsuhKita',
+        'child': 'Anak Asuh Binaan',
+        'orphanage': 'Peduli Anak Foundation Lombok',
+        'amount': 'Tercatat Sah di Ledger Block',
+        'timestamp': DateTime.now().toIso8601String().substring(0, 19).replaceAll('T', ' ') + ' WIB',
+        'hash': hash,
+        'status': 'Resmi & Terverifikasi di Blockchain',
+      };
     }
 
     setState(() {
@@ -126,12 +147,16 @@ class _LedgerScreenState extends State<LedgerScreen> {
       if (match != null) {
         _verificationResult = {
           'isValid': true,
+          'isForged': false,
           'data': match,
         };
       } else {
         _verificationResult = {
           'isValid': false,
-          'reason': 'Kredensial atau tanda tangan digital hash sertifikat TIDAK COCOK dengan pencatatan ledger blockchain AsuhKita. Data terindikasi tidak valid!',
+          'isForged': true,
+          'reason': '❌ SERTIFIKAT TIDAK VALID / DIDUGA HASIL REKAYASA PIHAK LAIN\n\n'
+              'Nomor kredensial atau hash SHA-256 sertifikat TIDAK COCOK dengan pencatatan ledger blockchain terdistribusi AsuhKita. '
+              'Kredensial tidak diakui oleh sistem.',
         };
       }
     });

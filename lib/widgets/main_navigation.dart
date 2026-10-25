@@ -52,10 +52,79 @@ class _MainNavigationState extends State<MainNavigation> {
             child: const Text('Batal'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
+              
+              // Tampilkan dialog loading berlogo AsuhKita tanpa lag
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (loadingCtx) => PopScope(
+                  canPop: false,
+                  child: Dialog(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    backgroundColor: Colors.white,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 64,
+                            height: 64,
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                colors: [AppColors.primary, AppColors.secondary],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                            ),
+                            child: const Center(
+                              child: Icon(
+                                Icons.volunteer_activism,
+                                color: Colors.white,
+                                size: 36,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+                          const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          const Text(
+                            'Keluar dari AsuhKita...',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'Membersihkan sesi secara aman',
+                            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+
               final auth = Provider.of<AuthProvider>(context, listen: false);
-              auth.logout();
+              await Future.delayed(const Duration(milliseconds: 350));
+              await auth.logout();
+
+              if (mounted) {
+                Navigator.of(context, rootNavigator: true).pop();
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.redAccent,

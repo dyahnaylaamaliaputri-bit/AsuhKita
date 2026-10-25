@@ -1449,10 +1449,11 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                             ),
                             const SizedBox(height: 10),
                             Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Terkumpul: ${_formatRupiah(totalDonations)}',
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Flexible(
+          child: Text(
+            'Terkumpul: ${_formatRupiah(totalDonations)}',
                                   style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
                                 ),
                                 Text(
@@ -1655,20 +1656,22 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Laporan Pengeluaran & Nota',
+                          Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: const [
+          Text(
+            'Laporan Pengeluaran & Nota',
                                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.textPrimary),
                               ),
                               Text(
                                 'Transparansi belanja khusus untuk anak ini',
                                 style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
-                              ),
-                            ],
-                          ),
-                          ElevatedButton.icon(
+          ),
+        ],
+      ),
+    ),
+    ElevatedButton.icon(
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.primary,
                               foregroundColor: Colors.white,
@@ -2034,38 +2037,43 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('Panel Admin Panti Asuhan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            appBar: AppBar(
+        leading: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  blurRadius: 4,
+                ),
+              ],
+            ),
+            child: const Center(
+              child: Icon(
+                Icons.volunteer_activism,
+                color: AppColors.primary,
+                size: 20,
+              ),
+            ),
+          ),
+        ),
+        title: const Text('Panel Kelola Panti', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
           IconButton(
-            tooltip: 'Dashboard Keuangan',
-            icon: const Icon(Icons.account_balance_wallet_outlined),
-            onPressed: () {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const FinanceDashboardScreen()));
-            },
-          ),
-          IconButton(
-            tooltip: 'Ruang Kasih (Pesan Donatur)',
-            icon: const Icon(Icons.chat_bubble_outline),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const FamilyRoomScreen()),
-              );
-            },
-          ),
-          IconButton(
-            tooltip: 'Reset Semua Data Anak (Mulai dari 0)',
-            icon: const Icon(Icons.delete_sweep_outlined),
-            onPressed: _confirmResetAllChildren,
-          ),
-          IconButton(
             tooltip: 'Refresh Data',
             icon: const Icon(Icons.refresh),
             onPressed: _loadChildren,
+          ),
+          IconButton(
+            tooltip: 'Reset Semua Data Anak',
+            icon: const Icon(Icons.delete_sweep_outlined),
+            onPressed: _confirmResetAllChildren,
           ),
         ],
       ),
@@ -2230,18 +2238,25 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                       ),
                                       const SizedBox(height: 6),
                                       Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Text(
-                                            'Terkumpul: ${_formatRupiah((child['totalDonations'] as int?) ?? 0)}',
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Flexible(
+          child: Text(
+            'Terkumpul: ${_formatRupiah((child['totalDonations'] as int?) ?? 0)}',
                                             style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.green),
-                                          ),
-                                          Text(
-                                            'Target: ${_formatRupiah(((child['target'] is num) ? (child['target'] as num).toDouble() : 500000.0))}',
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            'Target: ${_formatRupiah(((child['target'] is num) ? (child['target'] as num).toDouble() : 500000.0))}',
                                             style: const TextStyle(fontSize: 10, color: AppColors.textSecondary),
-                                          ),
-                                        ],
-                                      ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    ),
                                     ],
                                   ),
                                 ),

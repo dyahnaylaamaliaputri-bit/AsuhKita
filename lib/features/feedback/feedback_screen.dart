@@ -106,9 +106,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
   }
 
   String get _feedbackCacheKey {
-    final auth = Provider.of<AuthProvider>(context, listen: false);
-    final accountId = auth.userId.isNotEmpty ? auth.userId : auth.userEmail;
-    return 'asuhkita_persisted_feedback_list_$accountId';
+    return 'asuhkita_persisted_feedback_list_shared';
   }
 
   Future<void> _loadFromLocalCache() async {
@@ -116,17 +114,49 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
       final cacheKey = _feedbackCacheKey;
       final prefs = await SharedPreferences.getInstance();
       final savedJson = prefs.getString(cacheKey);
+      List<Map<String, dynamic>> combined = [];
       if (savedJson != null && savedJson.isNotEmpty) {
         final List<dynamic> decoded = jsonDecode(savedJson);
-        if (mounted) {
-          setState(() {
-            _feedbackHistory = decoded
-                .map((e) => Map<String, dynamic>.from(e))
-                .toList();
-          });
-        }
-        return;
+        combined = decoded.map((e) => Map<String, dynamic>.from(e)).toList();
       }
+
+      // Ambil juga riwayat tersimpan dari SQLite Database lokal
+      try {
+        final dbFeedbacks = await LocalDatabase().getAllFeedbacks();
+        for (var fb in dbFeedbacks) {
+          final id = fb['id']?.toString() ?? '';
+          if (!combined.any((item) => item['id']?.toString() == id)) {
+            String saran = '';
+            String kesan = '';
+            final msg = fb['message']?.toString() ?? '';
+            if (msg.contains('| Kesan:')) {
+              final parts = msg.split('| Kesan:');
+              saran = parts[0].replaceAll('Saran:', '').trim();
+              kesan = parts.length > 1 ? parts[1].trim() : '';
+            } else {
+              saran = msg;
+            }
+            final createdAt = fb['created_at']?.toString() ?? '';
+            combined.add({
+              'id': id,
+              'name': fb['user_name']?.toString() ?? 'Pengguna',
+              'user_email': fb['user_email']?.toString() ?? '',
+              'rating': fb['rating'] is int ? fb['rating'] : int.tryParse(fb['rating']?.toString() ?? '5') ?? 5,
+              'saran': saran,
+              'kesan': kesan,
+              'date': createdAt.length >= 10 ? createdAt.substring(0, 10) : '',
+              'created_at': createdAt,
+            });
+          }
+        }
+      } catch (_) {}
+
+      if (mounted) {
+        setState(() {
+          _feedbackHistory = combined;
+        });
+      }
+      return;
     } catch (error) {
       debugPrint('[Feedback] Gagal membaca cache riwayat: $error');
     }

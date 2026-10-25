@@ -490,13 +490,19 @@ class AuthProvider extends ChangeNotifier {
   // LOGOUT & CABUT SESI (Sesi Dihapus Bersih)
   // =========================================================================
   Future<void> logout({bool notifyServer = true}) async {
-    await NotificationService().unregisterDeviceToken();
+    unawaited(
+      NotificationService()
+          .unregisterDeviceToken()
+          .timeout(const Duration(milliseconds: 600), onTimeout: () {}),
+    );
     if (notifyServer) {
-      try {
-        await _dioClient.dio.post('/auth/logout');
-      } catch (_) {}
+      unawaited(
+        _dioClient.dio
+            .post('/auth/logout')
+            .timeout(const Duration(milliseconds: 600), onTimeout: (_) => Response(requestOptions: RequestOptions(path: '/auth/logout'))),
+      );
     }
-    // Hapus seluruh token sesi di SecureStorage
+    // Hapus seluruh token sesi di SecureStorage seketika
     await _storage.clearAuthSession();
     _isAuthenticated = false;
     _userName = '';
