@@ -1,5 +1,5 @@
-// Letak file: mobile/lib/core/secure_storage.dart
-// Fungsi: Mengelola penyimpanan aman token JWT (Keystore Android / Keychain iOS) dan session lokal
+
+
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'constants.dart';
@@ -11,7 +11,7 @@ class SecureStorageService {
 
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
-  // Simpan Access Token dan Refresh Token setelah login berhasil
+
   Future<void> saveAuthSession({
     required String accessToken,
     required String refreshToken,
@@ -116,7 +116,7 @@ class SecureStorageService {
     return await _storage.read(key: AppConstants.keyBiometricRefreshToken);
   }
 
-  // Hapus HANYA token sesi aktif saat logout, biarkan kredensial biometrik tetap tersimpan di Keystore
+
   Future<void> clearBiometricCredentials() async {
     await _storage.delete(key: AppConstants.keyBiometricAccessToken);
     await _storage.delete(key: AppConstants.keyBiometricRefreshToken);

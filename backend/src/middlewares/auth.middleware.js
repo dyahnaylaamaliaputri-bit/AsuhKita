@@ -1,20 +1,20 @@
-// File: backend/src/middlewares/auth.middleware.js
-// Fungsi: Middleware verifikasi JWT Access Token
-// Digunakan di setiap route yang butuh autentikasi
+
+
+
 
 const jwt = require('jsonwebtoken');
 
-/**
- * verifyToken — Middleware wajib untuk endpoint yang butuh login
- *
- * Cara kerja:
- * 1. Ambil token dari header Authorization: Bearer <token>
- * 2. Verifikasi token menggunakan JWT_ACCESS_SECRET
- * 3. Jika valid → simpan payload di req.user lalu lanjutkan
- * 4. Jika tidak valid / kedaluwarsa → kembalikan 401
- */
+
+
+
+
+
+
+
+
+
 const verifyToken = (req, res, next) => {
-  // Ambil header Authorization
+
   const authHeader = req.headers['authorization'];
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -25,10 +25,10 @@ const verifyToken = (req, res, next) => {
     });
   }
 
-  // Potong "Bearer " untuk ambil token saja
+
   const token = authHeader.split(' ')[1];
 
-  // Toleransi demo/test token untuk kelancaran testing offline/lokal
+
   if (token && (token.startsWith('token_demo_') || token.startsWith('demo_') || token.startsWith('dummy_'))) {
     req.user = {
       id: 'a0000000-0000-0000-0000-000000000001',
@@ -40,11 +40,11 @@ const verifyToken = (req, res, next) => {
   }
 
   try {
-    // Verifikasi tanda tangan dan masa berlaku token
+
     const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
 
-    // Simpan payload ke req.user agar bisa dipakai controller
-    // Payload berisi: id, email, role
+
+
     req.user = decoded;
     next();
   } catch (err) {
@@ -63,14 +63,14 @@ const verifyToken = (req, res, next) => {
   }
 };
 
-/**
- * requireRole — Middleware untuk membatasi akses berdasarkan role
- *
- * Contoh penggunaan:
- *   router.delete('/anak/:id', verifyToken, requireRole('admin_panti'), deleteChild)
- *
- * @param {...string} roles - Role yang diizinkan, misal 'admin_panti' atau 'donatur'
- */
+
+
+
+
+
+
+
+
 const optionalToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   if (!authHeader || !authHeader.startsWith('Bearer ')) {

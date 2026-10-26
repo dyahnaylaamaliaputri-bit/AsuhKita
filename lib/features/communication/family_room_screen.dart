@@ -1,10 +1,10 @@
-// Letak file: mobile/lib/features/communication/family_room_screen.dart
-// Fungsi: Ruang Kasih — Komunikasi Donatur ↔ Anak Asuh via Admin dengan konsep DM Instagram
-//         - Inbox DM: Terbagi menjadi "Obrolan Aktif (Dengan Riwayat Histori)" & "Mulai Obrolan Baru (Dari Awal)"
-//         - Tray Notes / Status Cerita anak asuh di bagian atas ala Instagram
-//         - Room Chat: Histori pesan tersimpan permanen di SQLite (offline cache)
-//         - Empty State room chat baru: Tampilan profil anak & tombol quick icebreakers
-//         - Voice & Video Call simulator, serta pengiriman foto karya anak asuh
+
+
+
+
+
+
+
 
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -30,7 +30,7 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
 
-  // Status notes ala Instagram untuk anak asuh
+
   final Map<String, String> _childNotes = {
     'Bintang': 'Lagi les matematika 📚',
     'Bulan': 'Selesai gambar gunung 🎨',
@@ -52,14 +52,14 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
     super.dispose();
   }
 
-  // ============================================================
-  // LOAD DATA ANAK ASUH DONATUR (DARI RIWAYAT DONASI/SPONSORSHIP)
-  // ============================================================
+
+
+
   Future<void> _loadChildrenAndMessages() async {
     setState(() => _isLoading = true);
 
     try {
-      // 1. Ambil data anak asuh yang didampingi donatur yang SEDANG LOGIN
+
       final auth = Provider.of<AuthProvider>(context, listen: false);
       final userEmail = auth.userEmail.toLowerCase().trim();
       final userName = auth.userName.toLowerCase().trim();
@@ -81,7 +81,7 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
         }
       }
 
-      // 2. Ambil data katalog semua anak (API Supabase / Local SQLite)
+
       List<Map<String, dynamic>> allCatalog = [];
       try {
         final res = await DioClient().dio.get('/children');
@@ -97,14 +97,14 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
         }
       } catch (_) {}
 
-      // Fallback: baca dari SQLite lokal
+
       if (allCatalog.isEmpty) {
         final cached = await LocalDatabase().getCachedChildren();
         final newKids = await LocalDatabase().getNewChildren();
         allCatalog = [...cached, ...newKids];
       }
 
-      // 3. Filter HANYA anak asuh yang dimiliki oleh donatur ini
+
       List<Map<String, dynamic>> mySponsoredChildren = [];
       if (sponsoredAliases.isNotEmpty) {
         final seen = <String>{};
@@ -118,7 +118,7 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
           }
         }
 
-        // Jika anak ada di riwayat donasi tapi belum ada di katalog, buat entri profilnya
+
         for (var alias in sponsoredAliases) {
           if (!seen.contains(alias)) {
             seen.add(alias);
@@ -133,13 +133,13 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
         }
       }
 
-      // JIKA ADMIN: Tampilkan semua katalog anak asuh agar bisa memantau dan membalas semua pesan donatur
-      // JIKA DONATUR: Tampilkan anak asuh yang didampingi (atau katalog jika belum ada sponsorship)
+
+
       final rawList = auth.isAdmin
           ? allCatalog
           : (mySponsoredChildren.isNotEmpty ? mySponsoredChildren : allCatalog);
 
-      // DEDUKLIKASI KETAT: 1 Akun/Nama Anak = Tepat 1 Entri Room Chat Tunggal
+
       final Map<String, Map<String, dynamic>> uniqueMap = {};
       for (var c in rawList) {
         final name = (c['alias'] ?? c['name'] ?? '').toString().trim();
@@ -152,7 +152,7 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
       }
       _children = uniqueMap.values.toList();
 
-      // 4. Load last message untuk setiap anak asuh (dengan key normalized lowercase)
+
       _lastMessages = {};
       for (var child in _children) {
         final alias = (child['alias'] ?? child['name'] ?? '').toString().trim();
@@ -186,14 +186,14 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Filter pencarian
+
     final filtered = _children.where((c) {
       final name = (c['alias'] ?? c['name'] ?? '').toString().toLowerCase();
       final city = (c['orphanage_city'] ?? c['city'] ?? '').toString().toLowerCase();
       return name.contains(_searchQuery.toLowerCase()) || city.contains(_searchQuery.toLowerCase());
     }).toList();
 
-    // Urutkan kontak/room: Yang memiliki pesan terbaru di urutan teratas
+
     filtered.sort((a, b) {
       final nameA = (a['alias'] ?? a['name'] ?? '').toString().trim().toLowerCase();
       final nameB = (b['alias'] ?? b['name'] ?? '').toString().trim().toLowerCase();
@@ -232,7 +232,7 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
               ? _buildEmptyState()
               : CustomScrollView(
               slivers: [
-                // 1. Search Bar Instagram Style
+
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
@@ -267,7 +267,7 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
                   ),
                 ),
 
-                // 2. Instagram Notes / Cerita Anak Asuh Tray (Horizontal Avatars)
+
                 SliverToBoxAdapter(
                   child: Container(
                     height: 110,
@@ -292,7 +292,7 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                // Bubble Note kecil di atas avatar
+
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                                   margin: const EdgeInsets.only(bottom: 4),
@@ -310,7 +310,7 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
-                                // Avatar dengan ring status
+
                                 Container(
                                   padding: const EdgeInsets.all(2.5),
                                   decoration: BoxDecoration(
@@ -348,7 +348,7 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
                   child: Divider(height: 1, thickness: 0.8, color: Color(0xFFEEEEEE)),
                 ),
 
-                // 3. Section: Daftar Percakapan Ruang Kasih
+
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
@@ -400,9 +400,9 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
     );
   }
 
-  // ============================================================
-  // EMPTY STATE JIKA DONATUR BELUM MEMILIKI ANAK ASUH (0 ANAK)
-  // ============================================================
+
+
+
   Widget _buildEmptyState() {
     return Center(
       child: SingleChildScrollView(
@@ -555,9 +555,9 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
     );
   }
 
-  // ============================================================
-  // ITEM DAFTAR DM (INSTAGRAM STYLE)
-  // ============================================================
+
+
+
   Widget _buildChatListItem(Map<String, dynamic> child, {required bool hasExistingHistory}) {
     final name = (child['alias'] ?? child['name'] ?? 'Anak Asuh').toString();
     final avatar = (child['avatar'] ?? child['photo'] ?? '').toString();
@@ -586,7 +586,7 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Row(
           children: [
-            // Avatar bulat dengan dot online/aktif
+
             Stack(
               children: [
                 CircleAvatar(
@@ -611,7 +611,7 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
               ],
             ),
             const SizedBox(width: 12),
-            // Nama & Preview pesan terakhir
+
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -672,7 +672,7 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
               ),
             ),
             const SizedBox(width: 8),
-            // Tombol Ikon Chat ala DM
+
             Icon(
               hasExistingHistory ? Icons.chevron_right : Icons.send_outlined,
               size: 20,
@@ -704,7 +704,7 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
       ),
     );
 
-    // Refresh last messages setelah kembali dari room chat
+
     final updated = await LocalDatabase().getLastChatMessage(name);
     if (mounted) {
       setState(() => _lastMessages[name.trim().toLowerCase()] = updated);
@@ -712,9 +712,9 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
   }
 }
 
-// ====================================================================
-// CHAT ROOM SCREEN (KONSEP DM INSTAGRAM LENGKAP)
-// ====================================================================
+
+
+
 class _ChatRoomScreen extends StatefulWidget {
   final String childAlias;
   final String childAvatar;
@@ -763,11 +763,11 @@ class _ChatRoomScreenState extends State<_ChatRoomScreen> {
     super.dispose();
   }
 
-  // ============================================================
-  // LOAD RIWAYAT HISTORI DARI SQLITE
-  // Jika sudah ada riwayat -> tampilkan utuh
-  // Jika dimulai dari awal -> biarkan kosong (tampilkan Empty State IG)
-  // ============================================================
+
+
+
+
+
   Future<void> _loadChatHistory() async {
     setState(() => _isLoading = true);
 
@@ -790,9 +790,9 @@ class _ChatRoomScreenState extends State<_ChatRoomScreen> {
     _scrollToBottom();
   }
 
-  // ============================================================
-  // KIRIM PESAN & SIMPAN PERMANEN KE SQLITE
-  // ============================================================
+
+
+
   void _sendMessage({String? text, String? fileUrl, String type = 'text'}) {
     final content = text ?? _messageController.text.trim();
     if (content.isEmpty && fileUrl == null) return;
@@ -814,7 +814,7 @@ class _ChatRoomScreenState extends State<_ChatRoomScreen> {
     });
     _scrollToBottom();
 
-    // 1. Simpan permanen ke SQLite
+
     _localDb.insertChatMessage(
       childAlias: widget.childAlias,
       sender: senderRole,
@@ -824,7 +824,7 @@ class _ChatRoomScreenState extends State<_ChatRoomScreen> {
       time: timeStr,
     );
 
-    // 2. Sinkronkan ke cloud API jika online
+
     try {
       DioClient().dio.post('/letters', data: {
         'child_alias': widget.childAlias,
@@ -835,7 +835,7 @@ class _ChatRoomScreenState extends State<_ChatRoomScreen> {
       });
     } catch (_) {}
 
-    // 3. Jika dikirim oleh DONATUR: Buat respon otomatis panti asuhan jika belum ada admin membalas
+
     if (!widget.isViewerAdmin) {
       Future.delayed(const Duration(milliseconds: 1500), () {
         if (mounted) {
@@ -846,7 +846,7 @@ class _ChatRoomScreenState extends State<_ChatRoomScreen> {
         if (type == 'file') {
           replyText = 'Alhamdulillah, karya/file dari Kakak sudah diterima! Kami akan segera tunjukkan ke ${widget.childAlias}. Terima kasih atas perhatiannya! 🎨💛';
         } else if (_messages.length <= 2) {
-          // Balasan pertama kali jika baru mulai chat
+
           replyText = 'Waalaikumsalam Kak! Terima kasih banyak sudah menyapa ${widget.childAlias} 😊 Salam hangat dari adik-adik di Panti Asuhan Peduli Anak. Ada yang bisa kami bantu sampaikan?';
         } else {
           final replies = [
@@ -868,7 +868,7 @@ class _ChatRoomScreenState extends State<_ChatRoomScreen> {
         });
         _scrollToBottom();
 
-        // Simpan balasan admin ke SQLite
+
         _localDb.insertChatMessage(
           childAlias: widget.childAlias,
           sender: 'admin',
@@ -877,7 +877,7 @@ class _ChatRoomScreenState extends State<_ChatRoomScreen> {
         );
       }
     });
-    } // end of if (!widget.isViewerAdmin)
+    }
   }
 
   Future<void> _pickAndSendFile() async {
@@ -1059,7 +1059,7 @@ class _ChatRoomScreenState extends State<_ChatRoomScreen> {
           ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
           : Column(
               children: [
-                // Chat List atau Empty State (Dimulai Dari Awal)
+
                 Expanded(
                   child: _messages.isEmpty
                       ? _buildEmptyStateFromScratch()
@@ -1177,16 +1177,16 @@ class _ChatRoomScreenState extends State<_ChatRoomScreen> {
                         ),
                 ),
 
-                // Message Input Bar Instagram DM Style
+
                 _buildMessageInputBar(),
               ],
             ),
     );
   }
 
-  // ============================================================
-  // EMPTY STATE RUANG CHAT YANG DIMULAI DARI AWAL (ALA INSTAGRAM)
-  // ============================================================
+
+
+
   Widget _buildEmptyStateFromScratch() {
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 30),
@@ -1194,7 +1194,7 @@ class _ChatRoomScreenState extends State<_ChatRoomScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           const SizedBox(height: 20),
-          // Avatar Besar dengan Ring Gradasi
+
           Container(
             padding: const EdgeInsets.all(4),
             decoration: const BoxDecoration(
@@ -1242,7 +1242,7 @@ class _ChatRoomScreenState extends State<_ChatRoomScreen> {
           ),
           const SizedBox(height: 28),
 
-          // Quick Replies / Icebreakers
+
           const Align(
             alignment: Alignment.centerLeft,
             child: Text(
@@ -1287,9 +1287,9 @@ class _ChatRoomScreenState extends State<_ChatRoomScreen> {
     );
   }
 
-  // ============================================================
-  // MESSAGE INPUT BAR (INSTAGRAM DM STYLE)
-  // ============================================================
+
+
+
   Widget _buildMessageInputBar() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -1301,13 +1301,13 @@ class _ChatRoomScreenState extends State<_ChatRoomScreen> {
         top: false,
         child: Row(
           children: [
-            // Tombol Kirim Foto / Karya
+
             IconButton(
               icon: const Icon(Icons.photo_library_outlined, color: AppColors.primary, size: 24),
               tooltip: 'Kirim Karya/Foto',
               onPressed: _pickAndSendFile,
             ),
-            // Text Input Pill
+
             Expanded(
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -1332,7 +1332,7 @@ class _ChatRoomScreenState extends State<_ChatRoomScreen> {
               ),
             ),
             const SizedBox(width: 8),
-            // Tombol Kirim atau Love
+
             _hasTyped
                 ? IconButton(
                     icon: const Icon(Icons.send, color: AppColors.primary, size: 24),

@@ -1,5 +1,5 @@
-// Letak file: mobile/lib/features/profile/profile_screen.dart
-// Fungsi: Layar Profil dengan foto kamera/galeri permanen (Base64 + File Cache), edit nama & nomor HP (AES-256), aktivasi biometrik, dan badge kebaikan dinamis (PBI-010, PBI-011, FR-11, FR-12, FR-48)
+
+
 
 import 'dart:convert';
 import 'dart:io';
@@ -30,7 +30,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   File? _imageFile;
   Uint8List? _imageBytes;
   bool _isEditing = false;
-  int _kebaikanPoints = 0; // Poin akumulasi dari langkah harian & mini game
+  int _kebaikanPoints = 0;
 
   @override
   void initState() {
@@ -46,7 +46,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final prefs = await SharedPreferences.getInstance();
       final emailKey = auth.userEmail.isNotEmpty ? auth.userEmail.toLowerCase().trim() : 'donatur_default';
 
-      // 1. Ambil foto profil dari Base64 string (tahan banting: tidak terhapus saat logout/restart)
+
       final photoBase64 = prefs.getString('profile_photo_base64_$emailKey') ??
           prefs.getString('profile_photo_base64_active');
       if (photoBase64 != null && photoBase64.isNotEmpty) {
@@ -57,7 +57,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           });
         }
       } else {
-        // Cek file permanen
+
         final savedPath = prefs.getString('profile_photo_$emailKey');
         if (savedPath != null && savedPath.isNotEmpty) {
           final f = File(savedPath);
@@ -69,7 +69,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
       }
 
-      // 2. Ambil akumulasi poin kebaikan dari SharedPreferences (Scoped per user email)
+
       final claimedPoin = prefs.getInt('asuhkita_kebaikan_points_$emailKey') ?? 0;
       final gameScore = prefs.getInt('asuhkita_game_score_$emailKey') ?? 0;
       final totalPoin = claimedPoin > 0 ? claimedPoin : (gameScore > 0 ? gameScore : 0);
@@ -81,7 +81,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     } catch (_) {}
 
-    // Ambil data profil lokal yang terenkripsi AES-256
+
     try {
       final profile = await LocalDatabase().getUserProfile(auth.userId.isNotEmpty ? auth.userId : 'usr_me');
       if (profile != null) {
@@ -95,7 +95,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (mounted) setState(() {});
   }
 
-  // Pilih foto dari Kamera atau Galeri (PBI-011, FR-12)
+
   Future<void> _pickImage(ImageSource source) async {
     try {
       final pickedFile = await _picker.pickImage(source: source, maxWidth: 600, imageQuality: 85);
@@ -115,7 +115,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final auth = Provider.of<AuthProvider>(context, listen: false);
         final emailKey = auth.userEmail.isNotEmpty ? auth.userEmail.toLowerCase().trim() : 'donatur_default';
 
-        // Simpan Base64 & Path permanen di SharedPreferences
+
         try {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('profile_photo_base64_$emailKey', base64String);
@@ -123,7 +123,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           await prefs.setString('profile_photo_$emailKey', permanentPath);
         } catch (_) {}
 
-        // Simpan ke SQLite terenkripsi AES-256
+
         await LocalDatabase().saveUserProfile(
           id: auth.userId.isNotEmpty ? auth.userId : 'usr_me',
           name: _nameController.text,
@@ -202,7 +202,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  // ==================== KHUSUS ADMIN: TAMBAH DATA ANAK ASUH DARI PROFIL ====================
+
   void _showAdminAddChildModal(BuildContext context) {
     final nameCtrl = TextEditingController();
     final ageCtrl = TextEditingController(text: '8');
@@ -353,7 +353,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(height: 14),
 
-                  // Kategori kebutuhan multi-chip
+
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -414,7 +414,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Dynamic Budget Per Kategori
+
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
@@ -691,7 +691,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           padding: const EdgeInsets.all(20.0),
           child: Column(
             children: [
-              // Bagian Foto Profil (PBI-011)
+
               Center(
                 child: Stack(
                   children: [
@@ -734,7 +734,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               const SizedBox(height: 20),
 
-              // Card Badge & Poin Kebaikan Dinamis (Hanya untuk Donatur, dihapus untuk Admin)
+
               if (auth.userRole != 'admin_panti')
                 Card(
                   elevation: 2,
@@ -830,7 +830,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               const SizedBox(height: 20),
 
-              // Form Detail Profil
+
               Card(
                 elevation: 1,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -884,7 +884,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               const SizedBox(height: 20),
 
-              // Kelola Data Anak Khusus Admin Panti
+
               if (auth.userRole == 'admin_panti') ...[
                 Card(
                   elevation: 2,
@@ -952,7 +952,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SizedBox(height: 20),
               ],
 
-              // Pengaturan Keamanan & Biometrik (FR-07, FR-08)
+
               Card(
                 elevation: 1,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),

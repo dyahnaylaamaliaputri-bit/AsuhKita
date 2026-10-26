@@ -1,17 +1,17 @@
-// File: backend/src/controllers/ai.controller.js
-// Fungsi: Controller integrasi kecerdasan buatan (Google Gemini 2.0 Flash)
-// Mengimplementasikan FR-49 (PBI-060), FR-50 (PBI-060), dan FR-51 (PBI-061)
+
+
+
 
 const https = require('https');
 
-/**
- * Helper untuk melakukan HTTP POST request ke Google Gemini REST API (model gemini-2.0-flash)
- * Menggunakan modul bawaan Node.js 'https' tanpa dependensi eksternal tambahan.
- *
- * @param {string} prompt - Prompt utama dari pengguna/sistem
- * @param {string} [systemInstruction] - Instruksi sistem pengarah gaya/konteks respons AI
- * @returns {Promise<string>} - Konten teks hasil generasi model
- */
+
+
+
+
+
+
+
+
 const callGeminiApi = (prompt, systemInstruction = '') => {
   return new Promise((resolve, reject) => {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -45,7 +45,7 @@ const callGeminiApi = (prompt, systemInstruction = '') => {
         'Content-Type': 'application/json',
         'Content-Length': Buffer.byteLength(postData)
       },
-      timeout: 20000 // 20 detik batas waktu (timeout)
+      timeout: 20000
     };
 
     const req = https.request(options, (res) => {
@@ -90,10 +90,10 @@ const callGeminiApi = (prompt, systemInstruction = '') => {
   });
 };
 
-/**
- * Template surat cadangan (fallback) jika API key tidak disetel atau panggilan API gagal.
- * Memastikan aplikasi tetap dapat berfungsi lancar pada mode demo/offline.
- */
+
+
+
+
 const getFallbackLetter = (childAlias, childAge, childNeedCategory, donorName, theme) => {
   const child = childAlias || 'Adik Tersayang';
   const sponsor = donorName || 'Kakak Asuh';
@@ -107,13 +107,13 @@ const getFallbackLetter = (childAlias, childAge, childNeedCategory, donorName, t
     return `Halo ${child},\n\nBagaimana kegiatanmu di sekolah hari ini? Kakak harap kamu selalu bersemangat dalam menuntut ilmu dan mencoba hal-hal baru setiap hari. Belajar memang butuh kesabaran dan ketekunan, tetapi Kakak percaya kamu memiliki potensi yang sangat luar biasa.\n\nJangan pernah takut salah saat belajar, karena setiap proses akan membuatmu semakin bijak dan pintar. Jika ada pelajaran yang sulit, jangan ragu untuk berdiskusi dengan guru dan teman-temanmu ya.\n\nSemangat terus belajarnya ya, Kakak selalu bangga padamu!\n\nSalam hangat,\n${sponsor}`;
   }
 
-  // Fallback default: Motivasi dan Semangat Hidup
+
   return `Halo ${child},\n\nSemoga hari ini membawakan senyuman dan kebahagiaan untukmu. Kakak menulis surat ini untuk mengingatkanmu bahwa kamu adalah anak yang istimewa, tangguh, dan sangat berharga.\n\nTeruslah bersemangat dalam menjalani hari-harimu, jaga kesehatan dengan baik, dan jangan pernah berhenti mengejar cita-citamu. Meskipun jarak kita jauh, doa dan dukungan penuh dari Kakak selalu menyertai setiap langkahmu menuju masa depan yang cerah.\n\nTetap semangat dan selalu tersenyum ya!\n\nSalam penuh kasih,\n${sponsor}`;
 };
 
-/**
- * Template rangkuman laporan cadangan (fallback) jika panggilan API gagal.
- */
+
+
+
 const getFallbackSummary = (childAlias, reportText) => {
   const child = childAlias || 'Anak asuh';
   return `• ${child} menunjukkan kemajuan perkembangan yang stabil dan positif pada periode ini.\n` +
@@ -123,12 +123,12 @@ const getFallbackSummary = (childAlias, reportText) => {
     `• Disarankan untuk terus memberikan pendampingan berkelanjutan guna memaksimalkan potensi tumbuh kembangnya.`;
 };
 
-// ============================================================
-// 1. DRAFT LETTER — AI Membantu Donatur Menulis Surat
-// POST /api/ai/letter-draft
-// FR-49: AI membantu donatur menulis surat untuk anak asuh
-// PBI-060: POST /ai/letter-draft
-// ============================================================
+
+
+
+
+
+
 const draftLetter = async (req, res, next) => {
   try {
     const {
@@ -168,12 +168,12 @@ Tuliskan surat yang menyentuh hati, memberikan semangat, dan menunjukkan kepedul
   }
 };
 
-// ============================================================
-// 2. SUMMARIZE REPORT — AI Merangkum Laporan Perkembangan Anak
-// POST /api/ai/report-summary
-// FR-50: AI merangkum laporan perkembangan anak
-// PBI-060: POST /ai/report-summary
-// ============================================================
+
+
+
+
+
+
 const summarizeReport = async (req, res, next) => {
   try {
     const { report_text, child_alias = 'Anak Asuh' } = req.body;
@@ -212,12 +212,12 @@ const summarizeReport = async (req, res, next) => {
   }
 };
 
-// ============================================================
-// 3. GET FAQ — Tanya Jawab Otomatis Platform & Peduli Anak
-// GET /api/ai/faq
-// FR-51: FAQ otomatis yang dijawab AI
-// PBI-061: GET /ai/faq
-// ============================================================
+
+
+
+
+
+
 const getFaq = async (req, res, next) => {
   try {
     const faqList = [

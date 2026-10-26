@@ -1,5 +1,5 @@
-// Letak file: mobile/lib/features/admin/finance_dashboard_screen.dart
-// Fungsi: Layar Dashboard Laporan Keuangan Panti Asuhan, Transparansi Belanja Per Masing-Masing Anak Asuh (Tanpa Dobel), dan Narasi AI (PBI-039, PBI-062)
+
+
 
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -23,12 +23,12 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
   bool _isGeneratingAiReport = false;
   String? _aiGeneratedNarrative;
 
-  // Rekap Keuangan Riil Panti Asuhan (Terintegrasi Supabase & SQLite)
+
   int _totalDonasiMasuk = 0;
   int _totalDanaDigunakan = 0;
   int get _saldoKasPanti => _totalDonasiMasuk - _totalDanaDigunakan;
 
-  // Daftar Keuangan Per Masing-Masing Anak (Dikelompokkan, Bebas Duplikasi Nama)
+
   List<Map<String, dynamic>> _childrenFinances = [];
 
   @override
@@ -40,7 +40,7 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
   Future<void> _loadFinanceData() async {
     setState(() => _isLoading = true);
     try {
-      // 1. Ambil seluruh data anak dari Supabase & SQLite
+
       List<Map<String, dynamic>> allChildrenRaw = [];
       try {
         final res = await DioClient().dio.get('/children');
@@ -57,7 +57,7 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
       final newKids = await _localDb.getNewChildren();
       final cachedKids = await _localDb.getCachedChildren();
 
-      // Gabungkan dan deduplikasi anak berdasarkan nama/alias unik (Case-Insensitive)
+
       final Map<String, Map<String, dynamic>> uniqueKidsMap = {};
 
       for (var k in allChildrenRaw) {
@@ -105,7 +105,7 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
         }
       }
 
-      // 2. Ambil seluruh donasi dari SQLite dan Supabase
+
       final localDonations = await _localDb.getCachedDonations();
       final allDonations = List<Map<String, dynamic>>.from(localDonations);
       try {
@@ -126,10 +126,10 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
         }
       } catch (_) {}
 
-      // 3. Ambil seluruh receipts pengeluaran belanja
+
       final receipts = await _localDb.getReceipts();
 
-      // 4. Hitung dan Agregasikan Laporan Keuangan PER MASING-MASING ANAK (Per Child, No Duplicate)
+
       int totalPlatformDonations = 0;
       int totalPlatformExpenses = 0;
       final List<Map<String, dynamic>> calculatedKids = [];
@@ -139,7 +139,7 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
         final childInfo = entry.value;
         final cName = childInfo['name'].toString();
 
-        // Cari semua donasi untuk anak ini
+
         final childDonations = allDonations.where((d) {
           final alias = (d['child_alias'] ?? '').toString().trim().toLowerCase();
           return alias == key;
@@ -154,7 +154,7 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
           if (dName.isNotEmpty) donorsSet.add(dName.toLowerCase());
         }
 
-        // Cari semua nota belanja untuk anak ini
+
         final childReceipts = receipts.where((r) {
           final rName = (r['childName'] ?? r['child_name'] ?? '').toString().trim().toLowerCase();
           return rName == key;
@@ -191,7 +191,7 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
         });
       }
 
-      // Urutkan anak berdasarkan dana yang terkumpul terbanyak
+
       calculatedKids.sort((a, b) => (b['totalDonations'] as int).compareTo(a['totalDonations'] as int));
 
       if (mounted) {
@@ -299,7 +299,7 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 36.0),
               children: [
-                // ==================== KARTU RINGKASAN KEUANGAN KESELURUHAN ====================
+
                 Card(
                   elevation: 3,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -377,7 +377,7 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // ==================== TOMBOL GENERATE AI NARRATIVE ====================
+
                 Card(
                   elevation: 1,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -430,7 +430,7 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // ==================== DAFTAR LAPORAN PER MASING-MASING ANAK (BEBAS DOBEL) ====================
+
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -554,7 +554,7 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  // Baris Ringkasan Arus Kas Anak
+
                                   Row(
                                     children: [
                                       Expanded(
@@ -590,7 +590,7 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
                                   ),
                                   const SizedBox(height: 12),
 
-                                  // Rincian Donatur yang Berdonasi
+
                                   Text(
                                     'Rincian Donatur ($donorCount Donatur):',
                                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
@@ -618,7 +618,7 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
                                     }),
                                   const SizedBox(height: 10),
 
-                                  // Rincian Nota Belanja
+
                                   Text(
                                     'Nota Belanja Terverifikasi (${receipts.length} Nota):',
                                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary),

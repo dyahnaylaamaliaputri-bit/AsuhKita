@@ -1,15 +1,15 @@
-// File: backend/src/controllers/feedback.controller.js
-// Fungsi: Logic Saran & Kesan mata kuliah PAM (PBI-012, FR-13)
-// Endpoint: POST /api/feedback, GET /api/feedback
+
+
+
 
 const { query } = require('../config/database');
 
-// ============================================================
-// SUBMIT FEEDBACK — Kirim saran dan kesan
-// POST /api/feedback
-// FR-13: Pengguna mengisi saran dan kesan mata kuliah PAM
-// PBI-012: tabel feedback, riwayat tampil di halaman yang sama
-// ============================================================
+
+
+
+
+
+
 const submitFeedback = async (req, res, next) => {
   try {
     const suggestion = typeof req.body?.suggestion === 'string'
@@ -59,11 +59,11 @@ const submitFeedback = async (req, res, next) => {
   }
 };
 
-// ============================================================
-// GET MY FEEDBACK — Riwayat saran & kesan user yang login
-// GET /api/feedback
-// FR-13: riwayat tampil di halaman yang sama
-// ============================================================
+
+
+
+
+
 const getMyFeedback = async (req, res, next) => {
   try {
     const isAdmin = req.user.role === 'admin_panti';

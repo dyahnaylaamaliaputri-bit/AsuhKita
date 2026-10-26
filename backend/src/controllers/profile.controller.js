@@ -1,17 +1,17 @@
-// File: backend/src/controllers/profile.controller.js
-// Fungsi: Logic bisnis profil pengguna (PBI-010, PBI-011, FR-11, FR-12)
-// Endpoint: GET/PUT /api/users/profile, POST /api/users/profile/photo
+
+
+
 
 const { query } = require('../config/database');
 const path = require('path');
 const fs = require('fs');
 
-// ============================================================
-// GET PROFILE — Ambil data profil user yang login
-// GET /api/users/profile
-// FR-11: nama, nomor HP (phone)
-// FR-12: foto profil
-// ============================================================
+
+
+
+
+
+
 const getProfile = async (req, res, next) => {
   try {
     const result = await query(
@@ -37,11 +37,11 @@ const getProfile = async (req, res, next) => {
   }
 };
 
-// ============================================================
-// UPDATE PROFILE — Ubah nama dan nomor HP
-// PUT /api/users/profile
-// FR-11: Pengguna mengubah nama dan nomor HP
-// ============================================================
+
+
+
+
+
 const updateProfile = async (req, res, next) => {
   try {
     const { name, phone } = req.body;
@@ -72,11 +72,11 @@ const updateProfile = async (req, res, next) => {
   }
 };
 
-// ============================================================
-// UPDATE BIOMETRIC SETTING — Aktifkan/nonaktifkan biometrik
-// PUT /api/users/profile/biometric
-// FR-07: Pengguna mengaktifkan opsi biometrik setelah login pertama
-// ============================================================
+
+
+
+
+
 const updateBiometric = async (req, res, next) => {
   try {
     const { biometric_enabled } = req.body;
@@ -104,16 +104,16 @@ const updateBiometric = async (req, res, next) => {
   }
 };
 
-// ============================================================
-// UPLOAD FOTO PROFIL — Simpan URL foto dari path lokal/cloud
-// POST /api/users/profile/photo
-// FR-12: Pengguna mengganti foto profil dari kamera atau galeri
-//
-// Catatan implementasi:
-// Untuk demo, Flutter mengirim Base64 image string.
-// Backend menyimpan ke folder uploads/ dan menyimpan URL-nya.
-// Di production, ganti dengan cloud storage (Supabase Storage/S3).
-// ============================================================
+
+
+
+
+
+
+
+
+
+
 const uploadPhoto = async (req, res, next) => {
   try {
     const { photo_base64, file_extension } = req.body;
@@ -126,22 +126,22 @@ const uploadPhoto = async (req, res, next) => {
       });
     }
 
-    // Buat folder uploads jika belum ada
+
     const uploadsDir = path.join(__dirname, '../../uploads/avatars');
     if (!fs.existsSync(uploadsDir)) {
       fs.mkdirSync(uploadsDir, { recursive: true });
     }
 
-    // Nama file unik berdasarkan user ID
+
     const ext = file_extension || 'jpg';
     const filename = `avatar_${req.user.id}.${ext}`;
     const filepath = path.join(uploadsDir, filename);
 
-    // Hapus header data URL jika ada (misal: "data:image/jpeg;base64,")
+
     const base64Data = photo_base64.replace(/^data:image\/\w+;base64,/, '');
     const buffer = Buffer.from(base64Data, 'base64');
 
-    // Cek ukuran file — maksimal 5MB
+
     if (buffer.length > 5 * 1024 * 1024) {
       return res.status(400).json({
         success: false,
@@ -150,13 +150,13 @@ const uploadPhoto = async (req, res, next) => {
       });
     }
 
-    // Simpan file
+
     fs.writeFileSync(filepath, buffer);
 
-    // URL yang bisa diakses oleh Flutter
+
     const avatarUrl = `/uploads/avatars/${filename}`;
 
-    // Update URL foto di database
+
     await query(
       'UPDATE users SET avatar_url = $1, updated_at = NOW() WHERE id = $2',
       [avatarUrl, req.user.id]
@@ -172,12 +172,12 @@ const uploadPhoto = async (req, res, next) => {
   }
 };
 
-// ============================================================
-// GET DONATION HISTORY — Riwayat donasi dengan detail
-// GET /api/users/donations
-// FR-26: Donatur melihat riwayat donasi beserta kurs yang dipakai
-// PBI-029: Cache SQLite dilakukan di sisi Flutter (A1)
-// ============================================================
+
+
+
+
+
+
 const getDonationHistory = async (req, res, next) => {
   try {
     const page = parseInt(req.query.page) || 1;

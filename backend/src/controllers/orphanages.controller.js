@@ -1,22 +1,22 @@
-// File: backend/src/controllers/orphanages.controller.js
-// Fungsi: LBS — Panti terdekat, jadwal video call, konversi waktu
-// PBI-042, PBI-045 — FR-35..FR-39
+
+
+
 
 const { query } = require('../config/database');
 
-// ============================================================
-// GET NEARBY ORPHANAGES — Panti terdekat dari koordinat user
-// GET /api/orphanages/nearby?lat=&lng=&radius=
-// FR-35: Menampilkan peta panti terdekat berdasarkan lokasi
-// FR-36: Menampilkan jarak ke panti
-// PBI-042: GET /orphanages/nearby?lat=&lng=
-//
-// Rumus haversine (dari dokumen FR hal. 14):
-// d = 2R * arcsin(sqrt(sin²(Δφ/2) + cos φ1 cos φ2 sin²(Δλ/2)))
-// ============================================================
+
+
+
+
+
+
+
+
+
+
 const getNearbyOrphanages = async (req, res, next) => {
   try {
-    const { lat, lng, radius = 50 } = req.query; // radius dalam km, default 50km
+    const { lat, lng, radius = 50 } = req.query;
 
     if (!lat || !lng) {
       return res.status(400).json({
@@ -38,8 +38,8 @@ const getNearbyOrphanages = async (req, res, next) => {
       });
     }
 
-    // Gunakan formula Haversine di PostgreSQL
-    // 6371 = radius bumi dalam kilometer
+
+
     const result = await query(
       `SELECT id, name, city, address, latitude, longitude, phone, description,
               ROUND(
@@ -59,7 +59,7 @@ const getNearbyOrphanages = async (req, res, next) => {
        ORDER BY distance_km ASC`,
       [latitude, longitude, radiusKm]
     ).catch(async () => {
-      // Fallback: jika query HAVING tidak didukung, gunakan subquery
+
       return await query(
         `SELECT * FROM (
            SELECT id, name, city, address, latitude, longitude, phone, description,
@@ -93,10 +93,10 @@ const getNearbyOrphanages = async (req, res, next) => {
   }
 };
 
-// ============================================================
-// GET ALL ORPHANAGES — Semua panti (untuk peta)
-// GET /api/orphanages
-// ============================================================
+
+
+
+
 const getAllOrphanages = async (req, res, next) => {
   try {
     const result = await query(
@@ -109,11 +109,11 @@ const getAllOrphanages = async (req, res, next) => {
   }
 };
 
-// ============================================================
-// CHECK IN — Validasi kunjungan dalam radius 100 meter
-// POST /api/orphanages/:id/checkin
-// FR-37: Check-in valid hanya bila jarak ≤ 100 m
-// ============================================================
+
+
+
+
+
 const checkIn = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -146,8 +146,8 @@ const checkIn = async (req, res, next) => {
       });
     }
 
-    // Hitung jarak dalam meter (haversine)
-    const R = 6371000; // meter
+
+    const R = 6371000;
     const dLat = (orphanage.latitude - parseFloat(lat)) * Math.PI / 180;
     const dLng = (orphanage.longitude - parseFloat(lng)) * Math.PI / 180;
     const a = Math.sin(dLat / 2) ** 2 +
@@ -156,7 +156,7 @@ const checkIn = async (req, res, next) => {
               Math.sin(dLng / 2) ** 2;
     const distanceMeters = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-    const isWithinRadius = distanceMeters <= 100; // FR-37: radius 100 meter
+    const isWithinRadius = distanceMeters <= 100;
 
     return res.status(200).json({
       success: true,
@@ -175,13 +175,13 @@ const checkIn = async (req, res, next) => {
   }
 };
 
-// ============================================================
-// CREATE SCHEDULE — Buat jadwal video call
-// POST /api/schedules
-// FR-38: Jadwal tampil sekaligus di 4 zona waktu
-// FR-39: Jadwal disimpan dalam UTC
-// PBI-045: POST/GET /schedules (simpan UTC)
-// ============================================================
+
+
+
+
+
+
+
 const createSchedule = async (req, res, next) => {
   try {
     const { sponsorship_id, scheduled_at_utc, donor_timezone, notes } = req.body;
@@ -194,7 +194,7 @@ const createSchedule = async (req, res, next) => {
       });
     }
 
-    // Validasi format tanggal
+
     const scheduledDate = new Date(scheduled_at_utc);
     if (isNaN(scheduledDate.getTime())) {
       return res.status(400).json({
@@ -221,9 +221,9 @@ const createSchedule = async (req, res, next) => {
 
     const schedule = result.rows[0];
 
-    // FR-38: Konversi ke 4 zona waktu sekaligus untuk ditampilkan
-    // Konversi dilakukan di backend dengan offset manual
-    // (paket timezone digunakan di Flutter, di backend kita hitung offset)
+
+
+
     const utcTime = new Date(schedule.scheduled_at_utc);
     const timezones = convertToFourTimezones(utcTime);
 
@@ -240,11 +240,11 @@ const createSchedule = async (req, res, next) => {
   }
 };
 
-// ============================================================
-// GET SCHEDULES — Daftar jadwal video call user
-// GET /api/schedules
-// PBI-045: GET /schedules
-// ============================================================
+
+
+
+
+
 const getSchedules = async (req, res, next) => {
   try {
     const result = await query(
@@ -258,7 +258,7 @@ const getSchedules = async (req, res, next) => {
       [req.user.id]
     );
 
-    // Tambahkan tampilan 4 zona waktu untuk setiap jadwal
+
     const schedulesWithTimezones = result.rows.map(s => ({
       ...s,
       display_times: convertToFourTimezones(new Date(s.scheduled_at_utc)),
@@ -273,18 +273,18 @@ const getSchedules = async (req, res, next) => {
   }
 };
 
-// ============================================================
-// Helper: Konversi UTC ke 4 zona waktu
-// FR-38: WIB (Asia/Jakarta), WITA (Asia/Makassar), WIT (Asia/Jayapura), London (Europe/London)
-// Offset manual (dalam menit) — DST London ditangani dengan cek bulan
-// ============================================================
+
+
+
+
+
 const convertToFourTimezones = (utcDate) => {
   const format = (d) => d.toISOString().replace('T', ' ').substring(0, 16) + ' ';
 
-  // Cek apakah London sedang dalam British Summer Time (BST = UTC+1)
-  // BST aktif dari akhir Maret hingga akhir Oktober
-  const month = utcDate.getUTCMonth(); // 0=Jan, 9=Oct
-  const londonOffset = (month >= 2 && month <= 9) ? 60 : 0; // BST: +1 jam (Maret-Oktober)
+
+
+  const month = utcDate.getUTCMonth();
+  const londonOffset = (month >= 2 && month <= 9) ? 60 : 0;
 
   const addMinutes = (date, minutes) => new Date(date.getTime() + minutes * 60000);
 
@@ -292,17 +292,17 @@ const convertToFourTimezones = (utcDate) => {
     WIB: {
       label: 'WIB (Asia/Jakarta)',
       offset: '+07:00',
-      time: format(addMinutes(utcDate, 420)), // UTC+7
+      time: format(addMinutes(utcDate, 420)),
     },
     WITA: {
       label: 'WITA (Asia/Makassar)',
       offset: '+08:00',
-      time: format(addMinutes(utcDate, 480)), // UTC+8
+      time: format(addMinutes(utcDate, 480)),
     },
     WIT: {
       label: 'WIT (Asia/Jayapura)',
       offset: '+09:00',
-      time: format(addMinutes(utcDate, 540)), // UTC+9
+      time: format(addMinutes(utcDate, 540)),
     },
     London: {
       label: londonOffset > 0 ? 'London (BST/UTC+1)' : 'London (GMT/UTC+0)',

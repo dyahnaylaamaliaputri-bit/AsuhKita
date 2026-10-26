@@ -1,5 +1,5 @@
-// Letak file: mobile/lib/features/auth/login_screen.dart
-// Fungsi: Layar Login pengguna dengan email, password terenkripsi, dan opsi login biometrik (PBI-005, PBI-056)
+
+
 
 import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
@@ -34,7 +34,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (bioEmail != null && bioEmail.isNotEmpty && mounted) {
         setState(() {
           _savedBioEmail = bioEmail;
-          // Tidak auto-fill text controller agar form tetap bersih sampai user memilih
+
         });
       }
     } catch (_) {}
@@ -157,7 +157,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Logo / Header AsuhKita
+
                   Container(
                     width: 80,
                     height: 80,
@@ -193,7 +193,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 32),
 
-                  // Input Email
+
                   TextFormField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
@@ -212,7 +212,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Input Password
+
                   TextFormField(
                     controller: _passwordController,
                     obscureText: _obscurePassword,
@@ -241,7 +241,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Tombol Masuk Utama
+
                   ElevatedButton(
                     onPressed: auth.isLoading ? null : _handleLogin,
                     style: ElevatedButton.styleFrom(
@@ -269,7 +269,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Opsi Login Biometrik jika sensor tersedia di HP
+
                   if (auth.isBiometricAvailable) ...[
                     OutlinedButton.icon(
                       onPressed: auth.isLoading ? null : _handleBiometricLogin,
@@ -298,7 +298,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   const SizedBox(height: 24),
 
-                  // Link Menuju Register
+
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [

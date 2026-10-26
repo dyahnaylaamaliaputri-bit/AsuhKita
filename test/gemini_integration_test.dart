@@ -1,8 +1,8 @@
-// TEST-05 | Integration Test: GeminiService (letter + summary + FAQ)
-// Menguji: FR-49, FR-50, FR-51 (PBI-062)
-// Mode : Tanpa API key nyata ? memverifikasi fallback berjalan sempurna
-//         Untuk tes dengan API key nyata: jalankan dengan
-//         flutter test --dart-define=GEMINI_KEY=AIzaSy...
+
+
+
+
+
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/services/gemini_service.dart';
@@ -85,7 +85,7 @@ void main() {
     });
 
     test('Pertanyaan kosong tidak menyebabkan crash', () async {
-      // Meski string kosong dikirim, service harus mengembalikan string
+
       final result = await gemini.askFaq('');
       expect(result, isA<String>());
     });

@@ -1,8 +1,8 @@
-// Letak file: mobile/lib/features/ai_assistant/ai_assistant_screen.dart
-// Fungsi: UI Sahabat Asuh Berbasis AI/LLM - Gemini 1.5 Flash
-//         - Bantu Tulis Surat untuk Anak Asuh (PBI-062, FR-49)
-//         - Ringkas Laporan Perkembangan Anak  (PBI-062, FR-50)
-//         - Chatbot FAQ Sahabat Asuh           (PBI-062, FR-51)
+
+
+
+
+
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -28,25 +28,25 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
   late TabController _tabController;
   final GeminiService _gemini = GeminiService();
 
-  // -- Tab 1: Bantu Tulis Surat untuk Donatur --
+
   final _letterChildNameController = TextEditingController();
   final _letterDonorNameController = TextEditingController(text: 'Kakak Donatur');
   final _letterTopicController = TextEditingController();
   String _generatedLetter = '';
   bool _isLoadingLetter = false;
 
-  // -- Tab 2: Ringkas Laporan --
+
   final _reportInputController = TextEditingController();
   String _summarizedReport = '';
   bool _isLoadingSummary = false;
 
-  // -- Tab 3: Chatbot FAQ --
+
   final _faqQuestionController = TextEditingController();
   final _faqScrollController = ScrollController();
   bool _isLoadingFaq = false;
 
-  // Format riwayat: {'role': 'user'/'model', 'text': '...'}
-  // Riwayat dipertahankan selama sesi agar konteks percakapan menyambung
+
+
   final List<Map<String, String>> _faqHistory = [
     {
       'role': 'model',
@@ -74,9 +74,9 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
     super.dispose();
   }
 
-  // ----------------------------------------------------------
-  // FR-49 | PBI-062 - Generate Surat untuk Donatur dengan Gemini
-  // ----------------------------------------------------------
+
+
+
   Future<void> _generateLetter() async {
     final alias = _letterChildNameController.text.trim();
     final donorName = _letterDonorNameController.text.trim().isNotEmpty
@@ -102,9 +102,9 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
     });
   }
 
-  // ----------------------------------------------------------
-  // FR-50 | PBI-062 - Ringkas Laporan dengan Gemini
-  // ----------------------------------------------------------
+
+
+
   Future<void> _summarizeReport() async {
     final text = _reportInputController.text.trim();
     if (text.isEmpty) {
@@ -122,10 +122,10 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
     });
   }
 
-  // ----------------------------------------------------------
-  // FR-51 | PBI-062 - Tanya FAQ dengan Gemini (Chat mode)
-  // Percakapan harus menyambung dan sesuai konteks
-  // ----------------------------------------------------------
+
+
+
+
   Future<void> _askFaq() async {
     final q = _faqQuestionController.text.trim();
     if (q.isEmpty || _isLoadingFaq) return;
@@ -137,8 +137,8 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
     });
     _scrollToBottom();
 
-    // Kirim ke Gemini dengan SELURUH riwayat percakapan sebelumnya
-    // agar jawaban sesuai konteks dan menyambung
+
+
     final answer = await (widget.faqAnswerProvider ?? _gemini.askFaq)(
       q,
       history: _faqHistory,
@@ -163,9 +163,9 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
     });
   }
 
-  // ----------------------------------------------------------
-  // Widget Helpers
-  // ----------------------------------------------------------
+
+
+
   Widget _geminiChip() => Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
@@ -212,7 +212,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
       body: TabBarView(
         controller: _tabController,
         children: [
-          // --------------- TAB 1: BANTU TULIS SURAT (FR-49) ---------------
+
           SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -353,7 +353,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
             ),
           ),
 
-          // --------------- TAB 2: RINGKAS LAPORAN (FR-50) ---------------
+
           SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -443,7 +443,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen>
             ),
           ),
 
-          // --------------- TAB 3: CHATBOT FAQ (FR-51) ---------------
+
           Column(
             children: [
               Expanded(

@@ -1,4 +1,4 @@
-// Letak file: mobile/lib/features/schedule/schedule_screen.dart
+
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -186,7 +186,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       final notifId =
           (_selectedDateTime.millisecondsSinceEpoch ~/ 1000) & 0x7fffffff;
 
-      // Jadwalkan notifikasi — HANYA MUNCUL tepat waktu yang dijadwalkan
+
       try {
         await NotificationService().scheduleFinanceReportReminder(
           id: notifId,
@@ -208,7 +208,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         return;
       }
 
-      // Pop-up konfirmasi di dalam app
+
       if (mounted) {
         showDialog(
           context: context,
@@ -397,7 +397,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       return;
     }
 
-    // ==================== JADWAL VIDEO CALL (DONATUR) ====================
+
     if (_sponsoredChildren.isEmpty) {
       showDialog(
         context: context,
@@ -435,7 +435,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         ? _topicController.text.trim()
         : 'Sesi Belajar & Bincang Inspirasi Masa Depan';
 
-    // Jadwalkan notifikasi — HANYA MUNCUL tepat waktu yang dijadwalkan
+
     try {
       await NotificationService().scheduleVideoCallReminder(
         id: (_selectedDateTime.millisecondsSinceEpoch ~/ 1000) & 0x7fffffff,
@@ -456,7 +456,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       return;
     }
 
-    // Pop-up konfirmasi di dalam app
+
     if (mounted) {
       showDialog(
         context: context,

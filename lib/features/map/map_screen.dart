@@ -1,11 +1,11 @@
-// Letak file: mobile/lib/features/map/map_screen.dart
-// Fungsi: Layar Peta Panti LBS (Location Based Service) Real-Time ala Google Maps:
-//         a. Permintaan Izin Lokasi (Location Permissions via Geolocator) & Deteksi GPS Akurat
-//         b. Pengambilan Data REST API GET /orphanages/nearby?lat={lat}&lng={lng}
-//         c. Tampilan Peta Interaktif berpusat pada lokasi user (Titik Biru Google Maps & Marker Rumah Panti)
-//         d. Perhitungan Jarak (Haversine Formula) & Waktu Tempuh
-//         e. Rute Navigasi Nyata (Polyline OSRM - Open Source Routing Machine)
-//         f. Bottom Sheet Modern & Interaktif
+
+
+
+
+
+
+
+
 
 import 'dart:math';
 import 'package:flutter/material.dart';
@@ -26,7 +26,7 @@ class _MapScreenState extends State<MapScreen> {
   final MapController _mapController = MapController();
   final TextEditingController _searchLocationController = TextEditingController();
 
-  // Posisi nyata pengguna (Default: Mataram / Lombok)
+
   LatLng _userLocation = const LatLng(-8.5833, 116.1167);
   String _currentRegion = 'Nusa Tenggara Barat';
   String _currentCity = 'Mataram (Lombok)';
@@ -34,16 +34,16 @@ class _MapScreenState extends State<MapScreen> {
   bool _isLoadingRoute = false;
   bool _locationPermissionGranted = false;
 
-  // Rute Perjalanan Aktif (Polyline OSRM)
+
   Map<String, dynamic>? _selectedOrphanage;
   List<LatLng> _routePoints = [];
   double _routeDistanceKm = 0.0;
   int _routeEstimatedMinutes = 0;
 
-  // Daftar Panti Asuhan terdaftar di sekitar lokasi aktif
+
   List<Map<String, dynamic>> _orphanages = [];
 
-  // Daftar Preset Region / Kota di Indonesia untuk Pilihan Cepat Donatur
+
   final List<Map<String, dynamic>> _presetRegions = [
     {
       'name': 'Mataram & Lombok Barat',
@@ -91,9 +91,9 @@ class _MapScreenState extends State<MapScreen> {
     super.dispose();
   }
 
-  // ============================================================
-  // a. PERMINTAAN IZIN LOKASI & DETEKSI GPS REAL-TIME (LBS)
-  // ============================================================
+
+
+
   Future<void> _initRealtimeLocationAndPermissions() async {
     setState(() => _isDetecting = true);
 
@@ -101,13 +101,13 @@ class _MapScreenState extends State<MapScreen> {
     LocationPermission permission;
 
     try {
-      // 1. Cek ketersediaan layanan GPS perangkat
+
       serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         debugPrint('[LBS] Location service is disabled.');
       }
 
-      // 2. Cek & Minta Izin Lokasi Native Android
+
       permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
@@ -117,7 +117,7 @@ class _MapScreenState extends State<MapScreen> {
           permission == LocationPermission.always) {
         _locationPermissionGranted = true;
 
-        // Dapatkan koordinat nyata GPS perangkat
+
         final position = await Geolocator.getCurrentPosition(
           locationSettings: const LocationSettings(
             accuracy: LocationAccuracy.high,
@@ -137,7 +137,7 @@ class _MapScreenState extends State<MapScreen> {
       await _fallbackIpLocation();
     }
 
-    // b. Ambil data panti asuhan terdekat dari backend REST API
+
     await _fetchNearbyOrphanagesFromApi(_userLocation);
 
     if (mounted) {
@@ -148,7 +148,7 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  // Fallback via IP Geolocation jika GPS tidak diizinkan atau mock
+
   Future<void> _fallbackIpLocation() async {
     try {
       final res = await DioClient().dio.get('http://ip-api.com/json').timeout(
@@ -168,15 +168,15 @@ class _MapScreenState extends State<MapScreen> {
         }
       }
     } catch (_) {
-      // Default Mataram
+
       _currentCity = 'Mataram (Lombok)';
       _currentRegion = 'Nusa Tenggara Barat';
     }
   }
 
-  // ============================================================
-  // b. PENGAMBILAN DATA REST API: GET /orphanages/nearby?lat=&lng=
-  // ============================================================
+
+
+
   Future<void> _fetchNearbyOrphanagesFromApi(LatLng center) async {
     List<Map<String, dynamic>> loaded = [];
 
@@ -186,7 +186,7 @@ class _MapScreenState extends State<MapScreen> {
         queryParameters: {
           'lat': center.latitude,
           'lng': center.longitude,
-          'radius': 30, // 30 km radius
+          'radius': 30,
         },
       ).timeout(const Duration(seconds: 5));
 
@@ -218,7 +218,7 @@ class _MapScreenState extends State<MapScreen> {
       debugPrint('[LBS] Failed fetching nearby orphanages from API: $e');
     }
 
-    // Jika database kosong atau API offline: buat panti terdekat di sekitar koordinat nyata user
+
     if (loaded.isEmpty) {
       final lat = center.latitude;
       final lon = center.longitude;
@@ -229,7 +229,7 @@ class _MapScreenState extends State<MapScreen> {
           'name': 'Panti Asuhan Peduli Kasih (Utama)',
           'region': _currentRegion,
           'address': 'Jl. Melati No. 8, $_currentCity',
-          'location': LatLng(lat + 0.00065, lon + 0.00060), // ~90 meter (Bisa Check-In <100m)
+          'location': LatLng(lat + 0.00065, lon + 0.00060),
           'phone': '0812-3456-7890',
           'quota': '32 Anak Asuh',
           'distance_km': _calculateDistance(center, LatLng(lat + 0.00065, lon + 0.00060)) / 1000.0,
@@ -239,7 +239,7 @@ class _MapScreenState extends State<MapScreen> {
           'name': 'Panti Asuhan Harapan Mulia',
           'region': _currentRegion,
           'address': 'Jl. Cendrawasih No. 14, $_currentCity',
-          'location': LatLng(lat + 0.0125, lon + 0.0145), // ~1.8 km
+          'location': LatLng(lat + 0.0125, lon + 0.0145),
           'phone': '0819-8765-4321',
           'quota': '24 Anak Asuh',
           'distance_km': _calculateDistance(center, LatLng(lat + 0.0125, lon + 0.0145)) / 1000.0,
@@ -249,7 +249,7 @@ class _MapScreenState extends State<MapScreen> {
           'name': 'Panti Asuhan Bintang Bersinar',
           'region': _currentRegion,
           'address': 'Kompleks Asrama Pendidikan, $_currentCity',
-          'location': LatLng(lat - 0.0185, lon - 0.0165), // ~2.8 km
+          'location': LatLng(lat - 0.0185, lon - 0.0165),
           'phone': '0857-1122-3344',
           'quota': '18 Anak Asuh',
           'distance_km': _calculateDistance(center, LatLng(lat - 0.0185, lon - 0.0165)) / 1000.0,
@@ -259,7 +259,7 @@ class _MapScreenState extends State<MapScreen> {
           'name': 'Panti Asuhan Tunas Harapan Bangsa',
           'region': _currentRegion,
           'address': 'Jl. Diponegoro Samping Alun-Alun, $_currentCity',
-          'location': LatLng(lat + 0.0250, lon - 0.0120), // ~3.5 km
+          'location': LatLng(lat + 0.0250, lon - 0.0120),
           'phone': '0821-9988-7766',
           'quota': '40 Anak Asuh',
           'distance_km': _calculateDistance(center, LatLng(lat + 0.0250, lon - 0.0120)) / 1000.0,
@@ -272,9 +272,9 @@ class _MapScreenState extends State<MapScreen> {
     });
   }
 
-  // ============================================================
-  // d & e. RUTE PERJALANAN VIA OSRM API (OPEN SOURCE ROUTING MACHINE)
-  // ============================================================
+
+
+
   Future<void> _fetchOsrmRoute(Map<String, dynamic> orphanage) async {
     setState(() {
       _isLoadingRoute = true;
@@ -290,8 +290,8 @@ class _MapScreenState extends State<MapScreen> {
     int estMinutes = max(2, (haversineDistMeters / 400).round());
 
     try {
-      // URL OSRM publik untuk routing kendaraan (driving):
-      // https://router.project-osrm.org/route/v1/driving/{lon1},{lat1};{lon2},{lat2}?overview=full&geometries=geojson
+
+
       final osrmUrl =
           'https://router.project-osrm.org/route/v1/driving/${start.longitude},${start.latitude};${end.longitude},${end.latitude}?overview=full&geometries=geojson';
 
@@ -322,7 +322,7 @@ class _MapScreenState extends State<MapScreen> {
       }
     } catch (e) {
       debugPrint('[OSRM] Fallback to simulated polyline waypoints: $e');
-      // Fallback waypoints jika jaringan OSRM sibuk
+
       final dLat = end.latitude - start.latitude;
       final dLon = end.longitude - start.longitude;
       polylinePoints = [
@@ -347,27 +347,27 @@ class _MapScreenState extends State<MapScreen> {
         _isLoadingRoute = false;
       });
 
-      // Pindahkan posisi kamera agar mencakup user dan panti
+
       try {
         final centerLat = (start.latitude + end.latitude) / 2;
         final centerLon = (start.longitude + end.longitude) / 2;
         _mapController.move(LatLng(centerLat, centerLon), 14.0);
       } catch (_) {}
 
-      // f. Munculkan Bottom Sheet Google Maps-like
+
       _showOrphanageBottomSheet(orphanage, _routeDistanceKm, _routeEstimatedMinutes);
     }
   }
 
-  // Rumus Haversine menghitung jarak dalam meter (FR-36)
+
   double _calculateDistance(LatLng pos1, LatLng pos2) {
     const Distance distance = Distance();
     return distance.as(LengthUnit.Meter, pos1, pos2);
   }
 
-  // ============================================================
-  // f. BOTTOM SHEET MODERN ALA GOOGLE MAPS (INFO PANTHI, JARAK, WAKTU)
-  // ============================================================
+
+
+
   void _showOrphanageBottomSheet(Map<String, dynamic> orphanage, double distKm, int estMins) {
     final distanceMeters = _calculateDistance(_userLocation, orphanage['location']);
     final bool canCheckIn = distanceMeters <= 100;
@@ -389,7 +389,7 @@ class _MapScreenState extends State<MapScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Handle bar
+
             Center(
               child: Container(
                 width: 44,
@@ -399,7 +399,7 @@ class _MapScreenState extends State<MapScreen> {
             ),
             const SizedBox(height: 14),
 
-            // Header Panti
+
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -442,7 +442,7 @@ class _MapScreenState extends State<MapScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Chip Jarak & Estimasi Waktu (Google Maps Look)
+
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
@@ -453,7 +453,7 @@ class _MapScreenState extends State<MapScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  // Jarak Haversine
+
                   Row(
                     children: [
                       const Icon(Icons.straighten, color: AppColors.primary, size: 22),
@@ -473,7 +473,7 @@ class _MapScreenState extends State<MapScreen> {
                     ],
                   ),
                   Container(height: 32, width: 1, color: Colors.grey.shade300),
-                  // Estimasi Waktu Tempuh
+
                   Row(
                     children: [
                       const Icon(Icons.directions_car_filled, color: Colors.green, size: 22),
@@ -495,7 +495,7 @@ class _MapScreenState extends State<MapScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Info Kuota & Kontak
+
             Row(
               children: [
                 Expanded(
@@ -535,7 +535,7 @@ class _MapScreenState extends State<MapScreen> {
             ),
             const SizedBox(height: 20),
 
-            // Tombol Aksi: Check-in Fisik (100m) & Navigasi
+
             Row(
               children: [
                 Expanded(
@@ -597,7 +597,7 @@ class _MapScreenState extends State<MapScreen> {
 
   void _handleCheckIn(Map<String, dynamic> orphanage) {
     final meters = _calculateDistance(_userLocation, orphanage['location']);
-    final canCheckIn = meters <= 100; // Radius toleransi check-in 100 meter
+    final canCheckIn = meters <= 100;
 
     if (canCheckIn) {
       showDialog(
@@ -661,7 +661,7 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  // Pilih Region Manual jika user ingin melihat panti di kota lain
+
   void _changeLocationManual(LatLng newLocation, String cityName, String regionName) {
     setState(() {
       _userLocation = newLocation;
@@ -737,7 +737,7 @@ class _MapScreenState extends State<MapScreen> {
       ),
       body: Stack(
         children: [
-          // ==================== PETA INTERAKTIF FLUTTER MAP ====================
+
           FlutterMap(
             mapController: _mapController,
             options: MapOptions(
@@ -747,23 +747,23 @@ class _MapScreenState extends State<MapScreen> {
               maxZoom: 18.0,
             ),
             children: [
-              // Tile Layer OpenStreetMap
+
               TileLayer(
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.asuhkita.mobile',
               ),
 
-              // Garis Rute Navigasi Polyline (OSRM Google Maps Style)
+
               if (_routePoints.isNotEmpty)
                 PolylineLayer(
                   polylines: [
-                    // Border shadow polyline
+
                     Polyline(
                       points: _routePoints,
                       color: Colors.blue.shade900.withValues(alpha: 0.4),
                       strokeWidth: 8.0,
                     ),
-                    // Main route polyline
+
                     Polyline(
                       points: _routePoints,
                       color: Colors.blueAccent,
@@ -772,10 +772,10 @@ class _MapScreenState extends State<MapScreen> {
                   ],
                 ),
 
-              // Marker Layer: User Location (Titik Biru) & Panti Asuhan (Rumah)
+
               MarkerLayer(
                 markers: [
-                  // c. MARKER KHUSUS PENGGUNA (Titik Biru Google Maps dengan Halo)
+
                   Marker(
                     point: _userLocation,
                     width: 60,
@@ -783,7 +783,7 @@ class _MapScreenState extends State<MapScreen> {
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
-                        // Halo radius
+
                         Container(
                           width: 44,
                           height: 44,
@@ -792,7 +792,7 @@ class _MapScreenState extends State<MapScreen> {
                             shape: BoxShape.circle,
                           ),
                         ),
-                        // Lingkaran putih luar
+
                         Container(
                           width: 22,
                           height: 22,
@@ -804,12 +804,12 @@ class _MapScreenState extends State<MapScreen> {
                             ],
                           ),
                         ),
-                        // Titik biru solid Google Maps
+
                         Container(
                           width: 14,
                           height: 14,
                           decoration: const BoxDecoration(
-                            color: Color(0xFF1A73E8), // Google Maps Blue
+                            color: Color(0xFF1A73E8),
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -817,7 +817,7 @@ class _MapScreenState extends State<MapScreen> {
                     ),
                   ),
 
-                  // c. MARKER KUSTOM PANTI ASUHAN (Ikon Rumah Hangat)
+
                   ..._orphanages.map((orp) {
                     final isSelected = _selectedOrphanage != null && _selectedOrphanage!['id'] == orp['id'];
 
@@ -830,7 +830,7 @@ class _MapScreenState extends State<MapScreen> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            // Badge nama panti
+
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
@@ -848,7 +848,7 @@ class _MapScreenState extends State<MapScreen> {
                               ),
                             ),
                             const SizedBox(height: 2),
-                            // Pin Icon Rumah Hangat
+
                             Container(
                               padding: const EdgeInsets.all(7),
                               decoration: BoxDecoration(
@@ -875,7 +875,7 @@ class _MapScreenState extends State<MapScreen> {
             ],
           ),
 
-          // Banner Status Lokasi & GPS Bar Atas
+
           Positioned(
             top: 12,
             left: 16,
@@ -932,7 +932,7 @@ class _MapScreenState extends State<MapScreen> {
             ),
           ),
 
-          // Loading overlay saat menghitung rute OSRM
+
           if (_isLoadingRoute)
             Positioned(
               bottom: 24,

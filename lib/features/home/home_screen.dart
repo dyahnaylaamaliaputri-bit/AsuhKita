@@ -1,6 +1,6 @@
-// Letak file: mobile/lib/features/home/home_screen.dart
-// Fungsi: Layar Beranda utama dengan ringkasan status dan kartu akses ke seluruh fitur aplikasi AsuhKita (PBI-009, Bab 6.7)
-// Mendukung pemisahan antarmuka Donatur vs Admin Panti secara ketat sesuai instruksi revisi.
+
+
+
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -66,13 +66,13 @@ class _HomeScreenState extends State<HomeScreen> {
       final localDb = LocalDatabase();
       final localDonations = await localDb.getCachedDonations();
 
-      // ============================================================
-      // INTEGRASI: Ambil jumlah anak dari sumber SAMA seperti Ruang Kasih & Sponsor
-      // Sumber: Supabase API → SQLite cached_children + new_children
-      // ============================================================
+
+
+
+
       int totalKids = 0;
       try {
-        // 1. Coba ambil dari Supabase (sumber utama, sama seperti sponsor & ruang kasih)
+
         final res = await DioClient().dio.get('/children');
         if (res.statusCode == 200) {
           List<dynamic> apiChildren = [];
@@ -83,7 +83,7 @@ class _HomeScreenState extends State<HomeScreen> {
           }
           if (apiChildren.isNotEmpty) {
             totalKids = apiChildren.length;
-            // Cache ke SQLite supaya sinkron
+
             await localDb.cacheChildren(
               List<Map<String, dynamic>>.from(apiChildren),
             );
@@ -91,11 +91,11 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       } catch (_) {}
 
-      // 2. Fallback: hitung dari SQLite lokal (sama seperti Ruang Kasih)
+
       if (totalKids == 0) {
         final cachedKids = await localDb.getCachedChildren();
         final newKids = await localDb.getNewChildren();
-        // Deduplicate berdasarkan alias (sama seperti Ruang Kasih)
+
         final seen = <String>{};
         final all = [...cachedKids, ...newKids];
         final uniqueKids = all.where((c) {
@@ -107,13 +107,13 @@ class _HomeScreenState extends State<HomeScreen> {
         totalKids = uniqueKids.length;
       }
 
-      // ============================================================
-      // TOTAL DANA & DONATUR TERINTEGRASI SUPABASE + SQLITE (NON STATIS)
-      // ============================================================
+
+
+
       final donorSet = <String>{};
       int totalFundsCalculated = 0;
 
-      // 1. Dari donasi lokal SQLite
+
       for (var d in localDonations) {
         final amt = (d['amount_idr'] is num) ? (d['amount_idr'] as num).toInt() : 0;
         totalFundsCalculated += amt;
@@ -123,7 +123,7 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       }
 
-      // 2. Coba sinkronisasi riwayat donasi dari Supabase API
+
       try {
         final donRes = await DioClient().dio.get('/donations');
         if (donRes.statusCode == 200) {
@@ -135,7 +135,7 @@ class _HomeScreenState extends State<HomeScreen> {
           }
           for (var ad in apiDonations) {
             final amt = (ad['amount_idr'] is num) ? (ad['amount_idr'] as num).toInt() : 0;
-            // Jika belum terhitung di lokal
+
             final donId = ad['id']?.toString() ?? '';
             final alreadyInLocal = localDonations.any((ld) => ld['id']?.toString() == donId);
             if (!alreadyInLocal && amt > 0) {
@@ -151,7 +151,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       final totalDonors = donorSet.isNotEmpty ? donorSet.length : (localDonations.isNotEmpty ? 1 : 0);
 
-      // Hitung anak asuh yang didampingi oleh donatur yang SEDANG LOGIN (dari riwayat donasi/sponsorship)
+
       String userEmail = '';
       String userName = '';
       try {
@@ -178,7 +178,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (mounted) {
         setState(() {
-          // Donatur: jumlah anak asuh donatur ini (0 jika belum mendampingi anak asuh)
+
           _sponsoredCount = sponsoredKidSet.length;
           _totalPlatformChildren = totalKids;
           _totalPlatformDonors = totalDonors;
@@ -220,7 +220,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Banner Sambutan Pengguna
+
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -267,7 +267,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 20),
 
-            // ==================== 3 FIELD STATUS ATAS ====================
+
             if (isAdmin)
               Row(
                 children: [
@@ -296,7 +296,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             const SizedBox(height: 24),
 
-            // ==================== DAFTAR MENU FITUR ====================
+
             Text(
               isAdmin ? 'Fitur & Manajemen Panti Asuhan' : 'Menu & Fasilitas Unggulan',
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
@@ -521,7 +521,7 @@ class _HomeScreenState extends State<HomeScreen> {
             Expanded(
               child: ListView(
                 children: [
-                  // 1. DATA OFFLINE (LOKAL SQLITE)
+
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -560,7 +560,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // 2. DATA ONLINE (CLOUD SUPABASE)
+
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -692,7 +692,7 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    // Ambil detail anak dari SQLite/API
+
     final cachedKids = await localDb.getCachedChildren();
     final newKids = await localDb.getNewChildren();
     final all = [...cachedKids, ...newKids];

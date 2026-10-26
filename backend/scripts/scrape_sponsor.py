@@ -28,12 +28,12 @@ with opener.open(url, timeout=20) as resp:
     html = resp.read().decode('utf-8', errors='ignore')
     print(f"Status: {resp.status}, Length: {len(html)}")
     
-    # Simpan ke file untuk dianalisis
+
     with open('d:/LENOVO/Downloads/AsuhKita Mobile/AsuhKita/pedulianak_sponsor.html', 'w', encoding='utf-8') as f:
         f.write(html)
     print("Disimpan ke pedulianak_sponsor.html")
     
-    # Cari endpoint ajax / api
+
     ajax_urls = re.findall(r'[\"\']([^\"\']*(?:ajax|api|sponsor|child|children)[^\"\']*)[\"\']', html, re.I)
     print("Kemungkinan API endpoints:")
     for a in set(ajax_urls)[:20]:

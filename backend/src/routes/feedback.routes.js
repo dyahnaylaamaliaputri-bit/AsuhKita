@@ -1,4 +1,4 @@
-// File: backend/src/routes/feedback.routes.js
+
 const express = require('express');
 const router = express.Router();
 const { verifyToken, requireRole } = require('../middlewares/auth.middleware');
@@ -11,8 +11,8 @@ const {
 
 router.use(verifyToken);
 
-router.post('/', submitFeedback);     // POST /api/feedback
-router.get('/', getMyFeedback);       // Admin: all; donor: feedback from all donors
+router.post('/', submitFeedback);
+router.get('/', getMyFeedback);
 router.put('/:id', requireRole('admin_panti'), updateFeedback);
 router.delete('/:id', requireRole('admin_panti'), deleteFeedback);
 

@@ -1,21 +1,18 @@
-// File: backend/src/controllers/letters.controller.js
-// Fungsi: CRUD Surat Donatur ke Anak Asuh (PBI-061, FR-49)
-// Tabel letters menyimpan surat yang ditulis donatur (manual atau dibantu AI)
-// Endpoint: POST /api/letters, GET /api/letters, GET /api/letters/:id, DELETE /api/letters/:id
+
+
+
+
 
 const { query } = require('../config/database');
 
-// ============================================================
-// CREATE LETTER — Donatur mengirim surat ke anak asuh
-// POST /api/letters
-// Body: { child_id, content, ai_generated (boolean) }
-// PBI-061: Menyimpan surat ke tabel letters
-// ============================================================
+
+
+
 const createLetter = async (req, res, next) => {
   try {
     const { child_id, content, ai_generated } = req.body;
 
-    // Validasi input wajib
+
     if (!child_id || !content) {
       return res.status(400).json({
         success: false,
@@ -24,7 +21,7 @@ const createLetter = async (req, res, next) => {
       });
     }
 
-    // Validasi isi surat tidak kosong
+
     if (content.trim().length < 10) {
       return res.status(400).json({
         success: false,
@@ -33,7 +30,7 @@ const createLetter = async (req, res, next) => {
       });
     }
 
-    // Cek apakah anak asuh ada
+
     const childCheck = await query(
       `SELECT id, alias FROM children WHERE id = $1`,
       [child_id]
@@ -47,7 +44,7 @@ const createLetter = async (req, res, next) => {
       });
     }
 
-    // Simpan surat ke tabel letters
+
     const result = await query(
       `INSERT INTO letters (user_id, child_id, content, ai_generated)
        VALUES ($1, $2, $3, $4)
@@ -65,19 +62,19 @@ const createLetter = async (req, res, next) => {
   }
 };
 
-// ============================================================
-// GET MY LETTERS — Riwayat surat yang dikirim donatur
-// GET /api/letters
-// Query params: ?child_id=xxx (opsional, filter per anak)
-// PBI-061: Menampilkan riwayat surat donatur
-// ============================================================
+
+
+
+
+
+
 const getMyLetters = async (req, res, next) => {
   try {
     const { child_id } = req.query;
     let sql, params;
 
     if (child_id) {
-      // Filter surat ke anak tertentu
+
       sql = `SELECT l.id, l.child_id, c.alias AS child_alias, l.content,
                     l.ai_generated, l.created_at
              FROM letters l
@@ -86,7 +83,7 @@ const getMyLetters = async (req, res, next) => {
              ORDER BY l.created_at DESC`;
       params = [req.user.id, child_id];
     } else {
-      // Semua surat dari donatur ini
+
       sql = `SELECT l.id, l.child_id, c.alias AS child_alias, l.content,
                     l.ai_generated, l.created_at
              FROM letters l
@@ -108,11 +105,11 @@ const getMyLetters = async (req, res, next) => {
   }
 };
 
-// ============================================================
-// GET LETTER BY ID — Detail satu surat
-// GET /api/letters/:id
-// PBI-061: Ambil detail surat berdasarkan ID
-// ============================================================
+
+
+
+
+
 const getLetterById = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -143,11 +140,11 @@ const getLetterById = async (req, res, next) => {
   }
 };
 
-// ============================================================
-// DELETE LETTER — Hapus surat milik sendiri
-// DELETE /api/letters/:id
-// PBI-061: Donatur bisa menghapus surat yang pernah dikirim
-// ============================================================
+
+
+
+
+
 const deleteLetter = async (req, res, next) => {
   try {
     const { id } = req.params;

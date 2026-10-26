@@ -1,5 +1,5 @@
-// Letak file: mobile/lib/features/sponsor/child_detail_screen.dart
-// Fungsi: Layar Detail Profil Lengkap Anak Asuh & Pemilihan Paket Sponsorship
+
+
 
 import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
@@ -127,7 +127,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Header Avatar & Informasi Singkat
+
             Container(
               padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
               decoration: const BoxDecoration(
@@ -170,7 +170,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
               ),
             ),
 
-            // Banner Status Orang Tua Asuh (Jika anak ini sudah menjadi anak asuh donatur)
+
             if (_isSponsoredByMe)
               Container(
                 margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
@@ -256,7 +256,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // CARD 1: BIODATA & DATA LENGKAP ANAK
+
                   Card(
                     elevation: 1.5,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -283,7 +283,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // CARD 2: CERITA & ASPIRASI
+
                   Card(
                     elevation: 1.5,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -310,7 +310,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // CARD 3: TARGET PEMENUHAN KEBUTUHAN
+
                   Card(
                     elevation: 1.5,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -368,7 +368,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                   ),
                   const SizedBox(height: 20),
 
-                  // CARD 4: PILIH PAKET SPONSORSHIP
+
                   const Text(
                     'Pilih Paket Sponsorship Orang Tua Asuh',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
@@ -449,7 +449,7 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                   ),
                   const SizedBox(height: 20),
 
-                  // Tombol Lanjut ke Donasi
+
                   SafeArea(
                     top: false,
                     child: Padding(

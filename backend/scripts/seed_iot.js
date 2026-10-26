@@ -1,16 +1,16 @@
-// Script: seed IoT device ke Supabase dengan UUID yang benar
+
 require('dotenv').config();
 const { Pool } = require('pg');
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
 
 (async () => {
   try {
-    // Ambil UUID panti Al-Ikhlas dari Supabase (sudah ada dari seed migrations)
+
     const orph = await pool.query("SELECT id FROM orphanages WHERE name ILIKE '%Al-Ikhlas%' LIMIT 1");
     const orphId = orph.rows[0]?.id || 'a0000001-0000-0000-0000-000000000001';
     console.log('Orphanage ID:', orphId);
 
-    // Insert IoT device dengan UUID fixed yang sama dengan yang ada di mock DB
+
     const deviceId = 'c0000001-0000-0000-0000-000000000001';
     await pool.query(
       'INSERT INTO iot_devices (id, orphanage_id, device_name, device_key) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO UPDATE SET device_name = EXCLUDED.device_name, device_key = EXCLUDED.device_key',

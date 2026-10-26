@@ -1,5 +1,5 @@
-// Letak file: mobile/lib/features/admin/donation_tracking_screen.dart
-// Fungsi: Layar Riwayat & Tracking Donasi Donatur untuk Admin Panti Asuhan (Hanya menampilkan donasi riil yang dilakukan oleh donatur, PBI-039)
+
+
 
 import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
@@ -29,7 +29,7 @@ class _DonationTrackingScreenState extends State<DonationTrackingScreen> {
     final combined = <Map<String, dynamic>>[];
 
     try {
-      // 1. Ambil donasi riil dari SQLite lokal
+
       final localDonations = await LocalDatabase().getCachedDonations();
       for (var d in localDonations) {
         combined.add({
@@ -57,7 +57,7 @@ class _DonationTrackingScreenState extends State<DonationTrackingScreen> {
         });
       }
 
-      // 2. Coba sinkronisasi dari Supabase API (hanya donasi nyata di cloud)
+
       try {
         final res = await DioClient().dio.get('/donations');
         if (res.statusCode == 200) {
@@ -70,7 +70,7 @@ class _DonationTrackingScreenState extends State<DonationTrackingScreen> {
 
           for (var ad in apiList) {
             final id = ad['id']?.toString() ?? '';
-            // Jangan duplikat jika sudah ada di lokal
+
             if (!combined.any((c) => c['id'] == id)) {
               combined.add({
                 'id': id,
@@ -92,7 +92,7 @@ class _DonationTrackingScreenState extends State<DonationTrackingScreen> {
         }
       } catch (_) {}
 
-      // Urutkan donasi terbaru di atas
+
       combined.sort((a, b) => b['date'].toString().compareTo(a['date'].toString()));
 
       if (mounted) {
@@ -141,7 +141,7 @@ class _DonationTrackingScreenState extends State<DonationTrackingScreen> {
       ),
       body: Column(
         children: [
-          // Banner Ringkasan Donasi Riil
+
           Container(
             padding: const EdgeInsets.all(16),
             color: AppColors.surfaceLight,
@@ -172,7 +172,7 @@ class _DonationTrackingScreenState extends State<DonationTrackingScreen> {
             ),
           ),
 
-          // Search Bar
+
           Padding(
             padding: const EdgeInsets.all(14.0),
             child: TextField(
@@ -190,7 +190,7 @@ class _DonationTrackingScreenState extends State<DonationTrackingScreen> {
             ),
           ),
 
-          // List Data Tracking Donasi Donatur
+
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator(color: AppColors.primary))

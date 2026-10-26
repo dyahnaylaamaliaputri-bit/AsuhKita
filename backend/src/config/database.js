@@ -1,27 +1,27 @@
-// File: backend/src/config/database.js
-// Fungsi: Konfigurasi koneksi ke Supabase (PostgreSQL)
-// Mode: Otomatis deteksi apakah DATABASE_URL valid atau pakai MOCK (untuk demo tanpa Supabase)
+
+
+
 
 const { Pool } = require('pg');
 require('dotenv').config();
 
-// ============================================================
-// CEK apakah DATABASE_URL sudah diisi dengan nilai nyata
-// ============================================================
+
+
+
 const dbUrl = process.env.DATABASE_URL || '';
 const isMockMode = !dbUrl || dbUrl.includes('xxxx') || dbUrl.includes('password') || dbUrl === '';
 
-// ============================================================
-// DATA IN-MEMORY MOCK — dipakai saat Supabase belum di-setup
-// Data ini menggantikan database untuk demo/testing awal
-// ============================================================
+
+
+
+
 const mockDb = {
   users: [
     {
       id: 'usr-demo-001',
       name: 'Demo Donatur',
       email: 'demo@asuhkita.com',
-      // bcrypt hash dari 'password123' (generate: bcrypt.hash('password123', 12))
+
       password_hash: '$2b$12$iMUdfP5MB9M6N/AUpe/od.XqpgywkyPpvj1IjmWYRsKSgTeV8uU5u',
       phone: '08123456789',
       role: 'donatur',
@@ -34,7 +34,7 @@ const mockDb = {
       id: 'usr-admin-001',
       name: 'Admin Al-Ikhlas',
       email: 'admin@asuhkita.com',
-      // bcrypt hash dari 'admin123!'  (generate: bcrypt.hash('admin123!', 12))
+
       password_hash: '$2b$12$6hOLUgTUK1cINBxPjnv1s.HyTp9NF8p4kUzTW5.dubktmkFevFEYW',
       phone: '0211111111',
       role: 'admin_panti',
@@ -102,40 +102,40 @@ const mockDb = {
   ],
 };
 
-// ============================================================
-// MOCK QUERY ENGINE — Mensimulasikan PostgreSQL query
-// Mendukung pola query dasar yang digunakan controllers
-// ============================================================
+
+
+
+
 let mockIdCounter = 1000;
 const generateMockId = () => `mock-${Date.now()}-${mockIdCounter++}`;
 
 const executeMockQuery = (text, params = []) => {
   const sql = text.trim().toUpperCase();
 
-  // ---- SELECT queries ----
 
-  // SELECT * FROM users WHERE email = $1
+
+
   if (sql.includes('FROM USERS') && sql.includes('EMAIL =')) {
     const email = params[0]?.toLowerCase();
     const rows = mockDb.users.filter(u => u.email === email);
     return { rows, rowCount: rows.length };
   }
 
-  // SELECT id FROM users WHERE email = $1 (cek duplikat email)
+
   if (sql.includes('FROM USERS') && sql.includes('EMAIL =')) {
     const email = params[0]?.toLowerCase();
     const rows = mockDb.users.filter(u => u.email === email).map(u => ({ id: u.id }));
     return { rows, rowCount: rows.length };
   }
 
-  // SELECT * FROM users WHERE id = $1
+
   if (sql.includes('FROM USERS') && (sql.includes('WHERE ID =') || sql.includes('WHERE U.ID ='))) {
     const id = params[0];
     const rows = mockDb.users.filter(u => u.id === id);
     return { rows, rowCount: rows.length };
   }
 
-  // INSERT INTO users
+
   if (sql.startsWith('INSERT INTO USERS') || (sql.includes('INSERT INTO') && sql.includes('USERS'))) {
     const [name, email, password_hash, role, phone] = params;
     const newUser = {
@@ -149,7 +149,7 @@ const executeMockQuery = (text, params = []) => {
     return { rows: [newUser], rowCount: 1 };
   }
 
-  // UPDATE users SET
+
   if (sql.includes('UPDATE USERS SET')) {
     const userId = params[params.length - 1];
     const userIdx = mockDb.users.findIndex(u => u.id === userId);
@@ -163,14 +163,14 @@ const executeMockQuery = (text, params = []) => {
     return { rows: [], rowCount: 0 };
   }
 
-  // SELECT FROM sessions
+
   if (sql.includes('FROM SESSIONS') && sql.includes('REFRESH_HASH =')) {
     const hash = params[0]; const userId = params[1];
     const rows = mockDb.sessions.filter(s => s.refresh_hash === hash && s.user_id === userId);
     return { rows, rowCount: rows.length };
   }
 
-  // INSERT INTO sessions
+
   if (sql.includes('INSERT INTO SESSIONS')) {
     const [user_id, refresh_hash, device_info, ip_address, expires_at] = params;
     const session = { id: generateMockId(), user_id, refresh_hash, device_info, ip_address, is_revoked: false, expires_at, created_at: new Date().toISOString() };
@@ -178,24 +178,24 @@ const executeMockQuery = (text, params = []) => {
     return { rows: [session], rowCount: 1 };
   }
 
-  // UPDATE sessions SET is_revoked
+
   if (sql.includes('UPDATE SESSIONS SET IS_REVOKED')) {
     const hash = params[0];
     mockDb.sessions.forEach(s => { if (s.refresh_hash === hash) s.is_revoked = true; });
     return { rows: [], rowCount: 1 };
   }
 
-  // SELECT FROM orphanages
+
   if (sql.includes('FROM ORPHANAGES') && !sql.includes('JOIN')) {
     const rows = [...mockDb.orphanages];
     return { rows, rowCount: rows.length };
   }
 
-  // SELECT FROM children (dengan filter sederhana)
+
   if (sql.includes('FROM CHILDREN') || (sql.includes('FROM CHILDREN C') && sql.includes('JOIN ORPHANAGES'))) {
     let rows = mockDb.children.map(c => ({ ...c }));
 
-    // Filter search alias
+
     if (params.length > 0) {
       params.forEach(p => {
         if (typeof p === 'string' && p.includes('%')) {
@@ -213,14 +213,14 @@ const executeMockQuery = (text, params = []) => {
       rows = rows.filter(c => c.status === 'Tersedia');
     }
 
-    // Limit
+
     const limitIdx = params.findIndex(p => typeof p === 'number' && p <= 100);
     if (limitIdx >= 0) rows = rows.slice(0, params[limitIdx]);
 
     return { rows, rowCount: rows.length };
   }
 
-  // INSERT INTO children (admin menambah anak baru)
+
   if (sql.includes('INSERT INTO CHILDREN') || (sql.includes('INSERT INTO') && sql.includes('CHILDREN'))) {
     const newChild = {
       id: generateMockId(),
@@ -243,12 +243,12 @@ const executeMockQuery = (text, params = []) => {
     return { rows: [newChild], rowCount: 1 };
   }
 
-  // SELECT COUNT(*) FROM children
+
   if (sql.includes('SELECT COUNT(*)') && sql.includes('CHILDREN')) {
     return { rows: [{ count: String(mockDb.children.length) }], rowCount: 1 };
   }
 
-  // SELECT FROM sponsorship_packages
+
   if (sql.includes('FROM SPONSORSHIP_PACKAGES')) {
     let rows = [...mockDb.sponsorship_packages];
     const catParam = params.find(p => ['Pendidikan','Kesehatan','Gizi','Umum'].includes(p));
@@ -256,14 +256,14 @@ const executeMockQuery = (text, params = []) => {
     return { rows, rowCount: rows.length };
   }
 
-  // SELECT FROM sponsorships
+
   if (sql.includes('FROM SPONSORSHIPS') && sql.includes('USER_ID =')) {
     const userId = params[0];
     const rows = mockDb.sponsorships.filter(s => s.user_id === userId);
     return { rows, rowCount: rows.length };
   }
 
-  // INSERT INTO sponsorships
+
   if (sql.includes('INSERT INTO SPONSORSHIPS')) {
     const [user_id, child_id, package_id, frequency] = params;
     const pkg = mockDb.sponsorship_packages.find(p => p.id === package_id);
@@ -272,21 +272,21 @@ const executeMockQuery = (text, params = []) => {
     return { rows: [s], rowCount: 1 };
   }
 
-  // SELECT FROM donations
+
   if (sql.includes('FROM DONATIONS') && (sql.includes('USER_ID =') || sql.includes('D.USER_ID ='))) {
     const userId = params[0];
     const rows = mockDb.donations.filter(d => d.user_id === userId);
     return { rows, rowCount: rows.length };
   }
 
-  // SELECT FROM donations WHERE local_id
+
   if (sql.includes('FROM DONATIONS') && sql.includes('LOCAL_ID =')) {
     const localId = params[0];
     const rows = mockDb.donations.filter(d => d.local_id === localId);
     return { rows, rowCount: rows.length };
   }
 
-  // INSERT INTO donations
+
   if (sql.includes('INSERT INTO DONATIONS')) {
     const d = {
       id: generateMockId(),
@@ -301,26 +301,26 @@ const executeMockQuery = (text, params = []) => {
     return { rows: [d], rowCount: 1 };
   }
 
-  // SELECT COUNT(*) FROM donations
+
   if (sql.includes('SELECT COUNT(*)') && sql.includes('DONATIONS')) {
     const userId = params[0];
     const count = mockDb.donations.filter(d => d.user_id === userId).length;
     return { rows: [{ count: String(count) }], rowCount: 1 };
   }
 
-  // SELECT FROM ledger_blocks ORDER BY block_index DESC LIMIT 1
+
   if (sql.includes('FROM LEDGER_BLOCKS') && sql.includes('LIMIT 1') && sql.includes('DESC')) {
     const blocks = [...mockDb.ledger_blocks].sort((a, b) => b.block_index - a.block_index);
     return { rows: blocks.slice(0, 1), rowCount: 1 };
   }
 
-  // SELECT * FROM ledger_blocks ORDER BY block_index ASC (verifikasi)
+
   if (sql.includes('FROM LEDGER_BLOCKS') && sql.includes('ASC')) {
     const rows = [...mockDb.ledger_blocks].sort((a, b) => a.block_index - b.block_index);
     return { rows, rowCount: rows.length };
   }
 
-  // SELECT FROM ledger_blocks (general)
+
   if (sql.includes('FROM LEDGER_BLOCKS')) {
     const page = params[1] ? parseInt(params[1]) : 0;
     const limit = params[0] ? parseInt(params[0]) : 20;
@@ -328,12 +328,12 @@ const executeMockQuery = (text, params = []) => {
     return { rows, rowCount: rows.length };
   }
 
-  // SELECT COUNT(*) FROM ledger_blocks
+
   if (sql.includes('SELECT COUNT(*)') && sql.includes('LEDGER_BLOCKS')) {
     return { rows: [{ count: String(mockDb.ledger_blocks.length) }], rowCount: 1 };
   }
 
-  // INSERT INTO ledger_blocks
+
   if (sql.includes('INSERT INTO LEDGER_BLOCKS')) {
     const [block_index, block_type, ref_id, payload_hash, prev_hash, hash, created_at] = params;
     const block = { id: generateMockId(), block_index, block_type, ref_id, payload_hash, prev_hash, hash, created_at };
@@ -341,7 +341,7 @@ const executeMockQuery = (text, params = []) => {
     return { rows: [block], rowCount: 1 };
   }
 
-  // SELECT all donor feedback for donors, or all feedback for admins.
+
   if (sql.includes('FROM FEEDBACK F') && sql.includes('JOIN USERS')) {
     const rows = mockDb.feedback
       .filter(f => mockDb.users.some(u => u.id === f.user_id && u.role === 'donatur'))
@@ -354,14 +354,14 @@ const executeMockQuery = (text, params = []) => {
     return { rows, rowCount: rows.length };
   }
 
-  // Legacy per-user feedback query.
+
   if (sql.includes('FROM FEEDBACK') && sql.includes('USER_ID =')) {
     const userId = params[0];
     const rows = mockDb.feedback.filter(f => f.user_id === userId).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     return { rows, rowCount: rows.length };
   }
 
-  // INSERT INTO feedback
+
   if (sql.includes('INSERT INTO FEEDBACK')) {
     const f = {
       id: generateMockId(),
@@ -427,21 +427,21 @@ const executeMockQuery = (text, params = []) => {
     return { rows: mockDb.push_tokens.map(({ token }) => ({ token })), rowCount: mockDb.push_tokens.length };
   }
 
-  // SELECT FROM game_scores
+
   if (sql.includes('FROM GAME_SCORES') && sql.includes('USER_ID =')) {
     const userId = params[0];
     const rows = mockDb.game_scores.filter(g => g.user_id === userId);
     return { rows, rowCount: rows.length };
   }
 
-  // INSERT INTO game_scores
+
   if (sql.includes('INSERT INTO GAME_SCORES')) {
     const g = { id: generateMockId(), user_id: params[0], score: params[1], created_at: new Date().toISOString() };
     mockDb.game_scores.push(g);
     return { rows: [g], rowCount: 1 };
   }
 
-  // Leaderboard
+
   if (sql.includes('FROM GAME_SCORES GS') || (sql.includes('GAME_SCORES') && sql.includes('GROUP BY'))) {
     const grouped = {};
     mockDb.game_scores.forEach(g => {
@@ -457,14 +457,14 @@ const executeMockQuery = (text, params = []) => {
     return { rows, rowCount: rows.length };
   }
 
-  // SELECT FROM step_logs
+
   if (sql.includes('FROM STEP_LOGS') && sql.includes('USER_ID =')) {
     const userId = params[0];
     const rows = mockDb.step_logs.filter(s => s.user_id === userId);
     return { rows, rowCount: rows.length };
   }
 
-  // INSERT/UPSERT INTO step_logs
+
   if (sql.includes('INTO STEP_LOGS')) {
     const [user_id, log_date, steps, points] = params;
     const idx = mockDb.step_logs.findIndex(s => s.user_id === user_id && s.log_date === log_date);
@@ -477,28 +477,28 @@ const executeMockQuery = (text, params = []) => {
     return { rows: [s], rowCount: 1 };
   }
 
-  // SELECT FROM iot_devices
+
   if (sql.includes('FROM IOT_DEVICES') && sql.includes('WHERE ID =')) {
     const id = params[0];
     const rows = mockDb.iot_devices.filter(d => d.id === id);
     return { rows, rowCount: rows.length };
   }
 
-  // SELECT FROM iot_events
+
   if (sql.includes('FROM IOT_EVENTS')) {
     const limit = params[0] ? parseInt(params[0]) : 20;
     const rows = [...mockDb.iot_events].sort((a,b) => new Date(b.created_at)-new Date(a.created_at)).slice(0, limit);
     return { rows, rowCount: rows.length };
   }
 
-  // INSERT INTO iot_events
+
   if (sql.includes('INSERT INTO IOT_EVENTS')) {
     const e = { id: generateMockId(), device_id: params[0], amount_sim: params[1], ledger_ref: null, created_at: new Date().toISOString() };
     mockDb.iot_events.push(e);
     return { rows: [e], rowCount: 1 };
   }
 
-  // UPDATE iot_events SET ledger_ref
+
   if (sql.includes('UPDATE IOT_EVENTS SET LEDGER_REF')) {
     const [ledgerId, eventId] = params;
     const idx = mockDb.iot_events.findIndex(e => e.id === eventId);
@@ -506,20 +506,20 @@ const executeMockQuery = (text, params = []) => {
     return { rows: [], rowCount: 1 };
   }
 
-  // SELECT FROM exchange_rates
+
   if (sql.includes('FROM EXCHANGE_RATES') && sql.includes('CURRENCY =')) {
     const currency = params[0];
     const rows = mockDb.exchange_rates.filter(r => r.currency === currency).map(r => ({ rate_to_idr: r.rate_to_idr, fetched_at: new Date().toISOString() }));
     return { rows, rowCount: rows.length };
   }
 
-  // SELECT FROM call_schedules
+
   if (sql.includes('FROM CALL_SCHEDULES') || sql.includes('CALL_SCHEDULES CS')) {
     const rows = mockDb.call_schedules;
     return { rows, rowCount: rows.length };
   }
 
-  // INSERT INTO call_schedules
+
   if (sql.includes('INSERT INTO CALL_SCHEDULES')) {
     const [sponsorship_id, scheduled_at_utc, donor_timezone, notes] = params;
     const s = { id: generateMockId(), sponsorship_id, scheduled_at_utc, donor_timezone, notes, status: 'scheduled', created_at: new Date().toISOString() };
@@ -527,15 +527,15 @@ const executeMockQuery = (text, params = []) => {
     return { rows: [s], rowCount: 1 };
   }
 
-  // SELECT FROM letters WHERE user_id (with optional child_id filter)
+
   if (sql.includes('FROM LETTERS') && sql.includes('USER_ID =') && !sql.includes('INSERT') && !sql.includes('DELETE')) {
     const userId = params[0];
     let rows = mockDb.letters.filter(l => l.user_id === userId);
-    // Filter by child_id jika ada
+
     if (params[1]) {
       rows = rows.filter(l => l.child_id === params[1]);
     }
-    // Join dengan children untuk alias
+
     rows = rows.map(l => {
       const child = mockDb.children.find(c => c.id === l.child_id);
       return { ...l, child_alias: child?.alias || 'Unknown' };
@@ -544,7 +544,7 @@ const executeMockQuery = (text, params = []) => {
     return { rows, rowCount: rows.length };
   }
 
-  // SELECT FROM letters WHERE id AND user_id (get by ID)
+
   if (sql.includes('FROM LETTERS') && sql.includes('WHERE L.ID =')) {
     const letterId = params[0]; const userId = params[1];
     let rows = mockDb.letters.filter(l => l.id === letterId && l.user_id === userId);
@@ -555,7 +555,7 @@ const executeMockQuery = (text, params = []) => {
     return { rows, rowCount: rows.length };
   }
 
-  // INSERT INTO letters
+
   if (sql.includes('INSERT INTO LETTERS')) {
     const [user_id, child_id, content, ai_generated] = params;
     const l = { id: generateMockId(), user_id, child_id, content, ai_generated: ai_generated === true, created_at: new Date().toISOString() };
@@ -563,7 +563,7 @@ const executeMockQuery = (text, params = []) => {
     return { rows: [l], rowCount: 1 };
   }
 
-  // DELETE FROM letters WHERE id AND user_id
+
   if (sql.includes('DELETE FROM LETTERS')) {
     const letterId = params[0]; const userId = params[1];
     const idx = mockDb.letters.findIndex(l => l.id === letterId && l.user_id === userId);
@@ -574,50 +574,50 @@ const executeMockQuery = (text, params = []) => {
     return { rows: [], rowCount: 0 };
   }
 
-  // SELECT FROM children WHERE id (untuk validasi di letters controller)
+
   if (sql.includes('FROM CHILDREN') && sql.includes('WHERE ID =')) {
     const childId = params[0];
     const rows = mockDb.children.filter(c => c.id === childId);
     return { rows, rowCount: rows.length };
   }
 
-  // SELECT NOW() — health check database
+
   if (sql.includes('SELECT NOW()')) {
     return { rows: [{ now: new Date().toISOString() }], rowCount: 1 };
   }
 
-  // INSERT INTO progress_reports
+
   if (sql.includes('INSERT INTO PROGRESS_REPORTS')) {
     const r = { id: generateMockId(), child_id: params[0], period: params[1], summary: params[2], evidence_url: params[3], ledger_ref: null, created_at: new Date().toISOString() };
     return { rows: [r], rowCount: 1 };
   }
 
-  // Default: kembalikan rows kosong
+
   console.log('[MOCK DB] Query tidak dikenali:', text.substring(0, 80));
   return { rows: [], rowCount: 0 };
 };
 
-// ============================================================
-// EXPORT: Pool atau Mock tergantung kondisi
-// ============================================================
+
+
+
 let pool;
 let query;
 
 if (isMockMode) {
-  // Mode MOCK: pakai in-memory data
+
   console.log('⚠️  [MOCK MODE] DATABASE_URL belum dikonfigurasi.');
   console.log('⚠️  Server berjalan dengan data IN-MEMORY (untuk demo/testing).');
   console.log('⚠️  Untuk koneksi nyata, isi DATABASE_URL di file .env dengan URL Supabase kamu.');
   console.log('');
 
-  // Buat mock pool agar tidak error
+
   pool = {
     query: (text, params) => Promise.resolve(executeMockQuery(text, params)),
     on: () => {},
   };
   query = (text, params) => Promise.resolve(executeMockQuery(text, params));
 } else {
-  // Mode REAL: koneksi ke Supabase PostgreSQL
+
   pool = new Pool({
     connectionString: dbUrl,
     ssl: process.env.NODE_ENV === 'production'

@@ -1,17 +1,17 @@
-// File: backend/src/controllers/donations.controller.js
-// Fungsi: Logic donasi, sponsorship, dan konversi mata uang
-// PBI-023, PBI-024, PBI-026, PBI-029 — FR-22..FR-26
+
+
+
 
 const { query } = require('../config/database');
 const { addBlock } = require('../blockchain/hash_chain');
 const { v4: uuidv4 } = require('uuid');
 
-// ============================================================
-// CREATE SPONSORSHIP — Buat sponsorship baru
-// POST /api/sponsorships
-// FR-22: Donatur membuat sponsorship dengan frekuensi sekali/bulanan
-// PBI-026: POST /sponsorships
-// ============================================================
+
+
+
+
+
+
 const createSponsorship = async (req, res, next) => {
   try {
     const { child_id, package_id, frequency = 'monthly' } = req.body;
@@ -32,7 +32,7 @@ const createSponsorship = async (req, res, next) => {
       });
     }
 
-    // Cek apakah anak tersedia
+
     const childCheck = await query(
       "SELECT id, alias, status FROM children WHERE id = $1",
       [child_id]
@@ -50,7 +50,7 @@ const createSponsorship = async (req, res, next) => {
       });
     }
 
-    // Cek sponsorship aktif ganda (FR-22: satu donatur per anak)
+
     const existingCheck = await query(
       "SELECT id FROM sponsorships WHERE user_id = $1 AND child_id = $2 AND status = 'active'",
       [req.user.id, child_id]
@@ -64,7 +64,7 @@ const createSponsorship = async (req, res, next) => {
       });
     }
 
-    // Cek paket ada
+
     const packageCheck = await query(
       'SELECT id, name, amount_idr FROM sponsorship_packages WHERE id = $1',
       [package_id]
@@ -73,7 +73,7 @@ const createSponsorship = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Paket tidak ditemukan.', error: 'PACKAGE_NOT_FOUND' });
     }
 
-    // Buat sponsorship
+
     const sponsorResult = await query(
       `INSERT INTO sponsorships (user_id, child_id, package_id, frequency, status)
        VALUES ($1, $2, $3, $4, 'active')
@@ -81,7 +81,7 @@ const createSponsorship = async (req, res, next) => {
       [req.user.id, child_id, package_id, frequency]
     );
 
-    // Update status anak jika frekuensi bulanan
+
     if (frequency === 'monthly') {
       await query(
         "UPDATE children SET status = 'Disponsori' WHERE id = $1",
@@ -99,21 +99,21 @@ const createSponsorship = async (req, res, next) => {
   }
 };
 
-// ============================================================
-// CREATE DONATION — Buat donasi (simulasi, bukan uang nyata)
-// POST /api/donations
-// FR-23: Konversi mata uang (IDR, USD, SGD, EUR, SAR)
-// FR-25: Pembayaran simulasi
-// FR-27: Blok ledger dibuat otomatis
-// PBI-026: POST /donations dengan konversi kurs di server
-// ============================================================
+
+
+
+
+
+
+
+
 const createDonation = async (req, res, next) => {
   try {
     const {
       sponsorship_id,
       amount_original,
       currency = 'IDR',
-      local_id,  // UUID dari device untuk idempotency offline sync
+      local_id,
       notes = '',
     } = req.body;
 
@@ -134,7 +134,7 @@ const createDonation = async (req, res, next) => {
       });
     }
 
-    // Idempotency: cegah donasi ganda saat sync offline (FR-20, PBI-030)
+
     if (local_id) {
       const existingDonation = await query(
         'SELECT id FROM donations WHERE local_id = $1',
@@ -150,9 +150,9 @@ const createDonation = async (req, res, next) => {
       }
     }
 
-    // Ambil kurs dari database (cache kurs terakhir dari API eksternal)
-    // FR-24: kurs diambil dari API eksternal dengan cadangan kurs terakhir di database
-    let rateUsed = 1; // default IDR ke IDR
+
+
+    let rateUsed = 1;
     if (currency !== 'IDR') {
       const rateResult = await query(
         "SELECT rate_to_idr FROM exchange_rates WHERE currency = $1 ORDER BY fetched_at DESC LIMIT 1",
@@ -162,7 +162,7 @@ const createDonation = async (req, res, next) => {
       if (rateResult.rows.length > 0) {
         rateUsed = parseFloat(rateResult.rows[0].rate_to_idr);
       } else {
-        // Kurs cadangan statis jika API belum pernah dipanggil
+
         const fallbackRates = { USD: 16000, SGD: 12000, EUR: 17000, SAR: 4300 };
         rateUsed = fallbackRates[currency] || 1;
       }
@@ -170,7 +170,7 @@ const createDonation = async (req, res, next) => {
 
     const amountIdr = Math.round(parseFloat(amount_original) * rateUsed);
 
-    // Simpan donasi ke database
+
     const donationResult = await query(
       `INSERT INTO donations
          (sponsorship_id, user_id, amount_original, currency, rate_used, amount_idr, source, local_id, notes)
@@ -191,8 +191,8 @@ const createDonation = async (req, res, next) => {
 
     const donation = donationResult.rows[0];
 
-    // FR-27: Buat blok ledger secara otomatis setiap donasi berhasil
-    // PBI-035: Pembuatan blok otomatis saat donasi masuk
+
+
     const ledgerBlock = await addBlock('DONATION', donation.id, {
       donation_id: donation.id,
       user_id: req.user.id,
@@ -226,12 +226,12 @@ const createDonation = async (req, res, next) => {
   }
 };
 
-// ============================================================
-// GET DONATION HISTORY — Riwayat donasi user
-// GET /api/donations/history
-// FR-26: Donatur melihat riwayat donasi beserta kurs yang dipakai
-// PBI-029: GET /donations/history
-// ============================================================
+
+
+
+
+
+
 const getDonationHistory = async (req, res, next) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -275,15 +275,15 @@ const getDonationHistory = async (req, res, next) => {
   }
 };
 
-// ============================================================
-// SYNC OFFLINE DONATIONS — Sinkronisasi antrean offline dari SQLite
-// POST /api/donations/sync
-// FR-20: Donasi offline disinkronkan otomatis saat online
-// PBI-030: Antrean donasi offline + sinkronisasi otomatis
-// ============================================================
+
+
+
+
+
+
 const syncOfflineDonations = async (req, res, next) => {
   try {
-    const { donations } = req.body; // Array dari pending donations di SQLite Flutter
+    const { donations } = req.body;
 
     if (!Array.isArray(donations) || donations.length === 0) {
       return res.status(400).json({
@@ -297,7 +297,7 @@ const syncOfflineDonations = async (req, res, next) => {
 
     for (const d of donations) {
       try {
-        // Cek idempotency — sudah tersinkronisasi sebelumnya?
+
         if (d.local_id) {
           const existing = await query(
             'SELECT id FROM donations WHERE local_id = $1',
@@ -309,11 +309,11 @@ const syncOfflineDonations = async (req, res, next) => {
           }
         }
 
-        // Ambil kurs
+
         let rateUsed = parseFloat(d.rate_used) || 1;
         const amountIdr = Math.round(parseFloat(d.amount_original) * rateUsed);
 
-        // Simpan donasi
+
         const donResult = await query(
           `INSERT INTO donations
              (sponsorship_id, user_id, amount_original, currency, rate_used, amount_idr, source, local_id)
@@ -324,7 +324,7 @@ const syncOfflineDonations = async (req, res, next) => {
 
         const donationId = donResult.rows[0].id;
 
-        // Buat blok ledger
+
         await addBlock('DONATION', donationId, {
           donation_id: donationId,
           user_id: req.user.id,
@@ -348,10 +348,10 @@ const syncOfflineDonations = async (req, res, next) => {
   }
 };
 
-// ============================================================
-// GET MY SPONSORSHIPS — Daftar sponsorship aktif user
-// GET /api/sponsorships
-// ============================================================
+
+
+
+
 const getMySponsorships = async (req, res, next) => {
   try {
     const result = await query(

@@ -1,17 +1,17 @@
-// File: backend/src/controllers/children.controller.js
-// Fungsi: Logic pencarian dan detail anak panti (PBI-016, PBI-017, FR-15..FR-18)
-// Endpoint: GET /api/children, GET /api/children/:id
+
+
+
 
 const { query } = require('../config/database');
 
-// ============================================================
-// GET CHILDREN — Daftar anak dengan pencarian dan filter
-// GET /api/children?search=&category=&min_age=&max_age=&orphanage_id=&city=
-// FR-15: Cari berdasarkan nama samaran
-// FR-16: Filter kategori, usia, panti, kota
-// FR-17: Detail anak
-// PBI-017: GET /children (search, filter kategori, usia, panti, kota)
-// ============================================================
+
+
+
+
+
+
+
+
 const getChildren = async (req, res, next) => {
   try {
     const {
@@ -26,61 +26,61 @@ const getChildren = async (req, res, next) => {
       limit = 20,
     } = req.query;
 
-    // Bangun query dinamis berdasarkan filter yang diberikan
+
     const conditions = [];
     const params = [];
     let paramIndex = 1;
 
-    // Filter pencarian nama samaran
+
     if (search) {
-      conditions.push(`c.alias ILIKE $${paramIndex}`); // ILIKE = case-insensitive LIKE di PostgreSQL
+      conditions.push(`c.alias ILIKE $${paramIndex}`);
       params.push(`%${search}%`);
       paramIndex++;
     }
 
-    // Filter kategori kebutuhan
+
     if (category && category !== 'Semua') {
       conditions.push(`c.need_category = $${paramIndex}`);
       params.push(category);
       paramIndex++;
     }
 
-    // Filter usia minimum
+
     if (min_age) {
       conditions.push(`c.age >= $${paramIndex}`);
       params.push(parseInt(min_age));
       paramIndex++;
     }
 
-    // Filter usia maksimum
+
     if (max_age) {
       conditions.push(`c.age <= $${paramIndex}`);
       params.push(parseInt(max_age));
       paramIndex++;
     }
 
-    // Filter panti (by ID)
+
     if (orphanage_id) {
       conditions.push(`c.orphanage_id = $${paramIndex}`);
       params.push(orphanage_id);
       paramIndex++;
     }
 
-    // Filter kota (via JOIN orphanages)
+
     if (city) {
       conditions.push(`o.city ILIKE $${paramIndex}`);
       params.push(`%${city}%`);
       paramIndex++;
     }
 
-    // Filter status (default: Tersedia)
+
     conditions.push(`c.status = $${paramIndex}`);
     params.push(status);
     paramIndex++;
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-    // Pagination
+
     const offset = (parseInt(page) - 1) * parseInt(limit);
     params.push(parseInt(limit));
     params.push(offset);
@@ -101,8 +101,8 @@ const getChildren = async (req, res, next) => {
 
     const result = await query(sql, params);
 
-    // Count total untuk pagination (tanpa LIMIT/OFFSET)
-    const countParams = params.slice(0, -2); // hapus LIMIT dan OFFSET
+
+    const countParams = params.slice(0, -2);
     const countSql = `
       SELECT COUNT(*) FROM children c
       JOIN orphanages o ON c.orphanage_id = o.id
@@ -126,17 +126,17 @@ const getChildren = async (req, res, next) => {
   }
 };
 
-// ============================================================
-// GET CHILD DETAIL — Detail satu anak beserta paket sponsor
-// GET /api/children/:id
-// FR-17: Detail anak (avatar, usia, ringkasan cerita, kebutuhan, panti)
-// FR-18: Pilih jenis sponsor dan paket
-// ============================================================
+
+
+
+
+
+
 const getChildDetail = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    // Data anak
+
     const childResult = await query(
       `SELECT c.id, c.alias, c.age, c.gender, c.need_category,
               c.story_summary, c.avatar, c.status,
@@ -159,7 +159,7 @@ const getChildDetail = async (req, res, next) => {
 
     const child = childResult.rows[0];
 
-    // Paket sponsor yang tersedia (filter by kategori anak)
+
     const packagesResult = await query(
       `SELECT id, category, name, amount_idr, description
        FROM sponsorship_packages
@@ -168,7 +168,7 @@ const getChildDetail = async (req, res, next) => {
       [child.need_category]
     );
 
-    // Cek apakah user sudah sponsoring anak ini
+
     let isAlreadySponsored = false;
     if (req.user) {
       const existingSponsor = await query(
@@ -192,11 +192,11 @@ const getChildDetail = async (req, res, next) => {
   }
 };
 
-// ============================================================
-// GET ALL PACKAGES — Semua paket sponsor
-// GET /api/children/packages
-// FR-18: Pilih jenis sponsor (Pendidikan, Kesehatan, Gizi, Umum)
-// ============================================================
+
+
+
+
+
 const getPackages = async (req, res, next) => {
   try {
     const { category } = req.query;
@@ -221,11 +221,11 @@ const getPackages = async (req, res, next) => {
   }
 };
 
-// ============================================================
-// POST CREATE CHILD — Admin menambah anak baru
-// POST /api/children
-// Revisi: Admin input anak baru → langsung masuk Supabase → muncul di donatur
-// ============================================================
+
+
+
+
+
 const createChild = async (req, res, next) => {
   try {
     const {
@@ -252,7 +252,7 @@ const createChild = async (req, res, next) => {
       });
     }
 
-    // Pastikan valid UUID untuk orphanage_id
+
     let validOrphanageId = orphanage_id;
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!validOrphanageId || !uuidRegex.test(validOrphanageId)) {
@@ -264,7 +264,7 @@ const createChild = async (req, res, next) => {
       }
     }
 
-    // Normalisasi gender ('L' atau 'P')
+
     let normGender = 'L';
     if (gender) {
       const g = gender.toString().toUpperCase();
@@ -311,10 +311,10 @@ const createChild = async (req, res, next) => {
   }
 };
 
-// ============================================================
-// PUT UPDATE CHILD — Admin memperbarui data anak
-// PUT /api/children/:id
-// ============================================================
+
+
+
+
 const updateChild = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -393,10 +393,10 @@ const updateChild = async (req, res, next) => {
   }
 };
 
-// ============================================================
-// DELETE CHILD — Admin menghapus data anak
-// DELETE /api/children/:id
-// ============================================================
+
+
+
+
 const deleteChild = async (req, res, next) => {
   try {
     const { id } = req.params;

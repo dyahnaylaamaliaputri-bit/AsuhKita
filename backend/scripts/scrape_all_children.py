@@ -34,17 +34,17 @@ for page in range(1, 4):
                 print(f"No more content on page {page}")
                 break
                 
-            # Parse each card:
-            # Cards are inside: <div class="col-12 col-lg-6 ...> ... </div>
+
+
             cards = re.findall(r'<div class=\"item-list-list_card\">(.*?)<\/div>\s*<\/div>\s*<\/div>', content, re.DOTALL)
             print(f"Page {page} found {len(cards)} cards")
             
             for c in cards:
-                # Foto
+
                 img_m = re.search(r'<img[^>]+src=[\"\']([^\"\']+)[\"\']', c)
                 photo_url = img_m.group(1).replace(r'\/', '/') if img_m else ''
                 
-                # Nama (hapus polyglot tags [:en]...[:id]...[:])
+
                 name_m = re.search(r'<h[23][^>]*>(.*?)<\/h[23]>', c)
                 raw_name = name_m.group(1) if name_m else ''
                 name = re.sub(r'\[:.*?\]', '', raw_name).strip()
@@ -55,16 +55,16 @@ for page in range(1, 4):
                     name_en_m = re.search(r'\[:en\](.*?)\[:id\]', raw_name)
                     if name_en_m: name = name_en_m.group(1).strip()
                     
-                # Detail link or story
+
                 link_m = re.search(r'href=[\"\']([^\"\']+)[\"\']', c)
                 detail_url = link_m.group(1).replace(r'\/', '/') if link_m else ''
                 
-                # Price / target
+
                 price_m = re.search(r'<div class=\"price-amount\">(.*?)<\/div>', c)
                 price = re.sub(r'<[^>]+>', '', price_m.group(1)).strip() if price_m else ''
                 price = re.sub(r'\[:.*?\]', '', price).strip()
                 
-                # Story / Deskripsi singkat
+
                 desc_m = re.search(r'<p[^>]*>(.*?)<\/p>', c)
                 desc = re.sub(r'<[^>]+>', '', desc_m.group(1)).strip() if desc_m else ''
                 desc = re.sub(r'\[:.*?\]', '', desc).strip()

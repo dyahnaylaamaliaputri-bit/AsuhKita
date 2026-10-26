@@ -1,5 +1,5 @@
-// Letak file: mobile/lib/features/sponsor/sponsor_screen.dart
-// Fungsi: UI Pencarian & Filter Anak Asuh (Tab Sponsor), Integrasi Cache SQLite Offline, dan Shake-to-Refresh (PBI-018, PBI-019, PBI-020, PBI-052)
+
+
 
 import 'dart:async';
 import 'dart:convert';
@@ -14,7 +14,7 @@ import 'child_detail_screen.dart';
 class SponsorScreen extends StatefulWidget {
   const SponsorScreen({super.key});
 
-  /// Notifier realtime: jika admin menambah/mengubah data anak, layar donatur langsung ter-update otomatis
+
   static final ValueNotifier<int> refreshNotifier = ValueNotifier<int>(0);
 
   @override
@@ -31,11 +31,11 @@ class _SponsorScreenState extends State<SponsorScreen> {
   bool _isOffline = false;
   bool _forceOfflineMode = false;
 
-  // Sensor Stream untuk Shake-to-Refresh (PBI-052, FR-45)
+
   StreamSubscription? _accelerometerSubscription;
   DateTime _lastShakeTime = DateTime.now();
 
-  // Kategori kebutuhan — SAMA dengan admin (unified)
+
   final List<String> _categories = AppColors.needCategories;
 
   @override
@@ -54,7 +54,7 @@ class _SponsorScreenState extends State<SponsorScreen> {
     super.dispose();
   }
 
-  // Sensor Accelerometer: Goyangkan HP untuk refresh data (PBI-052, FR-45)
+
   void _initShakeDetector() {
     _accelerometerSubscription = accelerometerEventStream().listen((event) {
       final acceleration = sqrt(event.x * event.x + event.y * event.y + event.z * event.z);
@@ -84,7 +84,7 @@ class _SponsorScreenState extends State<SponsorScreen> {
     }
 
     if (_forceOfflineMode) {
-      // Mode offline manual (demonstrasi cache SQLite)
+
       _isOffline = true;
       final cached = await LocalDatabase().getCachedChildren(
         query: _searchController.text.trim(),
@@ -93,7 +93,7 @@ class _SponsorScreenState extends State<SponsorScreen> {
       _allChildren = cached;
     } else {
       try {
-        // 1. Coba ambil dari online API Supabase
+
         final res = await DioClient().dio.get('/children');
         List<Map<String, dynamic>> apiData = [];
         if (res.statusCode == 200) {
@@ -103,7 +103,7 @@ class _SponsorScreenState extends State<SponsorScreen> {
             apiData = List<Map<String, dynamic>>.from(res.data['data']);
           }
 
-          // Sinkronkan ke SQLite cache lokal (otomatis kosongkan cache jika di Supabase belum ada data)
+
           if (apiData.isNotEmpty) {
             await LocalDatabase().cacheChildren(apiData);
             _allChildren = List<Map<String, dynamic>>.from(apiData);
@@ -119,7 +119,7 @@ class _SponsorScreenState extends State<SponsorScreen> {
           throw Exception('Gagal memuat data dari server');
         }
       } catch (e) {
-        // 2. Jika offline/gagal, baca dari SQLite cache lokal (FR-19, NFR-03)
+
         _isOffline = true;
         final cached = await LocalDatabase().getCachedChildren(
           query: _searchController.text.trim(),
@@ -129,10 +129,10 @@ class _SponsorScreenState extends State<SponsorScreen> {
       }
     }
 
-    // Hitung total donasi per anak untuk status terpenuhi / belum terpenuhi
+
     await _loadDonationStats();
 
-    // Filter lokal berdasarkan query pencarian dan kategori
+
     _applyLocalFilter();
 
     setState(() => _isLoading = false);
@@ -184,9 +184,9 @@ class _SponsorScreenState extends State<SponsorScreen> {
     });
   }
 
-    // ============================================================
-  // AI PROFILING: MULTI-CRITERIA MATCHING RECOMMENDATION ENGINE
-  // ============================================================
+
+
+
   void _showAiProfilingModal() {
     String selectedAgeRange = 'Semua Usia';
     String selectedPriorityNeed = 'Semua Kebutuhan';
@@ -238,7 +238,7 @@ class _SponsorScreenState extends State<SponsorScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // 1. Rentang Usia
+
                         const Text('1. Preferensi Rentang Usia Anak', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                         const SizedBox(height: 6),
                         Wrap(
@@ -257,7 +257,7 @@ class _SponsorScreenState extends State<SponsorScreen> {
                         ),
                         const SizedBox(height: 14),
 
-                        // 2. Kategori Kebutuhan
+
                         const Text('2. Prioritas Kebutuhan Pokok', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                         const SizedBox(height: 6),
                         Wrap(
@@ -276,7 +276,7 @@ class _SponsorScreenState extends State<SponsorScreen> {
                         ),
                         const SizedBox(height: 14),
 
-                        // 3. Alokasi Budget Donatur
+
                         const Text('3. Rencana Budget / Dana Donasi Bulanan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                         const SizedBox(height: 6),
                         Wrap(
@@ -295,7 +295,7 @@ class _SponsorScreenState extends State<SponsorScreen> {
                         ),
                         const SizedBox(height: 14),
 
-                        // 4. Kriteria Urgensi
+
                         SwitchListTile(
                           contentPadding: EdgeInsets.zero,
                           title: const Text('Prioritaskan yang Belum Terpenuhi', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
@@ -353,7 +353,7 @@ class _SponsorScreenState extends State<SponsorScreen> {
       return;
     }
 
-    // Algoritma Scoring Profiling AI
+
     List<Map<String, dynamic>> scoredList = [];
 
     for (var child in _allChildren) {
@@ -365,7 +365,7 @@ class _SponsorScreenState extends State<SponsorScreen> {
       final collected = _collectedPerChild[alias] ?? 0;
       final isFulfilled = collected >= target && target > 0;
 
-      // 1. Usia
+
       if (ageRange == 'Balita (1-5 th)' && age >= 1 && age <= 5) {
         score += 15;
       } else if (ageRange == 'Sekolah (6-12 th)' && age >= 6 && age <= 12) {
@@ -376,14 +376,14 @@ class _SponsorScreenState extends State<SponsorScreen> {
         score += 10;
       }
 
-      // 2. Kebutuhan Pokok
+
       if (priorityNeed != 'Semua Kebutuhan' && needs.contains(priorityNeed.toLowerCase())) {
         score += 15;
       } else if (priorityNeed == 'Semua Kebutuhan') {
         score += 8;
       }
 
-      // 3. Budget Donasi
+
       if (budgetRange == '< Rp 150rb' && target <= 200000) {
         score += 15;
       } else if (budgetRange == 'Rp 150rb - 350rb' && target >= 150000 && target <= 350000) {
@@ -396,7 +396,7 @@ class _SponsorScreenState extends State<SponsorScreen> {
         score += 10;
       }
 
-      // 4. Urgensi
+
       if (prioritizeUnfulfilled && !isFulfilled) {
         score += 10;
       }
@@ -516,7 +516,7 @@ class _SponsorScreenState extends State<SponsorScreen> {
       ),
       body: Column(
         children: [
-          // Banner Status Online (Supabase) / Offline (SQLite) (FR-19)
+
           if (_forceOfflineMode)
           Container(
             width: double.infinity,
@@ -566,7 +566,7 @@ class _SponsorScreenState extends State<SponsorScreen> {
             ),
           ),
 
-          // Header Search Bar (PBI-018, FR-15)
+
           Container(
             padding: const EdgeInsets.all(16),
             color: Colors.white,
@@ -598,7 +598,7 @@ class _SponsorScreenState extends State<SponsorScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // Kategori Filter Kebutuhan — SERAGAM dengan admin (PBI-018, FR-16)
+
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
@@ -629,7 +629,7 @@ class _SponsorScreenState extends State<SponsorScreen> {
             ),
           ),
 
-          // Banner Tombol AI Profiling Rekomendasi Khusus
+
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             child: InkWell(
@@ -680,7 +680,7 @@ class _SponsorScreenState extends State<SponsorScreen> {
             ),
           ),
 
-          // Daftar Kartu Anak Asuh (PBI-018, FR-17)
+
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
@@ -720,7 +720,7 @@ class _SponsorScreenState extends State<SponsorScreen> {
                                 padding: const EdgeInsets.all(16.0),
                                 child: Row(
                                   children: [
-                                    // Foto Profil Anak (FR-17, NFR-06)
+
                                     ClipRRect(
                                       borderRadius: BorderRadius.circular(16),
                                       child: SizedBox(

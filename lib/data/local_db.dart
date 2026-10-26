@@ -1,5 +1,5 @@
-// Letak file: mobile/lib/data/local_db.dart
-// Fungsi: Pengelolaan database lokal SQLite (sqflite) untuk offline cache, antrean donasi offline, nota transparansi, feedback, chat, dan autentikasi lokal terenkripsi SHA-256 (PBI-020, PBI-029, PBI-030)
+
+
 
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
@@ -43,7 +43,7 @@ class LocalDatabase {
   }
 
   Future<void> _createTables(Database db) async {
-    // Tabel Autentikasi Pengguna Lokal Terenkripsi SHA-256
+
     await db.execute('''
       CREATE TABLE IF NOT EXISTS auth_users (
         email TEXT PRIMARY KEY,
@@ -55,7 +55,7 @@ class LocalDatabase {
       )
     ''');
 
-    // Tabel Cache Daftar Anak (FR-19, NFR-03)
+
     await db.execute('''
       CREATE TABLE IF NOT EXISTS cached_children (
         id TEXT PRIMARY KEY,
@@ -71,7 +71,7 @@ class LocalDatabase {
       )
     ''');
 
-    // Tabel Cache Riwayat Donasi (FR-19, PBI-029)
+
     await db.execute('''
       CREATE TABLE IF NOT EXISTS cached_donations (
         id TEXT PRIMARY KEY,
@@ -89,7 +89,7 @@ class LocalDatabase {
       )
     ''');
 
-    // Tabel Antrean Donasi Offline (FR-20, PBI-030)
+
     await db.execute('''
       CREATE TABLE IF NOT EXISTS offline_donations_queue (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -105,7 +105,7 @@ class LocalDatabase {
       )
     ''');
 
-    // Tabel Cache Profil Pengguna dengan Nomor HP Terenkripsi AES-256 (FR-11, FR-21)
+
     await db.execute('''
       CREATE TABLE IF NOT EXISTS user_profile (
         id TEXT PRIMARY KEY,
@@ -116,7 +116,7 @@ class LocalDatabase {
       )
     ''');
 
-    // Tabel Nota / Bukti Transparansi Keuangan (Revisi Admin)
+
     await db.execute('''
       CREATE TABLE IF NOT EXISTS receipts (
         id TEXT PRIMARY KEY,
@@ -130,7 +130,7 @@ class LocalDatabase {
       )
     ''');
 
-    // Tabel Feedback / Saran & Kesan Persisten (Revisi Logout Donatur & Admin)
+
     await db.execute('''
       CREATE TABLE IF NOT EXISTS feedback_entries (
         id TEXT PRIMARY KEY,
@@ -143,7 +143,7 @@ class LocalDatabase {
       )
     ''');
 
-    // Tabel Anak Baru yang Diinputkan Admin (Dengan Dukungan Multi-Kategori & Budget)
+
     await db.execute('''
       CREATE TABLE IF NOT EXISTS new_children (
         id TEXT PRIMARY KEY,
@@ -162,7 +162,7 @@ class LocalDatabase {
       )
     ''');
 
-    // Safe column migrations untuk database yang sudah ada sebelumnya
+
     try {
       await db.execute('ALTER TABLE new_children ADD COLUMN category_budgets TEXT');
     } catch (_) {}
@@ -176,7 +176,7 @@ class LocalDatabase {
       await db.execute('ALTER TABLE cached_donations ADD COLUMN donor_email TEXT');
     } catch (_) {}
 
-    // Tabel Riwayat Chat Ruang Kasih (Pesan tersimpan permanen per anak asuh)
+
     await db.execute('''
       CREATE TABLE IF NOT EXISTS chat_messages (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -191,7 +191,7 @@ class LocalDatabase {
     ''');
   }
 
-  // ==================== OPERASI HASHING & AUTENTIKASI LOKAL ====================
+
   static String hashPassword(String password) {
     const salt = 'asuhkita_secure_salt_2026_xyz';
     final bytes = utf8.encode('$salt$password');
@@ -199,7 +199,7 @@ class LocalDatabase {
   }
 
   Future<void> _seedDefaultAuthUsers(Database db) async {
-    // Akun default Donatur: donatur@asuhkita.id / donatur123
+
     await db.insert(
       'auth_users',
       {
@@ -213,7 +213,7 @@ class LocalDatabase {
       conflictAlgorithm: ConflictAlgorithm.ignore,
     );
 
-    // Akun default Admin: admin@asuhkita.id / admin123!
+
     await db.insert(
       'auth_users',
       {
@@ -244,7 +244,7 @@ class LocalDatabase {
   }
 
   Future<void> seed20DummyChildren([Database? targetDb]) async {
-    // Dihapus sesuai permintaan: data anak asuh dikelola manual dari admin
+
     await clearDummyChildren(targetDb);
   }
 
@@ -314,7 +314,7 @@ class LocalDatabase {
     return rows.isNotEmpty;
   }
 
-  // ==================== OPERASI CACHE ANAK (PBI-020) ====================
+
   Future<void> cacheChildren(List<Map<String, dynamic>> childrenList) async {
     if (childrenList.isEmpty) return;
     final db = await database;
@@ -368,7 +368,7 @@ class LocalDatabase {
     );
   }
 
-  // ==================== OPERASI ANAK BARU DARI ADMIN ====================
+
   Future<void> insertChild(Map<String, dynamic> child) async {
     final db = await database;
     await db.insert('new_children', {
@@ -387,7 +387,7 @@ class LocalDatabase {
       'category_budgets': child['category_budgets']?.toString() ?? child['categoryBudgets']?.toString() ?? '',
     }, conflictAlgorithm: ConflictAlgorithm.replace);
 
-    // Sinkronkan juga langsung ke cached_children supaya langsung muncul di semua tampilan
+
     try {
       await db.insert('cached_children', {
         'id': child['id']?.toString() ?? 'child_${DateTime.now().millisecondsSinceEpoch}',
@@ -423,7 +423,7 @@ class LocalDatabase {
       'category_budgets': child['category_budgets']?.toString() ?? child['categoryBudgets']?.toString() ?? '',
     }, where: 'id = ? OR name = ?', whereArgs: [childId, name]);
 
-    // juga update di cached_children
+
     await db.update('cached_children', {
       'alias': name,
       'age': child['age'] is int ? child['age'] : int.tryParse(child['age']?.toString() ?? '0') ?? 0,
@@ -467,7 +467,7 @@ class LocalDatabase {
     }).toList();
   }
 
-  // ==================== OPERASI CACHE RIWAYAT DONASI (PBI-029) ====================
+
   Future<void> insertDonation(Map<String, dynamic> donation) async {
     final db = await database;
     await db.insert('cached_donations', {
@@ -491,7 +491,7 @@ class LocalDatabase {
     return await db.query('cached_donations', orderBy: 'created_at DESC');
   }
 
-  // ==================== OPERASI ANTREAN OFFLINE DONASI (PBI-030) ====================
+
   Future<int> queueOfflineDonation({
     required String childId,
     required String packageId,
@@ -530,7 +530,7 @@ class LocalDatabase {
     );
   }
 
-  // ==================== PROFIL & ENKRIPSI AES-256 (FR-11, FR-21) ====================
+
   Future<void> saveUserProfile({
     required String id,
     required String name,
@@ -567,7 +567,7 @@ class LocalDatabase {
     };
   }
 
-  // ==================== OPERASI NOTA / LAPORAN BELANJA (REVISI ADMIN) ====================
+
   Future<void> insertReceipt(Map<String, dynamic> receipt) async {
     final db = await database;
     await db.insert('receipts', {
@@ -597,7 +597,7 @@ class LocalDatabase {
     }).toList();
   }
 
-  // ==================== OPERASI FEEDBACK / SARAN & KESAN (REVISI LOGOUT PERSISTENCE) ====================
+
   Future<void> insertFeedback(Map<String, dynamic> fb) async {
     final db = await database;
     await db.insert('feedback_entries', {
@@ -616,7 +616,7 @@ class LocalDatabase {
     return await db.query('feedback_entries', orderBy: 'created_at DESC');
   }
 
-  // ==================== OPERASI CHAT RUANG KASIH (RIWAYAT CHAT PERSISTEN) ====================
+
   Future<void> insertChatMessage({
     required String childAlias,
     required String sender,

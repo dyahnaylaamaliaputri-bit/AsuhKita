@@ -1,9 +1,9 @@
-// TEST-04 | Unit Test: Konversi Kurs Multi-Valuta & Konversi Zona Waktu
-// Menguji: FR-23, FR-24, FR-38, FR-39 (PBI-025, PBI-027, PBI-046, PBI-048)
+
+
 
 import 'package:flutter_test/flutter_test.dart';
 
-// Kurs cadangan statis (FR-24) - mirror dari donation_form_screen.dart
+
 const Map<String, double> staticRates = {
   'IDR': 1.0,
   'USD': 15850.0,
@@ -12,13 +12,13 @@ const Map<String, double> staticRates = {
   'SAR': 4220.0,
 };
 
-// Fungsi konversi ke IDR (mirror dari DonationFormScreen)
+
 double convertToIdr(double amount, String currency) {
   final rate = staticRates[currency] ?? 1.0;
   return amount * rate;
 }
 
-// Format Rupiah (mirror)
+
 String formatRupiah(double val) {
   final formatted = val.toStringAsFixed(0).replaceAllMapped(
     RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
@@ -27,7 +27,7 @@ String formatRupiah(double val) {
   return 'Rp $formatted';
 }
 
-// Konversi zona waktu (mirror dari schedule_screen.dart)
+
 DateTime convertToZone(DateTime utcTime, int offsetHours) {
   return utcTime.add(Duration(hours: offsetHours));
 }
@@ -81,8 +81,8 @@ void main() {
   });
 
   group('FR-38, FR-39 | Konversi 4 Zona Waktu & UTC', () {
-    // Waktu referensi: 2026-10-21 10:00 WIB (UTC+7) -> UTC = 03:00
-    final dateTimeWib = DateTime(2026, 10, 21, 10, 0); // lokal WIB
+
+    final dateTimeWib = DateTime(2026, 10, 21, 10, 0);
     final utc = dateTimeWib.toUtc();
 
     test('UTC disimpan benar dari waktu WIB (UTC+7)', () {
@@ -113,7 +113,7 @@ void main() {
     test('Semua zona waktu memiliki tanggal yang benar', () {
       for (final offset in [7, 8, 9, 1]) {
         final converted = convertToZone(utc, offset);
-        // Semua harus tetap di 2026
+
         expect(converted.year, equals(2026));
       }
     });

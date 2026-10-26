@@ -1,4 +1,4 @@
-// File: backend/src/routes/donations.routes.js
+
 const express = require('express');
 const router = express.Router();
 const { verifyToken } = require('../middlewares/auth.middleware');
@@ -9,13 +9,13 @@ const {
 
 router.use(verifyToken);
 
-// Sponsorship
-router.post('/sponsorships', createSponsorship);      // POST /api/donations/sponsorships
-router.get('/sponsorships', getMySponsorships);       // GET  /api/donations/sponsorships
 
-// Donasi
-router.post('/', createDonation);                     // POST /api/donations
-router.get('/history', getDonationHistory);           // GET  /api/donations/history
-router.post('/sync', syncOfflineDonations);           // POST /api/donations/sync (offline sync)
+router.post('/sponsorships', createSponsorship);
+router.get('/sponsorships', getMySponsorships);
+
+
+router.post('/', createDonation);
+router.get('/history', getDonationHistory);
+router.post('/sync', syncOfflineDonations);
 
 module.exports = router;

@@ -1,16 +1,16 @@
-// File: backend/src/controllers/game.controller.js
-// Fungsi: Mini game "Tangkap Bintang Harapan" — skor, leaderboard, step logs, poin kebaikan
-// PBI-054, PBI-055 — FR-44..FR-48
+
+
+
 
 const { query } = require('../config/database');
 
-// ============================================================
-// SAVE GAME SCORE — Simpan skor mini game
-// POST /api/game/scores
-// FR-47: Skor game disimpan dan tampil di papan skor
-// FR-48: Skor dikonversi menjadi poin kebaikan (badge di profil)
-// PBI-054: POST /game/scores, papan skor, poin kebaikan
-// ============================================================
+
+
+
+
+
+
+
 const saveGameScore = async (req, res, next) => {
   try {
     const { score } = req.body;
@@ -30,8 +30,8 @@ const saveGameScore = async (req, res, next) => {
       [req.user.id, parseInt(score)]
     );
 
-    // FR-48: Konversi skor ke poin kebaikan
-    // Aturan: setiap 10 poin game = 1 poin kebaikan (dapat disesuaikan tim)
+
+
     const pointsEarned = Math.floor(parseInt(score) / 10);
 
     return res.status(201).json({
@@ -47,12 +47,12 @@ const saveGameScore = async (req, res, next) => {
   }
 };
 
-// ============================================================
-// GET LEADERBOARD — Papan skor 10 teratas
-// GET /api/game/leaderboard
-// FR-47: Tampil di papan skor
-// PBI-054: Papan skor
-// ============================================================
+
+
+
+
+
+
 const getLeaderboard = async (req, res, next) => {
   try {
     const result = await query(
@@ -73,10 +73,10 @@ const getLeaderboard = async (req, res, next) => {
   }
 };
 
-// ============================================================
-// GET MY SCORES — Riwayat skor user
-// GET /api/game/my-scores
-// ============================================================
+
+
+
+
 const getMyScores = async (req, res, next) => {
   try {
     const result = await query(
@@ -103,12 +103,12 @@ const getMyScores = async (req, res, next) => {
   }
 };
 
-// ============================================================
-// SAVE STEP LOG — Simpan log langkah harian (Donasi Langkah)
-// POST /api/steps
-// FR-44: Accelerometer mendeteksi langkah untuk Donasi Langkah
-// FR-48: Langkah dikonversi ke poin kebaikan
-// ============================================================
+
+
+
+
+
+
 const saveStepLog = async (req, res, next) => {
   try {
     const { steps, log_date } = req.body;
@@ -121,12 +121,12 @@ const saveStepLog = async (req, res, next) => {
       });
     }
 
-    const date = log_date || new Date().toISOString().split('T')[0]; // format: YYYY-MM-DD
+    const date = log_date || new Date().toISOString().split('T')[0];
 
-    // Aturan poin: setiap 1000 langkah = 1 poin kebaikan
+
     const points = Math.floor(parseInt(steps) / 1000);
 
-    // Gunakan UPSERT (INSERT OR UPDATE) karena satu user satu record per hari
+
     const result = await query(
       `INSERT INTO step_logs (user_id, log_date, steps, points)
        VALUES ($1, $2, $3, $4)
@@ -146,10 +146,10 @@ const saveStepLog = async (req, res, next) => {
   }
 };
 
-// ============================================================
-// GET STEP LOGS — Riwayat langkah dan total poin
-// GET /api/steps
-// ============================================================
+
+
+
+
 const getStepLogs = async (req, res, next) => {
   try {
     const result = await query(
@@ -161,7 +161,7 @@ const getStepLogs = async (req, res, next) => {
       [req.user.id]
     );
 
-    // Hitung total poin kebaikan dari semua sumber (game + langkah)
+
     const stepPoints = result.rows.reduce((sum, r) => sum + parseInt(r.points || 0), 0);
 
     const gamePointsResult = await query(

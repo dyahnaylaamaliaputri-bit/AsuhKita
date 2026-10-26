@@ -1,43 +1,43 @@
-// File: backend/src/controllers/iot.controller.js
-// Fungsi: Endpoint IoT kotak amal pintar ESP32
-// PBI-066, PBI-067 — FR-52, FR-53, FR-54
-//
-// Alur:
-// 1. ESP32 mengirim POST /api/iot/events dengan device_key + HMAC signature
-// 2. Backend validasi device_key (ambil dari DB) dan verifikasi HMAC
-// 3. Jika valid → simpan iot_event + buat blok ledger DONASI_KOTAK
-// 4. Simulasi via Postman bisa pakai endpoint yang sama (FR-54)
+
+
+
+
+
+
+
+
+
 
 const { query } = require('../config/database');
 const { addBlock } = require('../blockchain/hash_chain');
 const crypto = require('crypto');
 
-// ============================================================
-// POST IOT EVENT — Terima donasi dari kotak amal ESP32
-// POST /api/iot/events
-// FR-52: ESP32 mengirim event dengan device_key dan HMAC
-// FR-53: Donasi kotak amal tercatat sebagai blok ledger
-// FR-54: Dapat disimulasikan lewat Postman (fallback)
-// PBI-067: POST /iot/events (device key + HMAC)
-//
-// Request body:
-// {
-//   "device_id": "uuid-device",
-//   "device_key": "plain-key",
-//   "amount_sim": 50000,
-//   "timestamp": "2026-10-20T10:00:00Z",
-//   "hmac_signature": "sha256-hmac-hex"
-// }
-//
-// Cara hitung HMAC di ESP32 (Arduino C++):
-// payload = device_id + "|" + amount_sim + "|" + timestamp
-// hmac = HMAC-SHA256(payload, IOT_DEVICE_SECRET)
-// ============================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 const receiveIotEvent = async (req, res, next) => {
   try {
     const { device_id, device_key, amount_sim, timestamp, hmac_signature } = req.body;
 
-    // Validasi field wajib
+
     if (!device_id || !device_key || !amount_sim || !timestamp || !hmac_signature) {
       return res.status(400).json({
         success: false,
@@ -54,7 +54,7 @@ const receiveIotEvent = async (req, res, next) => {
       });
     }
 
-    // 1. Cari perangkat di database dan verifikasi device_key
+
     const deviceResult = await query(
       'SELECT id, device_name, orphanage_id, device_key, is_active FROM iot_devices WHERE id = $1',
       [device_id]
@@ -78,7 +78,7 @@ const receiveIotEvent = async (req, res, next) => {
       });
     }
 
-    // Verifikasi device_key (simple string match untuk prototype)
+
     if (device.device_key !== device_key) {
       return res.status(401).json({
         success: false,
@@ -87,9 +87,9 @@ const receiveIotEvent = async (req, res, next) => {
       });
     }
 
-    // 2. Verifikasi HMAC signature
-    // HMAC-SHA256 menggunakan IOT_DEVICE_SECRET dari environment
-    // payload = device_id + "|" + amount_sim + "|" + timestamp
+
+
+
     const payload = `${device_id}|${amount_sim}|${timestamp}`;
     const expectedHmac = crypto
       .createHmac('sha256', process.env.IOT_DEVICE_SECRET || 'dev_secret')
@@ -104,7 +104,7 @@ const receiveIotEvent = async (req, res, next) => {
       });
     }
 
-    // 3. Cegah duplikasi event (timestamp + device_id unik per menit)
+
     const duplicateCheck = await query(
       `SELECT id FROM iot_events WHERE device_id = $1
        AND created_at > NOW() - INTERVAL '2 minutes'
@@ -120,7 +120,7 @@ const receiveIotEvent = async (req, res, next) => {
       });
     }
 
-    // 4. Simpan event IoT ke database
+
     const eventResult = await query(
       `INSERT INTO iot_events (device_id, amount_sim) VALUES ($1, $2) RETURNING id`,
       [device_id, parseInt(amount_sim)]
@@ -128,7 +128,7 @@ const receiveIotEvent = async (req, res, next) => {
 
     const eventId = eventResult.rows[0].id;
 
-    // 5. Buat blok ledger tipe IOT_EVENT (FR-53)
+
     const ledgerBlock = await addBlock('IOT_EVENT', eventId, {
       event_id: eventId,
       device_id,
@@ -138,7 +138,7 @@ const receiveIotEvent = async (req, res, next) => {
       timestamp,
     });
 
-    // 6. Update ledger_ref di iot_events
+
     await query(
       'UPDATE iot_events SET ledger_ref = $1 WHERE id = $2',
       [ledgerBlock.id, eventId]
@@ -162,11 +162,11 @@ const receiveIotEvent = async (req, res, next) => {
   }
 };
 
-// ============================================================
-// GET IOT EVENTS — Riwayat event kotak amal
-// GET /api/iot/events
-// FR-53: Donasi kotak amal tampil di aplikasi
-// ============================================================
+
+
+
+
+
 const getIotEvents = async (req, res, next) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -203,11 +203,11 @@ const getIotEvents = async (req, res, next) => {
   }
 };
 
-// ============================================================
-// REGISTER IOT DEVICE — Daftarkan perangkat baru (admin panti)
-// POST /api/iot/devices
-// Memerlukan: requireRole('admin_panti')
-// ============================================================
+
+
+
+
+
 const registerDevice = async (req, res, next) => {
   try {
     const { orphanage_id, device_name, device_key } = req.body;
@@ -237,11 +237,11 @@ const registerDevice = async (req, res, next) => {
   }
 };
 
-// ============================================================
-// GENERATE TEST HMAC — Helper untuk simulasi Postman/skrip (FR-54)
-// GET /api/iot/test-hmac?device_id=&amount=&timestamp=
-// Hanya untuk development! Nonaktifkan di production.
-// ============================================================
+
+
+
+
+
 const generateTestHmac = async (req, res, next) => {
   try {
     if (process.env.NODE_ENV === 'production') {

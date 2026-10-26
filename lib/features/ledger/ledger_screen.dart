@@ -1,6 +1,6 @@
-// Letak file: mobile/lib/features/ledger/ledger_screen.dart
-// Fungsi: Layar Verifikasi Keaslian Kredensial / Sertifikat Donasi Blockchain (PBI-038, FR-27, FR-28, FR-31)
-//         Didedikasikan untuk verifikasi sertifikat donasi di Dashboard & Admin
+
+
+
 
 import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
@@ -19,7 +19,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
   bool _isVerifying = false;
   Map<String, dynamic>? _verificationResult;
 
-  // Database Kredensial Resmi Tersimpan di Rantai Blockchain
+
   final Map<String, Map<String, dynamic>> _blockchainCertificateRegistry = {
     'CERT-78491023': {
       'certCode': 'CERT-78491023',
@@ -76,7 +76,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
 
     await Future.delayed(const Duration(milliseconds: 500));
 
-    // Ekstrak kode dan hash dari format link kredensial
+
     String code = '';
     String hash = '';
 
@@ -92,7 +92,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
       hash = input.toLowerCase().trim();
     }
 
-    // Deteksi indikasi pemalsuan / rekayasa data pihak ketiga
+
     final isTamperedOrForged = input.toLowerCase().contains('palsu') ||
         input.toLowerCase().contains('fake') ||
         input.toLowerCase().contains('forged') ||
@@ -116,7 +116,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
       return;
     }
 
-    // Cocokkan terhadap database registri resmi
+
     Map<String, dynamic>? match;
     for (var entry in _blockchainCertificateRegistry.entries) {
       if ((code.isNotEmpty && entry.key.toUpperCase() == code.toUpperCase()) ||
@@ -126,7 +126,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
       }
     }
 
-    // Validasi hash bila format sha256 murni
+
     if (match == null && hash.length == 64 && hash.startsWith('0000')) {
       match = {
         'certCode': code.isNotEmpty ? code : 'CERT-VALID-ONLINE',
@@ -175,7 +175,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Kartu Input Verifikasi
+
             Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
@@ -233,7 +233,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  // Quick Test Presets
+
                   Wrap(
                     spacing: 6,
                     runSpacing: 6,
@@ -274,7 +274,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Hasil Pemeriksaan Keaslian
+
             if (_verificationResult != null)
               Container(
                 width: double.infinity,

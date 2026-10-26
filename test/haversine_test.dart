@@ -1,10 +1,10 @@
-// TEST-03 | Unit Test: Haversine Distance & Check-in Radius (LBS)
-// Menguji: FR-35, FR-36, FR-37 (PBI-043, PBI-044)
+
+
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
 
-// Helper: Menghitung jarak Haversine (sama persis dengan map_screen.dart)
+
 double calculateDistance(LatLng pos1, LatLng pos2) {
   const Distance distance = Distance();
   return distance.as(LengthUnit.Meter, pos1, pos2);
@@ -12,7 +12,7 @@ double calculateDistance(LatLng pos1, LatLng pos2) {
 
 void main() {
   group('FR-35, FR-36, FR-37 | Haversine Distance & Check-in Radius LBS', () {
-    // Posisi simulasi user (sama dengan map_screen.dart)
+
     final userLocation = const LatLng(-7.797068, 110.370529);
 
     test('Panti Kasih Ibu (~50m) ? DALAM radius 100m, check-in diizinkan', () {

@@ -1,4 +1,4 @@
-// Script: Test IoT event ke Supabase (versi final)
+
 require('dotenv').config();
 const crypto = require('crypto');
 const http = require('http');

@@ -1,5 +1,5 @@
-// File: backend/index.js
-// Fungsi: Entry point — menjalankan server Express dan test koneksi database
+
+
 
 require('dotenv').config();
 const app = require('./src/app');
@@ -7,14 +7,14 @@ const { pool } = require('./src/config/database');
 
 const PORT = process.env.PORT || 3000;
 
-// Test koneksi database sebelum server mulai
+
 async function startServer() {
   try {
-    // Coba query sederhana untuk memastikan koneksi ke Supabase berhasil
+
     await pool.query('SELECT NOW()');
     console.log('✅ Koneksi ke Supabase PostgreSQL berhasil!');
 
-    // Jalankan server Express
+
     app.listen(PORT, () => {
       console.log('');
       console.log('╔══════════════════════════════════════╗');
@@ -46,7 +46,7 @@ async function startServer() {
   } catch (err) {
     console.error('❌ Gagal terhubung ke database:', err.message);
     console.error('Periksa DATABASE_URL di file .env kamu!');
-    process.exit(1); // Hentikan server jika database tidak bisa diakses
+    process.exit(1);
   }
 }
 

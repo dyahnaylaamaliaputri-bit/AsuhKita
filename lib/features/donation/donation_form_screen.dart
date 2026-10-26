@@ -39,12 +39,12 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
   final _donorMessageController = TextEditingController();
   final LocalAuthentication _localAuth = LocalAuthentication();
 
-  String _selectedCurrency = 'IDR'; // IDR, USD, SGD, EUR, SAR (FR-23)
-  String _frequency = 'Bulanan'; // 'Bulanan' atau 'Sekali' (FR-22)
+  String _selectedCurrency = 'IDR';
+  String _frequency = 'Bulanan';
   bool _isProcessing = false;
   bool _isFetchingRates = false;
 
-  // Kurs aktif (diperbarui dari ExchangeRateService saat online, FR-43, PBI-048)
+
   Map<String, double> _exchangeRates = {
     'IDR': 1.0,
     'USD': 15850.0,
@@ -58,11 +58,11 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
   @override
   void initState() {
     super.initState();
-    // Default nominal sesuai paket pilihan dalam IDR
+
     final defaultIdr = widget.packageData['monthly_idr'] ?? 250000;
     _amountController.text = defaultIdr.toString();
 
-    // Inisialisasi Identitas Donatur dari Akun Aktif
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       try {
         final auth = Provider.of<AuthProvider>(context, listen: false);
@@ -75,7 +75,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
       } catch (_) {}
     });
 
-    // Fetch kurs real-time (FR-43, PBI-048)
+
     _fetchRealTimeRates();
   }
 
@@ -99,7 +99,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
     super.dispose();
   }
 
-  // Hitung otomatis nilai IDR (PBI-027, FR-23)
+
   double get _calculatedIdr {
     final inputVal = double.tryParse(_amountController.text.replaceAll(',', '.')) ?? 0.0;
     final rate = _exchangeRates[_selectedCurrency] ?? 1.0;
@@ -130,21 +130,21 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
       return;
     }
 
-    // ============================================================
-    // VALIDASI PEMENUHAN BUDGET KATEGORI KEBUTUHAN (BUTIR 3)
-    // Satu anak bisa > 2 donatur, maksimal donatur menyumbang jika budget kategori terpenuhi
-    // ============================================================
+
+
+
+
     try {
       final childAlias = (widget.childData['alias'] ?? widget.childData['name'] ?? '').toString().trim().toLowerCase();
       final categoryName = (widget.packageData['name'] ?? widget.childData['need_category'] ?? widget.childData['urgentNeeds'] ?? 'Pendidikan').toString();
       
-      // Hitung target kategori
+
       double categoryBudget = (widget.packageData['price_idr'] is num) ? (widget.packageData['price_idr'] as num).toDouble() : 0.0;
       if (categoryBudget <= 0 && widget.childData['target'] is num) {
         categoryBudget = (widget.childData['target'] as num).toDouble();
       }
 
-      // Cek category_budgets JSON jika ada
+
       final rawCatBudgets = widget.childData['category_budgets'] ?? widget.childData['categoryBudgets'];
       if (rawCatBudgets != null && rawCatBudgets.toString().isNotEmpty) {
         try {
@@ -204,13 +204,13 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
       }
     } catch (_) {}
 
-    // Tampilkan QR Code Pembayaran (QRIS Dinamis) terlebih dahulu (Permintaan Butir 6)
+
     _showPaymentQrDialog(amountInput);
   }
 
-  // ============================================================
-  // LANGKAH 1: QR CODE UNTUK MEMBAYAR TRANSAKSI
-  // ============================================================
+
+
+
   void _showPaymentQrDialog(double amountInput) {
     final qrisPayload =
         '00020101021226670014ID.LINKAJA.WWW01189360001400000000015204581253033605802ID5914ASUHKITA PANTI6007MATARAM62180714ASUH${DateTime.now().millisecondsSinceEpoch}6304';
@@ -276,7 +276,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
                 ),
                 const SizedBox(height: 14),
 
-                // Tampilan QR Code Dinamis
+
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -481,11 +481,11 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
     );
   }
 
-  // ============================================================
-  // LANGKAH 2: EKSEKUSI PENYIMPANAN & TAMPILKAN SERTIFIKAT RESMI
-  // ============================================================
+
+
+
   Future<void> _finalizeDonationAndShowCertificate(double amountInput) async {
-    // Konfirmasi Keamanan dengan Biometrik (PBI-057, FR-09)
+
     try {
       final canBio = await _localAuth.canCheckBiometrics || await _localAuth.isDeviceSupported();
       if (canBio) {
@@ -498,7 +498,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
 
     setState(() => _isProcessing = true);
 
-    // Ambil identitas donatur dari Form Input / AuthProvider
+
     String donorName = _donorNameController.text.trim();
     String donorEmail = _donorEmailController.text.trim();
     try {
@@ -552,7 +552,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
       isOnlineSuccess = false;
     }
 
-    // SIMPAN PERSISTEN KE DATABASE LOKAL SQLITE
+
     await LocalDatabase().insertDonation({
       'id': 'don_${DateTime.now().millisecondsSinceEpoch}',
       'sponsorship_id': 'sp_${DateTime.now().millisecondsSinceEpoch}',
@@ -574,13 +574,13 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
       await prefs.setInt('asuhkita_user_sponsored_count', currentSponsored + 1);
     } catch (_) {}
 
-    // UPDATE REAL-TIME: Triger auto-refresh di Dashboard & Sponsor Screen
+
     HomeScreen.refreshNotifier.value++;
     SponsorScreen.refreshNotifier.value++;
 
     setState(() => _isProcessing = false);
 
-    // Tampilkan Sertifikat Resmi Pendanaan Orang Tua Asuh
+
     if (mounted) {
       _showSuccessCertificateDialog(
         isOnline: isOnlineSuccess,
@@ -629,7 +629,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
                 ),
                 const SizedBox(height: 14),
 
-                // Bingkai Sertifikat Digital Ornamen Emas (FR-29)
+
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -656,7 +656,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 8),
-                      // Tampilkan Nama Donatur
+
                       Text(
                         donorName.toUpperCase(),
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.indigo),
@@ -704,7 +704,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // TOMBOL UNDUH PDF SERTIFIKAT
+
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
@@ -730,7 +730,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
                 ),
                 const SizedBox(height: 8),
 
-                // TOMBOL SALIN LINK KREDENSIAL & CEK DI BLOCKCHAIN
+
                 Row(
                   children: [
                     Expanded(
@@ -809,7 +809,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Rincian Singkat Anak & Paket
+
             Card(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               child: Padding(
@@ -844,7 +844,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Card Identitas Donatur (Untuk Tertera di Sertifikat Resmi & Blockchain)
+
             Card(
               elevation: 2,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -921,7 +921,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Card Input Mata Uang & Konversi Kurs
+
             Card(
               elevation: 2,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -941,7 +941,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
                     ),
                     const Divider(height: 20),
 
-                    // Pilihan Mata Uang: IDR, USD, SGD, EUR, SAR (FR-23)
+
                     Row(
                       children: [
                         Container(
@@ -966,7 +966,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
                                 if (val != null) {
                                   setState(() {
                                     _selectedCurrency = val;
-                                    // Sesuaikan nilai default input jika ganti valuta
+
                                     if (val == 'USD') {
                                       _amountController.text = '20';
                                     } else if (val == 'SGD') {
@@ -986,7 +986,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
                         ),
                         const SizedBox(width: 12),
 
-                        // Input Nominal
+
                         Expanded(
                           child: TextField(
                             controller: _amountController,
@@ -1002,7 +1002,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
                     ),
                     const SizedBox(height: 14),
 
-                    // Info Nilai Kurs Real-time / Cadangan (FR-43, PBI-048)
+
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
@@ -1068,7 +1068,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Hasil Konversi Rupiah Langsung (PBI-027, FR-23)
+
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
@@ -1100,7 +1100,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Pilihan Frekuensi Donasi (FR-22)
+
             Card(
               elevation: 1,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -1150,7 +1150,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Tombol Konfirmasi Pembayaran QRIS
+
             ElevatedButton.icon(
               onPressed: _isProcessing ? null : _processDonation,
               icon: const Icon(Icons.qr_code_2_rounded, size: 24),

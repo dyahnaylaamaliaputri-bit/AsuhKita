@@ -1,21 +1,21 @@
-// File: backend/scripts/simulate_iot.js
-// Fungsi: Skrip simulasi event IoT kotak amal (FR-54 — fallback tanpa hardware ESP32)
-// Cara pakai: node scripts/simulate_iot.js
-//
-// Pastikan backend sudah berjalan (node index.js) sebelum menjalankan skrip ini
+
+
+
+
+
 
 require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
 const crypto = require('crypto');
 const http = require('http');
 
-// ---- Konfigurasi Simulasi ----
+
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:3000';
-const DEVICE_ID   = 'c0000001-0000-0000-0000-000000000001'; // dari seed iot_devices
+const DEVICE_ID   = 'c0000001-0000-0000-0000-000000000001';
 const DEVICE_KEY  = 'demo_device_key_001';
-const AMOUNT_SIM  = 50000; // nominal simulasi dalam Rupiah
+const AMOUNT_SIM  = 50000;
 const IOT_SECRET  = process.env.IOT_DEVICE_SECRET || 'asuhkita_iot_dev_secret';
 
-// ---- Generate HMAC ----
+
 const timestamp = new Date().toISOString();
 const payload   = `${DEVICE_ID}|${AMOUNT_SIM}|${timestamp}`;
 const hmac      = crypto.createHmac('sha256', IOT_SECRET).update(payload).digest('hex');
@@ -35,7 +35,7 @@ console.log('   Timestamp:', timestamp);
 console.log('   HMAC     :', hmac);
 console.log('');
 
-// ---- Kirim request ke backend ----
+
 const url = new URL('/api/iot/events', BACKEND_URL);
 const options = {
   hostname: url.hostname,

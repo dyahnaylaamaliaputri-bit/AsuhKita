@@ -1,5 +1,5 @@
-// TEST-02 | Widget Test: IoT Donation Screen (Simulasi Sensor IR ESP32)
-// Menguji: FR-52, FR-53, FR-54 (PBI-069)
+
+
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -49,7 +49,7 @@ void main() {
       expect(btn, findsOneWidget);
       await tester.tap(btn);
       await tester.pump();
-      // Setelah tap, event baru muncul di list
+
       expect(find.text('Rp 10.000'), findsWidgets);
     });
 
@@ -64,7 +64,7 @@ void main() {
       final btn50 = find.text('+ Rp 50.000');
       await tester.tap(btn50);
       await tester.pump();
-      // Harus muncul Snackbar
+
       expect(find.byType(SnackBar), findsOneWidget);
     });
 
@@ -88,9 +88,9 @@ void main() {
       });
       await tester.pumpWidget(makeTestable());
       await tester.pump();
-      // "Riwayat Deteksi Kotak Amal IoT" heading
+
       expect(find.text('Riwayat Deteksi Kotak Amal IoT'), findsOneWidget);
-      // Device name dari data awal
+
       expect(find.textContaining('Panti Kasih Ibu'), findsWidgets);
     });
 
@@ -103,7 +103,7 @@ void main() {
       });
       await tester.pumpWidget(makeTestable());
       await tester.pump();
-      // Hash ada di card items
+
       expect(find.textContaining('Blok Hash:'), findsWidgets);
     });
   });

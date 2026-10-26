@@ -1,23 +1,23 @@
-// File: backend/src/controllers/ledger.controller.js
-// Fungsi: Ledger blockchain dan sertifikat orang tua asuh
-// PBI-035, PBI-036, PBI-037 — FR-27..FR-31, NFR-05
+
+
+
 
 const { query } = require('../config/database');
 const { verifyChain, addBlock, generatePayloadHash } = require('../blockchain/hash_chain');
 const crypto = require('crypto');
 
-// ============================================================
-// GET LEDGER — Daftar blok ledger
-// GET /api/ledger
-// FR-31: Donatur melihat ledger terkait donasinya
-// PBI-036: GET /ledger
-// ============================================================
+
+
+
+
+
+
 const getLedger = async (req, res, next) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
     const offset = (page - 1) * limit;
-    const { type } = req.query; // filter by type (DONATION, REPORT, dsb)
+    const { type } = req.query;
 
     let sql = `
       SELECT lb.id, lb.block_index, lb.block_type, lb.ref_id,
@@ -61,18 +61,18 @@ const getLedger = async (req, res, next) => {
   }
 };
 
-// ============================================================
-// VERIFY CHAIN — Verifikasi keutuhan hash chain
-// GET /api/ledger/verify
-// FR-28: Endpoint verifikasi menghitung ulang rantai & menunjuk blok pertama yang tidak valid
-// NFR-05: Perubahan satu data donasi langsung membuat verifikasi gagal
-// PBI-036: GET /ledger/verify
-// Demo wajib: ubah 1 data di DB → jalankan ini → harus gagal ❌
-// ============================================================
+
+
+
+
+
+
+
+
 const verifyLedger = async (req, res, next) => {
   try {
     const verificationResult = await verifyChain();
-    const statusCode = verificationResult.valid ? 200 : 200; // selalu 200, valid/invalid di body
+    const statusCode = verificationResult.valid ? 200 : 200;
 
     return res.status(statusCode).json({
       success: true,
@@ -83,10 +83,10 @@ const verifyLedger = async (req, res, next) => {
   }
 };
 
-// ============================================================
-// GET BLOCK DETAIL — Detail satu blok
-// GET /api/ledger/:index
-// ============================================================
+
+
+
+
 const getBlockDetail = async (req, res, next) => {
   try {
     const { index } = req.params;
@@ -110,12 +110,12 @@ const getBlockDetail = async (req, res, next) => {
   }
 };
 
-// ============================================================
-// ISSUE CERTIFICATE — Terbitkan sertifikat orang tua asuh
-// POST /api/certificates
-// FR-29: Sertifikat Orang Tua Asuh dengan kode verifikasi dan QR berisi hash blok
-// PBI-037: Implementasi penerbitan sertifikat dan GET /certificates/:id
-// ============================================================
+
+
+
+
+
+
 const issueCertificate = async (req, res, next) => {
   try {
     const { sponsorship_id } = req.body;
@@ -128,7 +128,7 @@ const issueCertificate = async (req, res, next) => {
       });
     }
 
-    // Cek sponsorship milik user ini
+
     const sponsorResult = await query(
       `SELECT s.id, s.frequency, s.started_at, s.status,
               c.alias, c.age, c.need_category,
@@ -154,10 +154,10 @@ const issueCertificate = async (req, res, next) => {
 
     const sponsorship = sponsorResult.rows[0];
 
-    // Kode verifikasi unik (8 karakter)
+
     const verificationCode = crypto.randomBytes(4).toString('hex').toUpperCase();
 
-    // Data yang masuk ke payload hash (tidak mengandung data sensitif)
+
     const certPayload = {
       sponsorship_id,
       donor_name: sponsorship.donor_name,
@@ -168,12 +168,12 @@ const issueCertificate = async (req, res, next) => {
       verification_code: verificationCode,
     };
 
-    // Buat blok ledger untuk sertifikat
+
     const ledgerBlock = await addBlock('CERTIFICATE', sponsorship_id, certPayload);
 
-    // Data sertifikat yang dikembalikan ke Flutter
-    // Flutter akan render ini sebagai QR code menggunakan qr_flutter
-    // QR berisi: hash blok ledger (bisa diverifikasi di /api/ledger/:index)
+
+
+
     const certificate = {
       id: `CERT-${verificationCode}`,
       verification_code: verificationCode,
@@ -187,7 +187,7 @@ const issueCertificate = async (req, res, next) => {
       issued_at: new Date().toISOString(),
       ledger_block_index: ledgerBlock.block_index,
       ledger_hash: ledgerBlock.hash,
-      // String yang di-encode ke QR code
+
       qr_data: JSON.stringify({
         type: 'ASUHKITA_CERT',
         verification_code: verificationCode,
@@ -207,17 +207,17 @@ const issueCertificate = async (req, res, next) => {
   }
 };
 
-// ============================================================
-// VERIFY CERTIFICATE — Verifikasi sertifikat via kode atau QR
-// GET /api/certificates/verify/:code
-// FR-30: Sertifikat dapat diverifikasi publik melalui QR atau kode
-// ============================================================
+
+
+
+
+
 const verifyCertificate = async (req, res, next) => {
   try {
     const { code } = req.params;
 
-    // Cari blok dengan verification_code di payload_hash
-    // Kita cari di ledger_blocks bertipe CERTIFICATE
+
+
     const blockResult = await query(
       `SELECT lb.block_index, lb.hash, lb.payload_hash, lb.created_at, lb.ref_id
        FROM ledger_blocks lb
@@ -225,16 +225,16 @@ const verifyCertificate = async (req, res, next) => {
        ORDER BY lb.block_index ASC`
     );
 
-    // Cari blok yang payload-nya mengandung kode verifikasi ini
+
     let foundBlock = null;
     for (const block of blockResult.rows) {
-      // Kita tidak bisa decode payload_hash, jadi cek lewat ref_id (sponsorship_id)
-      // dan verification_code disimpan di tabel terpisah atau di blok itu sendiri
-      // Untuk implementasi ini, kita simpan verification_code di tabel sponsors_certificates
-      // (Tabel ini perlu ditambahkan — lihat catatan di bawah)
+
+
+
+
     }
 
-    // Alternatif sederhana: simpan cert data di tabel certificates
+
     const certResult = await query(
       `SELECT c.*, lb.hash AS ledger_hash, lb.block_index AS ledger_block_index
        FROM certificates c
@@ -265,12 +265,12 @@ const verifyCertificate = async (req, res, next) => {
   }
 };
 
-// ============================================================
-// ADD REPORT BLOCK — Admin mengunggah laporan perkembangan
-// POST /api/ledger/report
-// FR-33, FR-34: Admin panti mengunggah laporan & bukti penggunaan dana → blok REPORT
-// Memerlukan: requireRole('admin_panti')
-// ============================================================
+
+
+
+
+
+
 const addReportBlock = async (req, res, next) => {
   try {
     const { child_id, period, summary, evidence_url } = req.body;
@@ -283,7 +283,7 @@ const addReportBlock = async (req, res, next) => {
       });
     }
 
-    // Simpan laporan ke tabel progress_reports
+
     const reportResult = await query(
       `INSERT INTO progress_reports (child_id, period, summary, evidence_url)
        VALUES ($1, $2, $3, $4) RETURNING id`,
@@ -292,7 +292,7 @@ const addReportBlock = async (req, res, next) => {
 
     const reportId = reportResult.rows[0].id;
 
-    // Buat blok ledger tipe REPORT (FR-34: blok PENYALURAN)
+
     const ledgerBlock = await addBlock('REPORT', reportId, {
       report_id: reportId,
       child_id,
@@ -301,7 +301,7 @@ const addReportBlock = async (req, res, next) => {
       evidence_url: evidence_url || '',
     });
 
-    // Update ledger reference di progress_reports
+
     await query(
       'UPDATE progress_reports SET ledger_ref = $1 WHERE id = $2',
       [ledgerBlock.id, reportId]

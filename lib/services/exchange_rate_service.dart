@@ -1,8 +1,8 @@
-// Letak file: mobile/lib/services/exchange_rate_service.dart
-// Fungsi: Fetch kurs mata uang real-time dari ExchangeRate-API + fallback kurs statis
-//         (PBI-048, FR-43, FR-24)
-// API     : https://open.er-api.com/v6/latest/IDR  (gratis, tanpa API key)
-// Mata uang: IDR, USD, SGD, EUR, SAR
+
+
+
+
+
 
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -17,7 +17,7 @@ class ExchangeRateService {
   static const String _cacheTimestampKey = 'asuhkita_exchange_rates_ts';
   static const Duration _cacheDuration = Duration(hours: 6);
 
-  // Kurs cadangan statis (FR-24) - digunakan jika offline
+
   static const Map<String, double> _staticRates = {
     'IDR': 1.0,
     'USD': 15850.0,
@@ -26,19 +26,19 @@ class ExchangeRateService {
     'SAR': 4220.0,
   };
 
-  // Kurs aktif (default = statis, diperbarui saat fetch berhasil)
+
   Map<String, double> _currentRates = Map.from(_staticRates);
   bool _isUsingRealtime = false;
 
   Map<String, double> get rates => Map.from(_currentRates);
   bool get isUsingRealtime => _isUsingRealtime;
 
-  // -----------------------------------------------------------------
-  // FR-43 | PBI-048 - Fetch kurs real-time
-  // Menggunakan open.er-api.com (gratis, no API key)
-  // -----------------------------------------------------------------
+
+
+
+
   Future<Map<String, double>> fetchRates() async {
-    // 1. Cek cache lokal dulu (valid 6 jam)
+
     final cached = await _loadFromCache();
     if (cached != null) {
       _currentRates = cached;
@@ -46,20 +46,20 @@ class ExchangeRateService {
       return _currentRates;
     }
 
-    // 2. Fetch dari API
+
     try {
       final dio = Dio(BaseOptions(
         connectTimeout: const Duration(milliseconds: 2500),
         receiveTimeout: const Duration(milliseconds: 2500),
       ));
 
-      // API mengembalikan nilai 1 IDR = X mata uang, kita balik ke X = 1 IDR
+
       final response = await dio.get('https://open.er-api.com/v6/latest/IDR');
 
       if (response.statusCode == 200 && response.data != null) {
         final ratesFromApi = response.data['rates'] as Map<String, dynamic>;
 
-        // Konversi: 1 IDR = ratesFromApi['USD'] USD -> 1 USD = 1/ratesFromApi['USD'] IDR
+
         final fetched = <String, double>{'IDR': 1.0};
         for (final currency in ['USD', 'SGD', 'EUR', 'SAR']) {
           final rateAgainstIDR = ratesFromApi[currency];
@@ -76,27 +76,27 @@ class ExchangeRateService {
         return _currentRates;
       }
     } catch (e) {
-      // Gagal fetch - gunakan kurs statis (FR-24 fallback)
+
       _isUsingRealtime = false;
     }
 
-    // 3. Fallback ke kurs statis
+
     _currentRates = Map.from(_staticRates);
     _isUsingRealtime = false;
     return _currentRates;
   }
 
-  // -----------------------------------------------------------------
-  // Konversi nominal ke IDR
-  // -----------------------------------------------------------------
+
+
+
   double convertToIdr(double amount, String currency) {
     final rate = _currentRates[currency] ?? _staticRates[currency] ?? 1.0;
     return amount * rate;
   }
 
-  // -----------------------------------------------------------------
-  // Cache ke SharedPreferences
-  // -----------------------------------------------------------------
+
+
+
   Future<void> _saveToCache(Map<String, double> rates) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_cacheKey, jsonEncode(rates));
@@ -123,7 +123,7 @@ class ExchangeRateService {
     }
   }
 
-  // Paksa hapus cache (untuk refresh manual)
+
   Future<void> clearCache() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_cacheKey);

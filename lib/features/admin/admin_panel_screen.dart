@@ -34,7 +34,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
   Future<void> _loadChildren() async {
     setState(() => _isLoading = true);
     try {
-      // 1. Coba ambil dari Supabase via API
+
       List<Map<String, dynamic>> apiChildren = [];
       bool isApiConnected = false;
       try {
@@ -50,7 +50,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
         }
       } catch (_) {}
 
-      // 2. Ambil riwayat donasi untuk hitung dana terkumpul & donatur per anak
+
       final localDonations = await _localDb.getCachedDonations();
       final allDonations = List<Map<String, dynamic>>.from(localDonations);
       try {
@@ -71,10 +71,10 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
         }
       } catch (_) {}
 
-      // 3. Ambil receipts pengeluaran
+
       final receipts = await _localDb.getReceipts();
 
-      // Gabungkan data: Supabase online sebagai acuan tunggal
+
       final Map<String, Map<String, dynamic>> map = {};
 
       if (isApiConnected && apiChildren.isNotEmpty) {
@@ -100,7 +100,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
         }
         await _localDb.cacheChildren(apiChildren);
       } else {
-        // Fallback offline jika tidak ada koneksi
+
         final cached = await _localDb.getCachedChildren();
         final newKids = await _localDb.getNewChildren();
         for (var k in cached) {
@@ -115,12 +115,12 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
         }
       }
 
-      // Hitung agregasi per anak (tanpa dobel nama)
+
       for (var key in map.keys) {
         final child = map[key]!;
         final cName = (child['name'] ?? child['alias'] ?? '').toString().toLowerCase();
 
-        // Donasi masuk untuk anak ini
+
         final childDonations = allDonations.where((d) {
           final alias = (d['child_alias'] ?? '').toString().toLowerCase();
           return alias == cName;
@@ -137,7 +137,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
           }
         }
 
-        // Pengeluaran nota untuk anak ini
+
         final childReceipts = receipts.where((r) {
           final rName = (r['childName'] ?? r['child_name'] ?? '').toString().toLowerCase();
           return rName == cName;
@@ -149,7 +149,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
           totalSpent += amt;
         }
 
-        // Parse category budgets map
+
         Map<String, double> catBudgets = {};
         final rawCatBudgets = child['category_budgets'] ?? child['categoryBudgets'];
         if (rawCatBudgets != null && rawCatBudgets.toString().isNotEmpty) {
@@ -215,7 +215,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     String selectedGender = 'Laki-laki';
     String? base64Image;
 
-    // Multi-Kategori Kebutuhan & Input Budget per masing-masing kategori (Butir 4)
+
     final availableCategories = [
       'Pendidikan',
       'Nutrisi & Makanan',
@@ -235,7 +235,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
       backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setModalState) {
-          // Hitung total target budget secara dinamis dari seluruh kategori yang dipilih
+
           double totalBudgetCalculated = 0;
           for (var cat in selectedNeeds) {
             final ctrl = budgetControllers[cat];
@@ -368,7 +368,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                   ),
                   const SizedBox(height: 14),
 
-                  // ==================== PILIHAN MULTI KATEGORI KEBUTUHAN ====================
+
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -431,7 +431,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // ==================== DYNAMIC FIELD INPUT BUDGET PER KATEGORI ====================
+
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
@@ -549,7 +549,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       onPressed: () async {
-                              // 1. Validasi Form
+
                               final name = nameCtrl.text.trim();
                               final ageStr = ageCtrl.text.trim();
                               final age = int.tryParse(ageStr);
@@ -595,12 +595,12 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                 return;
                               }
 
-                              // Tutup form bottom sheet seketika agar pengguna tidak mengira belum tersubmit
+
                               if (ctx.mounted) {
                                 Navigator.pop(ctx);
                               }
 
-                              // Tampilkan Loading Dialog penuh
+
                               if (!mounted) return;
                               showDialog(
                                 context: context,
@@ -638,7 +638,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                 ),
                               );
 
-                              // Buat map category_budgets
+
                               final Map<String, double> catBudgetsMap = {};
                               for (var cat in selectedNeeds) {
                                 final ctrl = budgetControllers[cat];
@@ -647,8 +647,8 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                               }
                               final totalTarget = catBudgetsMap.values.fold<double>(0.0, (sum, val) => sum + val);
 
-                              // 2. Kirim request HTTP POST (via dio) ke backend Express (POST /children)
-                              // 2. Kirim request HTTP POST (via dio) ke backend Express (POST /children)
+
+
                               String serverChildId = 'child_${DateTime.now().millisecondsSinceEpoch}';
                               try {
                                 final res = await DioClient().dio.post(
@@ -673,7 +673,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                   serverChildId = res.data['data']['id'].toString();
                                 }
                               } catch (_) {
-                                // Jika backend belum aktif atau offline, gunakan id lokal tanpa menampilkan error merah
+
                               }
 
                               final savedKid = {
@@ -699,13 +699,13 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                 'status': 'Tersedia',
                               };
 
-                              // Simpan ke SQLite lokal (selalu tersimpan dan realtime)
+
                               await _localDb.insertChild(savedKid);
 
-                              // State aplikasi langsung diperbarui (realtime ke donatur)
+
                               SponsorScreen.refreshNotifier.value++;
 
-                              // Tutup loading dialog
+
                               if (mounted) {
                                 Navigator.of(context, rootNavigator: true).pop();
                               }
@@ -749,7 +749,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     );
   }
 
-  // ==================== EDIT DATA ANAK ASUH (CRUD - EDIT) ====================
+
   void _showEditChildDialog(Map<String, dynamic> child) {
     final nameCtrl = TextEditingController(text: (child['name'] ?? child['alias'] ?? '').toString());
     final ageCtrl = TextEditingController(text: (child['age'] ?? 8).toString());
@@ -904,7 +904,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                   ),
                   const SizedBox(height: 14),
 
-                  // Kategori kebutuhan multi-chip
+
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -965,7 +965,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Dynamic Budget Per Kategori
+
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
@@ -1100,7 +1100,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
 
                         await _localDb.updateChild(updatedKid);
 
-                        // Coba sync update ke Supabase
+
                         try {
                           await DioClient().dio.put('/children/${updatedKid['id']}', data: {
                             'alias': updatedKid['name'],
@@ -1140,7 +1140,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     );
   }
 
-  // ==================== HAPUS DATA ANAK ASUH (CRUD - DELETE) ====================
+
   Future<void> _confirmDeleteChild(Map<String, dynamic> child) async {
     final cName = (child['name'] ?? child['alias'] ?? 'Anak Asuh').toString();
     final childId = child['id']?.toString() ?? '';
@@ -1280,7 +1280,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                       ),
                       const Divider(height: 28),
 
-                      // ==================== KARTU STATUS BUDGET & MULTI-DONATUR ====================
+
                       Container(
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
@@ -1353,7 +1353,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                       ),
                       const SizedBox(height: 16),
 
-                      // ==================== RINCIAN PER KATEGORI KEBUTUHAN (BUTIR 3 & 4) ====================
+
                       const Text(
                         'Rincian Budget & Status Per Kategori:',
                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textPrimary),
@@ -1372,7 +1372,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                             final catName = entry.key;
                             final catTarget = entry.value;
 
-                            // Hitung dana terkumpul untuk kategori ini
+
                             int catCollected = 0;
                             int catDonorCount = 0;
                             for (var d in childDonations) {
@@ -1383,7 +1383,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                               }
                             }
                             if (catBudgetsMap.length > 1 && catCollected == 0 && totalDonations > 0) {
-                              // Proporsional jika belum terpetakan paket
+
                               catCollected = (totalDonations * (catTarget / totalTarget)).toInt();
                             }
 
@@ -1452,7 +1452,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                         ),
                       const SizedBox(height: 16),
 
-                      // ==================== DAFTAR DONATUR YANG TELAH BERDONASI ====================
+
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -1520,7 +1520,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                         ),
                       const Divider(height: 28),
 
-                      // ==================== SECTION NOTA / LAPORAN BELANJA ANAK ====================
+
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -1759,7 +1759,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                 };
                 await _localDb.insertReceipt(newReceipt);
 
-                // Sync to Supabase
+
                 try {
                   await DioClient().dio.post('/ledger/receipts', data: newReceipt);
                 } catch (_) {}
@@ -2059,7 +2059,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                               style: const TextStyle(fontSize: 10, color: AppColors.primaryDark, fontWeight: FontWeight.bold),
                                             ),
                                           ),
-                                          // Status Terpenuhi / Belum Terpenuhi
+
                                           Builder(
                                             builder: (_) {
                                               final totalDonations = (child['totalDonations'] as int?) ?? 0;
@@ -2132,7 +2132,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                                   ),
                                 ),
                                 const SizedBox(width: 6),
-                                // Aksi CRUD Admin: Edit & Hapus
+
                                 Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [

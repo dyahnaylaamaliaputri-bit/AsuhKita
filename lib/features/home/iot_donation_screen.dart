@@ -1,5 +1,5 @@
-// Letak file: mobile/lib/features/home/iot_donation_screen.dart
-// Fungsi: Tampilan Event Donasi Kotak Amal Pintar IoT ESP32 & Fallback Simulasi (PBI-069, FR-52, FR-53, FR-54)
+
+
 
 import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
@@ -63,7 +63,7 @@ class _IotDonationScreenState extends State<IotDonationScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [
-          // Penjelasan Komprehensif Fungsi Kotak Amal IoT
+
           Card(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             color: AppColors.surfaceLight,
@@ -107,7 +107,7 @@ class _IotDonationScreenState extends State<IotDonationScreen> {
           ),
           const SizedBox(height: 16),
 
-          // Tombol Simulasi Fallback (FR-54)
+
           Card(
             elevation: 1,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),

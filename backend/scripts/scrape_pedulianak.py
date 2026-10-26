@@ -33,13 +33,13 @@ for url in urls:
             html = resp.read().decode('utf-8', errors='ignore')
             print(f"Status: {resp.status}, Final URL: {resp.url}, Length: {len(html)}")
             
-            # Cari link anak atau halaman sponsor
+
             sponsor_links = set(re.findall(r'href=[\"\'](https://www\.pedulianak\.org/[^\"]*sponsor[^\"]*)[\"\']', html, re.IGNORECASE))
             print("Sponsor links:")
             for sl in sponsor_links:
                 print("  ", sl)
                 
-            # Cari uploads
+
             uploads = set(re.findall(r'https://www\.pedulianak\.org/wp-content/uploads/[^\s\"\'<>]+\.(?:jpg|jpeg|png|webp)', html))
             print(f"Uploads: {len(uploads)}")
             for u in sorted(uploads)[:20]:

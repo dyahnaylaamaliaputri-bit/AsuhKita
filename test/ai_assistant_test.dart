@@ -1,7 +1,7 @@
-// TEST-01 | Widget Test: AI Assistant Screen (Sahabat Asuh - Gemini)
-// Menguji: FR-49, FR-50, FR-51 (PBI-062)
-// Catatan: Gemini API tidak dipanggil di sini (unit test tanpa network)
-//          Fallback lokal diuji saat API key tidak ada
+
+
+
+
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -69,7 +69,7 @@ void main() {
       await tester.pumpWidget(makeTestable());
       await tester.tap(find.text('Tanya FAQ'));
       await tester.pumpAndSettle();
-      // Pesan awal dari model
+
       expect(find.textContaining('Sahabat Asuh'), findsWidgets);
     });
 
@@ -90,16 +90,16 @@ void main() {
       await tester.tap(find.text('Tanya FAQ'));
       await tester.pumpAndSettle();
 
-      // Ketik pertanyaan
+
       final inputField = find.byType(TextField).last;
       await tester.enterText(inputField, 'Bagaimana cara donasi?');
       await tester.pump();
 
-      // Tap send (pakai InkWell wrapping icon send)
+
       await tester.tap(find.byIcon(Icons.send));
       await tester.pump();
 
-      // Pertanyaan user muncul sebagai bubble
+
       expect(find.text('Bagaimana cara donasi?'), findsOneWidget);
     });
   });

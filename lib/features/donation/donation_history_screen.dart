@@ -1,5 +1,5 @@
-// Letak file: mobile/lib/features/donation/donation_history_screen.dart
-// Fungsi: UI Riwayat Donasi Terverifikasi & Daftar Waiting List Donasi Offline (PBI-029, PBI-030, FR-19, FR-20)
+
+
 
 import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
@@ -38,7 +38,7 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> with Sing
 
     List<Map<String, dynamic>> allDonations = [];
 
-    // 1. Coba ambil riwayat online dari Supabase
+
     try {
       final res = await DioClient().dio.get('/donations');
       if (res.statusCode == 200) {
@@ -50,7 +50,7 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> with Sing
       }
     } catch (_) {}
 
-    // 2. Ambil dari SQLite lokal
+
     final localDonations = await LocalDatabase().getCachedDonations();
     if (localDonations.isNotEmpty) {
       final existingIds = allDonations.map((d) => (d['id'] ?? '').toString()).toSet();
@@ -68,7 +68,7 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> with Sing
       return dateB.compareTo(dateA);
     });
 
-    // 3. Ambil daftar Antrean Offline (Waiting List) dari SQLite
+
     final unsynced = await LocalDatabase().getUnsyncedDonations();
 
     if (mounted) {
@@ -80,7 +80,7 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> with Sing
     }
   }
 
-  // Sinkronisasi seluruh antrean donasi offline ke cloud
+
   Future<void> _syncOfflineDonations() async {
     if (_waitingList.isEmpty) return;
 
@@ -123,7 +123,7 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> with Sing
     }
   }
 
-  // Sinkronisasi 1 item antrean offline secara spesifik
+
   Future<void> _syncSingleDonation(Map<String, dynamic> donation) async {
     setState(() => _isSyncing = true);
     bool success = false;
@@ -160,7 +160,7 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> with Sing
     }
   }
 
-  // Simulasi Tambah Donasi Offline untuk pengujian Waiting List (Permintaan Butir 7)
+
   Future<void> _simulateAddOfflineDonation() async {
     await LocalDatabase().queueOfflineDonation(
       childId: 'ch_offline_${DateTime.now().millisecondsSinceEpoch}',
@@ -232,10 +232,10 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> with Sing
           : TabBarView(
               controller: _tabController,
               children: [
-                // ==================== TAB 1: RIWAYAT TERVERIFIKASI ====================
+
                 Column(
                   children: [
-                    // Summary Card
+
                     Container(
                       padding: const EdgeInsets.all(16),
                       margin: const EdgeInsets.all(16),
@@ -280,7 +280,7 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> with Sing
                       ),
                     ),
 
-                    // Daftar Donasi Terverifikasi
+
                     if (_donations.isEmpty)
                       Expanded(
                         child: Center(
@@ -385,10 +385,10 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> with Sing
                   ],
                 ),
 
-                // ==================== TAB 2: DAFTAR WAITING LIST OFFLINE ====================
+
                 Column(
                   children: [
-                    // Banner Penjelasan Waiting List & Tombol Aksi
+
                     Container(
                       width: double.infinity,
                       margin: const EdgeInsets.all(16),
@@ -451,7 +451,7 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> with Sing
                       ),
                     ),
 
-                    // Daftar Item Waiting List
+
                     if (_waitingList.isEmpty)
                       Expanded(
                         child: Center(

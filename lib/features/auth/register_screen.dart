@@ -1,5 +1,5 @@
-// Letak file: mobile/lib/features/auth/register_screen.dart
-// Fungsi: Layar pendaftaran akun donatur dan admin panti (PBI-005, FR-01, FR-06)
+
+
 
 import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
@@ -19,7 +19,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
-  final String _selectedRole = 'donatur'; // Default & wajib donatur untuk publik
+  final String _selectedRole = 'donatur';
   bool _obscurePassword = true;
 
   @override
@@ -98,7 +98,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // Info Peran Akun Donatur (Admin panti didaftarkan langsung di database)
+
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -131,7 +131,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Nama Lengkap
+
                 TextFormField(
                   controller: _nameController,
                   decoration: InputDecoration(
@@ -143,7 +143,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Email
+
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
@@ -160,7 +160,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Nomor Telepon / HP
+
                 TextFormField(
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
@@ -173,7 +173,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Password
+
                 TextFormField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
@@ -194,7 +194,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // Tombol Daftar
+
                 ElevatedButton(
                   onPressed: auth.isLoading ? null : _handleRegister,
                   style: ElevatedButton.styleFrom(

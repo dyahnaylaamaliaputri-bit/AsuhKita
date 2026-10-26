@@ -1,4 +1,4 @@
-// Letak file: mobile/lib/features/feedback/feedback_screen.dart
+
 
 import 'dart:convert';
 
@@ -120,7 +120,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
         combined = decoded.map((e) => Map<String, dynamic>.from(e)).toList();
       }
 
-      // Ambil juga riwayat tersimpan dari SQLite Database lokal
+
       try {
         final dbFeedbacks = await LocalDatabase().getAllFeedbacks();
         for (var fb in dbFeedbacks) {

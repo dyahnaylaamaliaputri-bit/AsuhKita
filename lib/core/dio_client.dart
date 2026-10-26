@@ -1,5 +1,5 @@
-// Letak file: mobile/lib/core/dio_client.dart
-// Fungsi: Klien HTTP Dio dengan Interceptor untuk otomatis menyisipkan Token JWT, Auto-Refresh Token, dan Auto-Logout (PBI-006)
+
+
 
 import 'package:dio/dio.dart';
 import 'constants.dart';
@@ -14,14 +14,14 @@ class DioClient {
   late final Dio dio;
   final SecureStorageService _storage = SecureStorageService();
 
-  // Callback yang dipanggil saat sesi benar-benar berakhir/expired untuk navigasi kembali ke login
+
   VoidCallback? onSessionExpired;
 
   DioClient._internal() {
     dio = Dio(
       BaseOptions(
         baseUrl: AppConstants.baseUrl,
-        connectTimeout: const Duration(milliseconds: 1500), // Respons cepat (1.5s) agar tidak lag/muter-muter
+        connectTimeout: const Duration(milliseconds: 1500),
         receiveTimeout: const Duration(milliseconds: 2500),
         headers: {
           'Content-Type': 'application/json',
@@ -37,7 +37,7 @@ class DioClient {
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          // Sisipkan Access Token jika ada
+
           final token = await _storage.getAccessToken();
           if (token != null && token.isNotEmpty) {
             options.headers['Authorization'] = 'Bearer $token';
@@ -45,10 +45,10 @@ class DioClient {
           return handler.next(options);
         },
         onError: (DioException error, handler) async {
-          // Tangani jika terjadi 401 Unauthorized (token kedaluwarsa)
+
           if (error.response?.statusCode == 401) {
             final path = error.requestOptions.path;
-            // Jika 401 terjadi saat login atau register, langsung teruskan error ke UI tanpa buang waktu
+
             if (path.contains('/auth/login') || path.contains('/auth/register')) {
               return handler.next(error);
             }
@@ -77,7 +77,7 @@ class DioClient {
                   final newAccessToken = resData['access'] ?? resData['accessToken'];
                   final newRefreshToken = resData['refresh'] ?? resData['refreshToken'] ?? refreshToken;
 
-                  // Simpan token baru
+
                   final role = await _storage.getUserRole() ?? 'donatur';
                   final name = await _storage.getUserName() ?? '';
                   final email = await _storage.getUserEmail() ?? '';
@@ -91,13 +91,13 @@ class DioClient {
                     role: role,
                   );
 
-                  // Ulangi request asli dengan token baru
+
                   error.requestOptions.headers['Authorization'] = 'Bearer $newAccessToken';
                   final retryResponse = await dio.fetch(error.requestOptions);
                   return handler.resolve(retryResponse);
                 }
               } catch (_) {
-                // Refresh token gagal/expired: bersihkan sesi dan navigasi kembali
+
                 await _storage.clearAuthSession();
                 onSessionExpired?.call();
               }

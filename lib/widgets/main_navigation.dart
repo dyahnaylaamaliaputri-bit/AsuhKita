@@ -1,5 +1,5 @@
-// Letak file: mobile/lib/widgets/main_navigation.dart
-// Fungsi: Kerangka Navigasi Bawah Tab Dinamis (Donatur vs Admin Panti) dan Dialog Konfirmasi Logout (PBI-009, PBI-013, FR-10, FR-14)
+
+
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -55,7 +55,7 @@ class _MainNavigationState extends State<MainNavigation> {
             onPressed: () async {
               Navigator.pop(ctx);
               
-              // Tampilkan dialog loading berlogo AsuhKita tanpa lag
+
               showDialog(
                 context: context,
                 barrierDismissible: false,
@@ -142,7 +142,7 @@ class _MainNavigationState extends State<MainNavigation> {
     final auth = Provider.of<AuthProvider>(context);
     final isAdmin = auth.userRole == 'admin_panti';
 
-    // Jika admin: Ganti tab sponsor menjadi kelola panti (Revisi instruksi: navigasi sponsor dihapus untuk admin)
+
     final List<Widget> pages = isAdmin
         ? [
             HomeScreen(onNavigateTab: _navigateToTab),

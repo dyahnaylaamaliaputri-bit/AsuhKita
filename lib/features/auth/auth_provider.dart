@@ -1,5 +1,5 @@
-// Letak file: mobile/lib/features/auth/auth_provider.dart
-// Fungsi: Provider state management untuk Login, Register, Sesi Token Terenkripsi, dan Biometrik (PBI-005, PBI-006, PBI-056)
+
+
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
@@ -24,7 +24,7 @@ class AuthProvider extends ChangeNotifier {
   bool _isAuthenticated = false;
   String _userName = '';
   String _userEmail = '';
-  String _userRole = 'donatur'; // 'donatur' atau 'admin_panti'
+  String _userRole = 'donatur';
   String _userId = '';
   bool _isBiometricAvailable = false;
   bool _isBiometricEnabled = false;
@@ -44,9 +44,9 @@ class AuthProvider extends ChangeNotifier {
     _initAuth();
   }
 
-  // =========================================================================
-  // PERSISTENT SESSION (Sesi Otomatis Pulih Saat APK Dibuka Kembali)
-  // =========================================================================
+
+
+
   Future<void> _initAuth() async {
     _dioClient.onSessionExpired = () {
       logout(notifyServer: false);
@@ -62,7 +62,7 @@ class AuthProvider extends ChangeNotifier {
 
     _isBiometricEnabled = await _storage.isBiometricEnabled();
 
-    // Pulihkan sesi dari SecureStorage (Keystore Android terenkripsi)
+
     final token = await _storage.getAccessToken();
     if (token != null && token.isNotEmpty) {
       _userName = await _storage.getUserName() ?? 'Donatur Asuh';
@@ -76,9 +76,9 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // =========================================================================
-  // LOGIN TERENKRIPSI & VERIFIKASI AKUN KETAT (TANPA BYPASS SANDI SALAH)
-  // =========================================================================
+
+
+
   Future<bool> login({required String email, required String password}) async {
     _isLoading = true;
     _errorMessage = null;
@@ -86,7 +86,7 @@ class AuthProvider extends ChangeNotifier {
 
     final cleanEmail = email.trim().toLowerCase();
 
-    // Validasi format dasar
+
     if (cleanEmail.isEmpty || password.isEmpty) {
       _errorMessage = 'Email dan kata sandi wajib diisi.';
       _isLoading = false;
@@ -94,7 +94,7 @@ class AuthProvider extends ChangeNotifier {
       return false;
     }
 
-    // --- 1. Coba Autentikasi ke Web Service / Online API Supabase (Timeout Cepat 2 Detik) ---
+
     try {
       final response = await _dioClient.dio.post(
         '/auth/login',
@@ -134,7 +134,7 @@ class AuthProvider extends ChangeNotifier {
             resData['refreshToken'] ??
             'refresh_${DateTime.now().millisecondsSinceEpoch}';
 
-        // Simpan sesi terenkripsi di SecureStorage
+
         await _storage.saveAuthSession(
           accessToken: token,
           refreshToken: refreshToken,
@@ -202,7 +202,7 @@ class AuthProvider extends ChangeNotifier {
       return false;
     }
 
-    // --- 2. Fallback Verifikasi Database Lokal SQLite Terenkripsi (Offline Mode) ---
+
     final isRegisteredLocally = await LocalDatabase().isEmailRegistered(
       cleanEmail,
     );
@@ -251,7 +251,7 @@ class AuthProvider extends ChangeNotifier {
       return true;
     }
 
-    // Jika akun terdaftar tapi kata sandi salah:
+
     _errorMessage =
         'Kata sandi salah. Silakan periksa kembali kata sandi Anda.';
     _isLoading = false;
@@ -259,9 +259,9 @@ class AuthProvider extends ChangeNotifier {
     return false;
   }
 
-  // =========================================================================
-  // REGISTER AKUN BARU (CEK EMAIL DUPLIKAT & INTEGRASI DATABASE)
-  // =========================================================================
+
+
+
   Future<bool> register({
     required String name,
     required String email,
@@ -275,7 +275,7 @@ class AuthProvider extends ChangeNotifier {
 
     final cleanEmail = email.trim().toLowerCase();
 
-    // 1. Cek email di cache SQLite pada platform native
+
     if (!kIsWeb && await LocalDatabase().isEmailRegistered(cleanEmail)) {
       _errorMessage =
           'Email "$cleanEmail" sudah terdaftar. Silakan gunakan email lain atau langsung masuk.';
@@ -284,7 +284,7 @@ class AuthProvider extends ChangeNotifier {
       return false;
     }
 
-    // 2. Bersihkan cache profil lama untuk email ini
+
     var registeredOnline = false;
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -296,7 +296,7 @@ class AuthProvider extends ChangeNotifier {
       await prefs.remove('asuhkita_user_sponsored_count_$cleanEmail');
     } catch (_) {}
 
-    // 3. Coba kirim pendaftaran ke Online Web Service / Backend Supabase
+
     try {
       final res = await _dioClient.dio.post(
         '/auth/register',
@@ -348,9 +348,9 @@ class AuthProvider extends ChangeNotifier {
     return true;
   }
 
-  // =========================================================================
-  // LOGIN DENGAN BIOMETRIK (SIDIK JARI / WAJAH)
-  // =========================================================================
+
+
+
   Future<bool> loginWithBiometrics() async {
     if (!_isBiometricAvailable) {
       _errorMessage = 'Sensor biometrik tidak didukung di perangkat ini.';
@@ -424,7 +424,7 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // Daftarkan / Verifikasi Sidik Jari dari Pengaturan Profil (FR-07)
+
   Future<bool> registerBiometricPrompt() async {
     if (!_isBiometricAvailable) return false;
     try {
@@ -452,7 +452,7 @@ class AuthProvider extends ChangeNotifier {
     return false;
   }
 
-  // Toggle aktivasi biometrik dari Pengaturan/Profil (FR-07)
+
   Future<void> toggleBiometric(bool enable) async {
     _isBiometricEnabled = enable;
     await _storage.setBiometricEnabled(enable);
@@ -471,7 +471,7 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Update Nama & Nomor HP profil (PBI-010, FR-11)
+
   Future<bool> updateProfile({
     required String newName,
     required String newPhone,
@@ -487,9 +487,9 @@ class AuthProvider extends ChangeNotifier {
     return true;
   }
 
-  // =========================================================================
-  // LOGOUT & CABUT SESI (Sesi Dihapus Bersih)
-  // =========================================================================
+
+
+
   Future<void> logout({bool notifyServer = true}) async {
     unawaited(
       NotificationService()
@@ -503,7 +503,7 @@ class AuthProvider extends ChangeNotifier {
             .timeout(const Duration(milliseconds: 600), onTimeout: () => Response(requestOptions: RequestOptions(path: '/auth/logout'))),
       );
     }
-    // Hapus seluruh token sesi di SecureStorage seketika
+
     await _storage.clearAuthSession();
     _isAuthenticated = false;
     _userName = '';

@@ -1,5 +1,5 @@
-// File: backend/scripts/update_pedulianak_supabase.js
-// Fungsi: Memperbarui data anak asuh di Supabase PostgreSQL dengan data & foto asli dari PeduliAnak.org
+
+
 
 const { Pool } = require('pg');
 
@@ -120,7 +120,7 @@ async function updateChildrenData() {
   try {
     console.log('✅ Terhubung ke Supabase PostgreSQL...');
 
-    // Ambil daftar panti untuk relasi foreign key
+
     const orphanagesRes = await client.query('SELECT id FROM orphanages LIMIT 5');
     const orphanageIds = orphanagesRes.rows.map(r => r.id);
 
@@ -130,18 +130,18 @@ async function updateChildrenData() {
 
     console.log(`🏠 Ditemukan ${orphanageIds.length} data panti.`);
 
-    // Bersihkan data lama jika belum ada donasi terkait, atau upsert
+
     console.log('🔄 Memperbarui data anak dengan data & foto asli pedulianak.org...');
 
     for (let i = 0; i < peduliAnakChildren.length; i++) {
       const ch = peduliAnakChildren[i];
       const orphId = orphanageIds[i % orphanageIds.length];
 
-      // Cek apakah anak dengan alias ini sudah ada
+
       const checkRes = await client.query('SELECT id FROM children WHERE alias = $1', [ch.alias]);
 
       if (checkRes.rows.length > 0) {
-        // Update data & foto yang sudah ada
+
         await client.query(
           `UPDATE children 
            SET age = $1, gender = $2, need_category = $3, story_summary = $4, avatar = $5, status = $6, updated_at = NOW()
@@ -150,7 +150,7 @@ async function updateChildrenData() {
         );
         console.log(`   [UPDATE] ${ch.alias} -> Foto: ${ch.avatar}`);
       } else {
-        // Insert anak baru
+
         await client.query(
           `INSERT INTO children (orphanage_id, alias, age, gender, need_category, story_summary, avatar, status)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
@@ -160,11 +160,11 @@ async function updateChildrenData() {
       }
     }
 
-    // Tampilkan total anak di database
+
     const countRes = await client.query('SELECT COUNT(*) FROM children');
     console.log(`\n🎉 SELESAI! Total data anak di Supabase sekarang: ${countRes.rows[0].count} anak.`);
 
-    // Verifikasi sampel data
+
     const sample = await client.query('SELECT alias, age, need_category, avatar FROM children LIMIT 5');
     console.log('\n📋 Sampel data di Supabase:');
     sample.rows.forEach(r => {

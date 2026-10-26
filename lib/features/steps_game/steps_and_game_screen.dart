@@ -1,5 +1,5 @@
-// Letak file: mobile/lib/features/steps_game/steps_and_game_screen.dart
-// Fungsi: Deteksi Langkah Sensor Accelerometer (Donasi Langkah), Mini Game Gyroscope, & Sistem Ranking/Tukar Reward Poin Kebaikan (PBI-051, PBI-053, FR-44, FR-46, FR-47, FR-48)
+
+
 
 import 'dart:async';
 import 'dart:math';
@@ -30,16 +30,16 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
     return 'default';
   }
 
-  // ========== STATE SENSOR ACCELEROMETER (DETEKSI LANGKAH) ==========
+
   static const String _stepsStorageKey = 'asuhkita_daily_steps';
-  int _stepCount = 0; // Langkah awal selalu dari 0
+  int _stepCount = 0;
   StreamSubscription? _accelerometerSub;
   DateTime _lastStepTime = DateTime.now();
 
-  // ========== STATE SENSOR GYROSCOPE & ACCELEROMETER TILT (MINI GAME) ==========
+
   StreamSubscription? _gyroscopeSub;
   StreamSubscription? _gameTiltSub;
-  double _basketX = 150.0; // Posisi horizontal keranjang
+  double _basketX = 150.0;
   double _starX = 120.0;
   double _starY = 0.0;
   int _gameScore = 0;
@@ -48,7 +48,7 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
   double _canvasWidth = 320.0;
   double _canvasHeight = 400.0;
 
-  // ========== STATE GAMIFIKASI & RANKING TIER ==========
+
   int _totalUserPoints = 0;
 
   @override
@@ -73,16 +73,16 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
     } catch (_) {}
   }
 
-  // Muat perhitungan langkah: jika hari baru atau akun baru, otomatis dari 0
+
   Future<void> _loadSavedSteps() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final today = DateTime.now().toIso8601String().substring(0, 10); // 'YYYY-MM-DD'
+      final today = DateTime.now().toIso8601String().substring(0, 10);
       final emailKey = _getUserEmailKey();
       final lastDate = prefs.getString('asuhkita_steps_date_$emailKey');
 
       if (lastDate != today) {
-        // Hari baru atau pertama kali membuka fitur untuk akun ini: RESET KE 0!
+
         await prefs.setString('asuhkita_steps_date_$emailKey', today);
         await prefs.setInt('${_stepsStorageKey}_$emailKey', 0);
         if (mounted) {
@@ -91,7 +91,7 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
           });
         }
       } else {
-        // Masih di hari yang sama: muat langkah tersimpan untuk akun ini
+
         final saved = prefs.getInt('${_stepsStorageKey}_$emailKey') ?? 0;
         if (mounted) {
           setState(() {
@@ -125,12 +125,12 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
     super.dispose();
   }
 
-  // 1. Deteksi Langkah dengan Sensor Accelerometer (PBI-051, FR-44, Bab 7.3 SRS)
+
   void _startPedometer() {
     _accelerometerSub = accelerometerEventStream().listen((e) {
       final mag = sqrt(e.x * e.x + e.y * e.y + e.z * e.z);
       final now = DateTime.now();
-      // Ambang batas magnitudo percepatan > 12.0 m/s^2 dan jeda langkah minimal 350 ms
+
       if (mag > 12.0 && now.difference(_lastStepTime).inMilliseconds > 350) {
         setState(() {
           _stepCount++;
@@ -141,7 +141,7 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
     });
   }
 
-  // 2. Mini Game Gyroscope & Kemiringan "Tangkap Bintang Harapan" (PBI-053, FR-46, FR-47)
+
   void _startGame() {
     setState(() {
       _isGameRunning = true;
@@ -151,7 +151,7 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
       _basketX = _canvasWidth / 2;
     });
 
-    // 1. Sensor Gyroscope (Kecepatan Rotasi Sudut HP)
+
     _gyroscopeSub?.cancel();
     _gyroscopeSub = gyroscopeEventStream().listen((e) {
       if (!_isGameRunning) return;
@@ -162,7 +162,7 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
       });
     });
 
-    // 2. Sensor Accelerometer Tilt (Sudut Kemiringan Statis Gravitasi HP)
+
     _gameTiltSub?.cancel();
     _gameTiltSub = accelerometerEventStream().listen((e) {
       if (!_isGameRunning) return;
@@ -173,25 +173,25 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
       });
     });
 
-    // Game loop 60 FPS (tiap 25 ms)
+
     _gameLoopTimer?.cancel();
     _gameLoopTimer = Timer.periodic(const Duration(milliseconds: 25), (timer) {
       if (!_isGameRunning) return;
 
       setState(() {
-        _starY += 4.5; // Bintang jatuh ke bawah
+        _starY += 4.5;
 
-        // Cek tabrakan / tangkapan bintang dengan keranjang
+
         if (_starY >= _canvasHeight - 65 && _starY <= _canvasHeight - 15) {
           if ((_starX - _basketX).abs() < 55) {
-            // Berhasil ditangkap!
+
             _gameScore += 10;
             _starY = 0.0;
             _starX = Random().nextDouble() * (_canvasWidth - 80) + 40;
           }
         }
 
-        // Bintang jatuh terlewat batas bawah
+
         if (_starY > _canvasHeight) {
           _starY = 0.0;
           _starX = Random().nextDouble() * (_canvasWidth - 80) + 40;
@@ -200,7 +200,7 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
     });
   }
 
-  // Integrasikan skor mini game langsung ke SharedPreferences & Profil Donatur (Badge)
+
   Future<void> _stopGame() async {
     _gameLoopTimer?.cancel();
     _gyroscopeSub?.cancel();
@@ -274,7 +274,7 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
   }
 
 
-  // Helper untuk menghitung Ranking Tier
+
   Map<String, dynamic> _getTierInfo(int points) {
     if (points >= 10000) {
       return {
@@ -351,7 +351,7 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
       body: TabBarView(
         controller: _tabController,
         children: [
-          // ========== TAB 1: DONASI LANGKAH (ACCELEROMETER) ==========
+
           SingleChildScrollView(
             padding: const EdgeInsets.all(20.0),
             child: Column(
@@ -523,7 +523,7 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
             ),
           ),
 
-          // ========== TAB 2: MINI GAME "TANGKAP BINTANG HARAPAN" (GYROSCOPE) ==========
+
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
@@ -549,7 +549,7 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
                 ),
                 const SizedBox(height: 12),
 
-                // Area Game Canvas dengan CustomPainter & Touch/Tilt Control
+
                 Expanded(
                   child: LayoutBuilder(
                     builder: (context, constraints) {
@@ -598,13 +598,13 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
             ),
           ),
 
-          // ========== TAB 3: SISTEM RANKING & TUKAR REWARD (GAMIFIKASI) ==========
+
           SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Kartu Level & Tier Pengguna
+
                 Container(
                   padding: const EdgeInsets.all(18),
                   decoration: BoxDecoration(
@@ -686,7 +686,7 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
 
                 const SizedBox(height: 20),
 
-                // ==================== TINGKAT LEVEL PENGGUNA ====================
+
                 const Row(
                   children: [
                     Icon(Icons.workspace_premium, color: AppColors.primary, size: 22),
@@ -751,7 +751,7 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
 
                 const SizedBox(height: 20),
 
-                // ==================== CARA MENDAPATKAN POIN ====================
+
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -868,7 +868,7 @@ class _StepsAndGameScreenState extends State<StepsAndGameScreen> with SingleTick
   }
 }
 
-// CustomPainter untuk merender elemen Game Canvas
+
 class GameCanvasPainter extends CustomPainter {
   final double basketX;
   final double starX;
@@ -901,7 +901,7 @@ class GameCanvasPainter extends CustomPainter {
       return;
     }
 
-    // 1. Gambar Bintang Harapan yang Jatuh
+
     final starPaint = Paint()..color = Colors.amber;
     canvas.drawCircle(Offset(starX, starY), 14, starPaint);
 
@@ -910,7 +910,7 @@ class GameCanvasPainter extends CustomPainter {
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
     canvas.drawCircle(Offset(starX, starY), 18, glowPaint);
 
-    // 2. Gambar Keranjang Penampung yang dikendalikan Gyroscope
+
     final basketPaint = Paint()..color = AppColors.accent1;
     final rrect = RRect.fromRectAndRadius(
       Rect.fromCenter(center: Offset(basketX, size.height - 40), width: 70, height: 24),
