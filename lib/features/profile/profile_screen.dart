@@ -44,11 +44,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      final emailKey = auth.userEmail.isNotEmpty ? auth.userEmail.toLowerCase().trim() : 'donatur_default';
+      final emailKey = auth.userEmail.isNotEmpty
+          ? auth.userEmail.toLowerCase().trim()
+          : (auth.userId.isNotEmpty ? auth.userId : 'donatur_default');
 
 
-      final photoBase64 = prefs.getString('profile_photo_base64_$emailKey') ??
-          prefs.getString('profile_photo_base64_active');
+      final photoBase64 = prefs.getString('profile_photo_base64_$emailKey');
       if (photoBase64 != null && photoBase64.isNotEmpty) {
         final decoded = base64Decode(photoBase64);
         if (mounted) {
@@ -113,13 +114,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         if (!mounted) return;
         final auth = Provider.of<AuthProvider>(context, listen: false);
-        final emailKey = auth.userEmail.isNotEmpty ? auth.userEmail.toLowerCase().trim() : 'donatur_default';
+        final emailKey = auth.userEmail.isNotEmpty
+            ? auth.userEmail.toLowerCase().trim()
+            : (auth.userId.isNotEmpty ? auth.userId : 'donatur_default');
 
 
         try {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('profile_photo_base64_$emailKey', base64String);
-          await prefs.setString('profile_photo_base64_active', base64String);
           await prefs.setString('profile_photo_$emailKey', permanentPath);
         } catch (_) {}
 

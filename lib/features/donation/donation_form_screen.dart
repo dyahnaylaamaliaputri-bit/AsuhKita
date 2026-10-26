@@ -1,9 +1,9 @@
 import '../ledger/ledger_screen.dart';
 import 'dart:convert';
+import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:pdf/pdf.dart';
@@ -12,7 +12,6 @@ import 'package:printing/printing.dart';
 import '../../core/app_colors.dart';
 import '../../core/dio_client.dart';
 import '../../data/local_db.dart';
-import '../auth/auth_provider.dart';
 import '../home/home_screen.dart';
 import '../sponsor/sponsor_screen.dart';
 import '../../services/exchange_rate_service.dart';
@@ -59,23 +58,6 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
   void initState() {
     super.initState();
 
-    final defaultIdr = widget.packageData['monthly_idr'] ?? 250000;
-    _amountController.text = defaultIdr.toString();
-
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      try {
-        final auth = Provider.of<AuthProvider>(context, listen: false);
-        if (_donorNameController.text.isEmpty) {
-          _donorNameController.text = auth.userName.isNotEmpty ? auth.userName : 'Donatur Peduli Asuh';
-        }
-        if (_donorEmailController.text.isEmpty) {
-          _donorEmailController.text = auth.userEmail.isNotEmpty ? auth.userEmail : 'donatur@asuhkita.org';
-        }
-      } catch (_) {}
-    });
-
-
     _fetchRealTimeRates();
   }
 
@@ -110,8 +92,12 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
     return 'Rp ${val.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}';
   }
 
-  Future<void> _processDonation() async {
+  bool _validateDonationInput() {
     final donorName = _donorNameController.text.trim();
+    final donorEmail = _donorEmailController.text.trim();
+    final amountInput =
+        double.tryParse(_amountController.text.replaceAll(',', '.')) ?? 0.0;
+
     if (donorName.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -119,16 +105,26 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
           backgroundColor: Colors.deepOrange,
         ),
       );
-      return;
+      return false;
     }
-
-    final amountInput = double.tryParse(_amountController.text.replaceAll(',', '.')) ?? 0.0;
+    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(donorEmail)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Masukkan alamat email donatur yang valid.')),
+      );
+      return false;
+    }
     if (amountInput <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Nominal donasi harus lebih dari 0')),
       );
-      return;
+      return false;
     }
+    return true;
+  }
+
+  Future<void> _processDonation() async {
+    if (!_validateDonationInput()) return;
+    final amountInput = double.tryParse(_amountController.text.replaceAll(',', '.')) ?? 0.0;
 
 
 
@@ -485,7 +481,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
 
 
   Future<void> _finalizeDonationAndShowCertificate(double amountInput) async {
-
+    if (!_validateDonationInput()) return;
     try {
       final canBio = await _localAuth.canCheckBiometrics || await _localAuth.isDeviceSupported();
       if (canBio) {
@@ -501,13 +497,6 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
 
     String donorName = _donorNameController.text.trim();
     String donorEmail = _donorEmailController.text.trim();
-    try {
-      final auth = Provider.of<AuthProvider>(context, listen: false);
-      if (donorName.isEmpty && auth.userName.isNotEmpty) donorName = auth.userName;
-      if (donorEmail.isEmpty && auth.userEmail.isNotEmpty) donorEmail = auth.userEmail;
-    } catch (_) {}
-    if (donorName.isEmpty) donorName = 'Donatur Peduli';
-    if (donorEmail.isEmpty) donorEmail = 'donatur@asuhkita.id';
 
     final needCategory = (widget.packageData['name'] ?? widget.childData['need_category'] ?? widget.childData['urgentNeeds'] ?? 'Pendidikan').toString();
 
@@ -518,7 +507,8 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
       'donor_name': donorName,
       'donor_email': donorEmail,
       'donor_phone': _donorPhoneController.text.trim(),
-      'donor_message': _donorMessageController.text.trim(),
+      'notes': _donorMessageController.text.trim(),
+      'package_name': needCategory,
       'need_category': needCategory,
       'amount_original': amountInput,
       'currency': _selectedCurrency,
@@ -529,17 +519,57 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
     };
 
     bool isOnlineSuccess = false;
-    String certificateCode = 'CERT-${DateTime.now().millisecondsSinceEpoch.toString().substring(5)}';
-    String blockHash = '0000a38f7e912b45e7f1c${DateTime.now().millisecondsSinceEpoch}';
+    String certificateCode = '';
+    String blockHash = '';
+    Map<String, dynamic>? onlineDonation;
 
     try {
       final res = await DioClient().dio.post('/donations', data: donationPayload);
       if (res.statusCode == 200 || res.statusCode == 201) {
+        final responseData = res.data is Map ? res.data['data'] : null;
+        final donation =
+            responseData is Map ? responseData['donation'] : null;
+        final ledgerBlock =
+            responseData is Map ? responseData['ledger_block'] : null;
+        if (responseData is! Map ||
+            donation is! Map ||
+            ledgerBlock is! Map) {
+          throw const FormatException(
+            'Respons server tidak memuat data donasi dan ledger yang diperlukan.',
+          );
+        }
+        certificateCode =
+            responseData['certificate_code']?.toString() ?? '';
+        blockHash = responseData['block_hash']?.toString() ??
+            ledgerBlock['hash']?.toString() ??
+            '';
+        if (certificateCode.isEmpty || blockHash.isEmpty) {
+          throw const FormatException(
+            'Server belum menerbitkan kredensial sertifikat yang valid.',
+          );
+        }
+        onlineDonation = Map<String, dynamic>.from(donation);
         isOnlineSuccess = true;
-        certificateCode = res.data['certificate_code'] ?? certificateCode;
-        blockHash = res.data['block_hash'] ?? blockHash;
       }
-    } catch (e) {
+    } on DioException catch (e) {
+      if (e.response != null) {
+        if (mounted) {
+          setState(() => _isProcessing = false);
+          final message = e.response?.data is Map
+              ? e.response?.data['message']?.toString()
+              : null;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                message?.isNotEmpty == true
+                    ? message!
+                    : 'Donasi belum dapat diproses oleh server.',
+              ),
+            ),
+          );
+        }
+        return;
+      }
       await LocalDatabase().queueOfflineDonation(
         childId: widget.childData['id'].toString(),
         packageId: widget.packageData['id'].toString(),
@@ -548,13 +578,26 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
         rateUsed: _exchangeRates[_selectedCurrency] ?? 1.0,
         amountIdr: _calculatedIdr,
         frequency: _frequency,
+        packageName: needCategory,
+        donorName: donorName,
+        donorEmail: donorEmail,
+        notes: _donorMessageController.text.trim(),
       );
       isOnlineSuccess = false;
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal mencatat donasi: $e')),
+        );
+      }
+      return;
     }
 
 
     await LocalDatabase().insertDonation({
-      'id': 'don_${DateTime.now().millisecondsSinceEpoch}',
+      'id': onlineDonation?['id']?.toString() ??
+          'don_${DateTime.now().millisecondsSinceEpoch}',
       'sponsorship_id': 'sp_${DateTime.now().millisecondsSinceEpoch}',
       'child_alias': widget.childData['alias'],
       'donor_name': donorName,
@@ -563,7 +606,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
       'amount_original': amountInput,
       'currency': _selectedCurrency,
       'rate_used': _exchangeRates[_selectedCurrency] ?? 1.0,
-      'amount_idr': _calculatedIdr,
+      'amount_idr': onlineDonation?['amount_idr'] ?? _calculatedIdr,
       'created_at': DateTime.now().toString().substring(0, 16),
       'status': isOnlineSuccess ? 'Terverifikasi di Ledger Cloud' : 'Tersimpan di SQLite (Menunggu Sync)',
     });
@@ -580,6 +623,10 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
 
     setState(() => _isProcessing = false);
 
+    final recordedAmountIdr = onlineDonation?['amount_idr'];
+    final certificateAmountIdr = recordedAmountIdr is num
+        ? recordedAmountIdr.toDouble()
+        : _calculatedIdr;
 
     if (mounted) {
       _showSuccessCertificateDialog(
@@ -587,7 +634,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
         certCode: certificateCode,
         hash: blockHash,
         donorName: donorName,
-        amountText: '${amountInput.toStringAsFixed(0)} $_selectedCurrency (${_formatRupiah(_calculatedIdr)})',
+        amountText: '${amountInput.toStringAsFixed(0)} $_selectedCurrency (${_formatRupiah(certificateAmountIdr)})',
       );
     }
   }
@@ -616,13 +663,18 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Row(
-                  children: const [
-                    Icon(Icons.workspace_premium, color: Colors.amber, size: 28),
-                    SizedBox(width: 8),
+                  children: [
+                    const Icon(Icons.workspace_premium, color: Colors.amber, size: 28),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Sertifikat Resmi Pendanaan',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        isOnline
+                            ? 'Sertifikat Resmi Pendanaan'
+                            : 'Donasi Menunggu Sinkronisasi',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ],
@@ -630,70 +682,85 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
                 const SizedBox(height: 14),
 
 
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.shade50.withValues(alpha: 0.5),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.amber.shade400, width: 2),
-                    boxShadow: [
-                      BoxShadow(color: Colors.amber.withValues(alpha: 0.1), blurRadius: 8),
-                    ],
+                if (isOnline)
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.shade50.withValues(alpha: 0.5),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.amber.shade400, width: 2),
+                      boxShadow: [
+                        BoxShadow(color: Colors.amber.withValues(alpha: 0.1), blurRadius: 8),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        const Icon(Icons.stars, color: Colors.amber, size: 36),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'SERTIFIKAT PENDANAAN ORANG TUA ASUH',
+                          style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF8B6914), fontSize: 13, letterSpacing: 0.5),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Diberikan sebagai bukti sah telah menjadi orang tua asuh yang mendampingi masa depan & pendidikan:',
+                          style: TextStyle(fontSize: 10, color: Colors.black87),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          donorName.toUpperCase(),
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.indigo),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.amber.shade300),
+                          ),
+                          child: Text(
+                            widget.childData['alias'] ?? 'Anak Asuh',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.primary),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text('Paket: ${widget.packageData['name']}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                        Text('Nominal: $amountText', style: const TextStyle(fontSize: 12, color: Colors.green, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: 120,
+                          height: 120,
+                          child: QrImageView(
+                            data: credentialUrl,
+                            version: QrVersions.auto,
+                            size: 120.0,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text('No. Sertifikat: $certCode', style: const TextStyle(fontSize: 10, fontFamily: 'monospace', fontWeight: FontWeight.bold)),
+                        Text('SHA-256 Ledger: ${hash.substring(0, 16)}...', style: TextStyle(fontSize: 9, color: Colors.grey.shade600)),
+                      ],
+                    ),
                   ),
-                  child: Column(
-                    children: [
-                      const Icon(Icons.stars, color: Colors.amber, size: 36),
-                      const SizedBox(height: 6),
-                      const Text(
-                        'SERTIFIKAT PENDANAAN ORANG TUA ASUH',
-                        style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF8B6914), fontSize: 13, letterSpacing: 0.5),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 4),
-                      const Text(
-                        'Diberikan sebagai bukti sah telah menjadi orang tua asuh yang mendampingi masa depan & pendidikan:',
-                        style: TextStyle(fontSize: 10, color: Colors.black87),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 8),
-
-                      Text(
-                        donorName.toUpperCase(),
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.indigo),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.amber.shade300),
-                        ),
-                        child: Text(
-                          widget.childData['alias'] ?? 'Anak Asuh',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.primary),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text('Paket: ${widget.packageData['name']}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-                      Text('Nominal: $amountText', style: const TextStyle(fontSize: 12, color: Colors.green, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: 120,
-                        height: 120,
-                        child: QrImageView(
-                          data: credentialUrl,
-                          version: QrVersions.auto,
-                          size: 120.0,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text('No. Sertifikat: $certCode', style: const TextStyle(fontSize: 10, fontFamily: 'monospace', fontWeight: FontWeight.bold)),
-                      Text('SHA-256 Ledger: ${hash.substring(0, 16)}...', style: TextStyle(fontSize: 9, color: Colors.grey.shade600)),
-                    ],
+                if (!isOnline)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.orange.shade300),
+                    ),
+                    child: const Text(
+                      'Donasi tersimpan sementara di perangkat. Sertifikat dan link verifikasi baru tersedia setelah transaksi berhasil disinkronkan ke server.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 13, color: Colors.deepOrange),
+                    ),
                   ),
-                ),
                 const SizedBox(height: 12),
                 Text(
                   isOnline
@@ -705,32 +772,34 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
                 const SizedBox(height: 16),
 
 
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      _downloadPdfCertificate(
-                        donorName: donorName,
-                        childAlias: widget.childData['alias'] ?? 'Anak Asuh',
-                        packageName: widget.packageData['name'] ?? 'Donasi',
-                        amountText: amountText,
-                        certCode: certCode,
-                        hash: hash,
-                      );
-                    },
-                    icon: const Icon(Icons.picture_as_pdf, size: 18),
-                    label: const Text('Unduh Sertifikat Resmi (PDF)'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red.shade700,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                if (isOnline)
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        _downloadPdfCertificate(
+                          donorName: donorName,
+                          childAlias: widget.childData['alias'] ?? 'Anak Asuh',
+                          packageName: widget.packageData['name'] ?? 'Donasi',
+                          amountText: amountText,
+                          certCode: certCode,
+                          hash: hash,
+                        );
+                      },
+                      icon: const Icon(Icons.picture_as_pdf, size: 18),
+                      label: const Text('Unduh Sertifikat Resmi (PDF)'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red.shade700,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
                     ),
                   ),
-                ),
                 const SizedBox(height: 8),
 
 
+                if (isOnline)
                 Row(
                   children: [
                     Expanded(
@@ -884,7 +953,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
                       controller: _donorEmailController,
                       keyboardType: TextInputType.emailAddress,
                       decoration: InputDecoration(
-                        labelText: 'Email Donatur',
+                        labelText: 'Email Donatur *',
                         hintText: 'email@example.com',
                         prefixIcon: const Icon(Icons.email_outlined, size: 20),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -966,18 +1035,6 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
                                 if (val != null) {
                                   setState(() {
                                     _selectedCurrency = val;
-
-                                    if (val == 'USD') {
-                                      _amountController.text = '20';
-                                    } else if (val == 'SGD') {
-                                      _amountController.text = '25';
-                                    } else if (val == 'EUR') {
-                                      _amountController.text = '18';
-                                    } else if (val == 'SAR') {
-                                      _amountController.text = '70';
-                                    } else {
-                                      _amountController.text = (widget.packageData['monthly_idr'] ?? 250000).toString();
-                                    }
                                   });
                                 }
                               },
@@ -993,7 +1050,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
                             keyboardType: const TextInputType.numberWithOptions(decimal: true),
                             onChanged: (_) => setState(() {}),
                             decoration: InputDecoration(
-                              labelText: 'Nominal ($_selectedCurrency)',
+                              labelText: 'Nominal ($_selectedCurrency) *',
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                             ),
                           ),

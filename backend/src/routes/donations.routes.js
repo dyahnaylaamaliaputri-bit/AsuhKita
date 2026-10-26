@@ -4,9 +4,11 @@ const router = express.Router();
 const { verifyToken } = require('../middlewares/auth.middleware');
 const {
   createSponsorship, createDonation,
-  getDonationHistory, syncOfflineDonations, getMySponsorships
+  verifyDonationCertificate, getDonationHistory, syncOfflineDonations,
+  getMySponsorships
 } = require('../controllers/donations.controller');
 
+router.get('/certificates/verify/:code', verifyDonationCertificate);
 router.use(verifyToken);
 
 

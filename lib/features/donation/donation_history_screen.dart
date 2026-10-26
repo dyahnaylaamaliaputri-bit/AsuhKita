@@ -91,12 +91,13 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> with Sing
       try {
         final res = await DioClient().dio.post('/donations', data: {
           'child_id': donation['child_id'],
-          'package_id': donation['package_id'],
+          'package_name': donation['package_name'],
+          'donor_name': donation['donor_name'],
+          'donor_email': donation['donor_email'],
+          'notes': donation['notes'],
+          'local_id': donation['local_id'],
           'amount_original': donation['amount_original'],
           'currency': donation['currency'],
-          'rate_used': donation['rate_used'],
-          'amount_idr': donation['amount_idr'],
-          'frequency': donation['frequency'],
         });
         if (res.statusCode == 200 || res.statusCode == 201) {
           await LocalDatabase().markDonationSynced(donation['id'] as int);
@@ -131,12 +132,13 @@ class _DonationHistoryScreenState extends State<DonationHistoryScreen> with Sing
     try {
       final res = await DioClient().dio.post('/donations', data: {
         'child_id': donation['child_id'],
-        'package_id': donation['package_id'],
+        'package_name': donation['package_name'],
+        'donor_name': donation['donor_name'],
+        'donor_email': donation['donor_email'],
+        'notes': donation['notes'],
+        'local_id': donation['local_id'],
         'amount_original': donation['amount_original'],
         'currency': donation['currency'],
-        'rate_used': donation['rate_used'],
-        'amount_idr': donation['amount_idr'],
-        'frequency': donation['frequency'],
       });
       if (res.statusCode == 200 || res.statusCode == 201) {
         await LocalDatabase().markDonationSynced(donation['id'] as int);

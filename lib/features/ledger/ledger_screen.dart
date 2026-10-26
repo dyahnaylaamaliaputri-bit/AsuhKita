@@ -4,6 +4,7 @@
 
 import 'package:flutter/material.dart';
 import '../../core/app_colors.dart';
+import '../../core/dio_client.dart';
 
 class LedgerScreen extends StatefulWidget {
   final String? initialCredential;
@@ -18,30 +19,6 @@ class _LedgerScreenState extends State<LedgerScreen> {
   final TextEditingController _credentialController = TextEditingController();
   bool _isVerifying = false;
   Map<String, dynamic>? _verificationResult;
-
-
-  final Map<String, Map<String, dynamic>> _blockchainCertificateRegistry = {
-    'CERT-78491023': {
-      'certCode': 'CERT-78491023',
-      'donor': 'dr. Hendra Wijaya',
-      'child': 'Bintang (Usia 8 th)',
-      'orphanage': 'Peduli Anak Foundation Lombok',
-      'amount': 'Rp 500.000 (Paket Pendidikan Cemerlang)',
-      'timestamp': '2026-03-24 14:32:10 WIB',
-      'hash': '0000a38f9b2c7e10842e47291a5e18239045dfcb281938501234abcd5678ef01',
-      'status': 'Resmi & Terverifikasi di Blockchain',
-    },
-    'CERT-99120481': {
-      'certCode': 'CERT-99120481',
-      'donor': 'Siti Nurhaliza',
-      'child': 'Bulan (Usia 6 th)',
-      'orphanage': 'Peduli Anak Foundation Lombok',
-      'amount': 'Rp 250.000 (Paket Nutrisi & Harian)',
-      'timestamp': '2026-03-23 09:15:44 WIB',
-      'hash': '0000c14b2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a',
-      'status': 'Resmi & Terverifikasi di Blockchain',
-    },
-  };
 
   @override
   void initState() {
@@ -60,7 +37,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
     super.dispose();
   }
 
-  void _verifyCertificateCredential() async {
+  Future<void> _verifyCertificateCredential() async {
     final input = _credentialController.text.trim();
     if (input.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -74,90 +51,51 @@ class _LedgerScreenState extends State<LedgerScreen> {
       _verificationResult = null;
     });
 
-    await Future.delayed(const Duration(milliseconds: 500));
+    final uri = Uri.tryParse(input);
+    final code = uri?.queryParameters['cert'] ??
+        uri?.queryParameters['code'] ??
+        input;
+    final hash = uri?.queryParameters['hash'] ?? '';
 
+    try {
+      final response = await DioClient().dio.get(
+        '/donations/certificates/verify/${Uri.encodeComponent(code)}',
+        queryParameters: hash.isEmpty ? null : {'hash': hash},
+      );
+      final responseData =
+          response.data is Map ? response.data['data'] : null;
+      final certificate =
+          responseData is Map ? responseData['certificate'] : null;
+      final isValid =
+          responseData is Map && responseData['valid'] == true && certificate is Map;
 
-    String code = '';
-    String hash = '';
-
-    if (input.contains('code=') || input.contains('cert=')) {
-      final uri = Uri.tryParse(input);
-      if (uri != null) {
-        code = uri.queryParameters['code'] ?? uri.queryParameters['cert'] ?? '';
-        hash = uri.queryParameters['hash'] ?? '';
-      }
-    } else if (input.startsWith('CERT-')) {
-      code = input.toUpperCase().trim();
-    } else {
-      hash = input.toLowerCase().trim();
-    }
-
-
-    final isTamperedOrForged = input.toLowerCase().contains('palsu') ||
-        input.toLowerCase().contains('fake') ||
-        input.toLowerCase().contains('forged') ||
-        input.toLowerCase().contains('rekayasa') ||
-        input.toLowerCase().contains('illegal') ||
-        input.toLowerCase().contains('tamper') ||
-        input.toLowerCase().contains('unauthorized');
-
-    if (isTamperedOrForged) {
+      if (!mounted) return;
+      setState(() {
+        _isVerifying = false;
+        _verificationResult = isValid
+            ? {
+                'isValid': true,
+                'data': Map<String, dynamic>.from(certificate),
+              }
+            : {
+                'isValid': false,
+                'reason': responseData is Map
+                    ? responseData['message']?.toString() ??
+                        'Kredensial tidak ditemukan di catatan donasi.'
+                    : 'Respons verifikasi dari server tidak valid.',
+              };
+      });
+    } catch (error) {
+      if (!mounted) return;
       setState(() {
         _isVerifying = false;
         _verificationResult = {
           'isValid': false,
-          'isForged': true,
-          'reason': '🚨 TERDETEKSI REKAYASA / DIPALSUKAN PIHAK LAIN!\n\n'
-              'Kredensial sertifikat ini menggunakan tanda tangan hash yang tidak terdaftar pada Genesis Block Ledger AsuhKita. '
-              'Struktur kriptografi mengindikasikan upaya manipulasi nominal/nama donatur dari pihak luar tanpa konsensus node panti. '
-              'Verifikasi Blockchain: DITOLAK (INVALID).',
+          'isError': true,
+          'reason': 'Verifikasi gagal terhubung ke server: $error',
         };
       });
-      return;
     }
-
-
-    Map<String, dynamic>? match;
-    for (var entry in _blockchainCertificateRegistry.entries) {
-      if ((code.isNotEmpty && entry.key.toUpperCase() == code.toUpperCase()) ||
-          (hash.isNotEmpty && entry.value['hash'].toString().toLowerCase().contains(hash))) {
-        match = entry.value;
-        break;
-      }
-    }
-
-
-    if (match == null && hash.length == 64 && hash.startsWith('0000')) {
-      match = {
-        'certCode': code.isNotEmpty ? code : 'CERT-VALID-ONLINE',
-        'donor': 'Donatur Resmi AsuhKita',
-        'child': 'Anak Asuh Binaan',
-        'orphanage': 'Peduli Anak Foundation Lombok',
-        'amount': 'Tercatat Sah di Ledger Block',
-        'timestamp': DateTime.now().toIso8601String().substring(0, 19).replaceAll('T', ' ') + ' WIB',
-        'hash': hash,
-        'status': 'Resmi & Terverifikasi di Blockchain',
-      };
-    }
-
-    setState(() {
-      _isVerifying = false;
-      if (match != null) {
-        _verificationResult = {
-          'isValid': true,
-          'isForged': false,
-          'data': match,
-        };
-      } else {
-        _verificationResult = {
-          'isValid': false,
-          'isForged': true,
-          'reason': '❌ SERTIFIKAT TIDAK VALID / DIDUGA HASIL REKAYASA PIHAK LAIN\n\n'
-              'Nomor kredensial atau hash SHA-256 sertifikat TIDAK COCOK dengan pencatatan ledger blockchain terdistribusi AsuhKita. '
-              'Kredensial tidak diakui oleh sistem.',
-        };
-      }
-    });
   }
 
   @override
@@ -208,7 +146,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                     controller: _credentialController,
                     maxLines: 2,
                     decoration: InputDecoration(
-                      hintText: 'Contoh: https://asuhkita.org/verify?cert=CERT-78491023&hash=0000a38f...',
+                      hintText: 'Tempel link sertifikat AsuhKita, kode CERT-..., atau hash SHA-256',
                       hintStyle: const TextStyle(fontSize: 12, color: Colors.grey),
                       filled: true,
                       fillColor: AppColors.surfaceLight,
@@ -239,20 +177,6 @@ class _LedgerScreenState extends State<LedgerScreen> {
                     runSpacing: 6,
                     children: [
                       const Text('Uji Contoh: ', style: TextStyle(fontSize: 11, color: Colors.grey, fontWeight: FontWeight.bold)),
-                      ActionChip(
-                        label: const Text('CERT-78491023', style: TextStyle(fontSize: 11)),
-                        onPressed: () {
-                          _credentialController.text = 'CERT-78491023';
-                          _verifyCertificateCredential();
-                        },
-                      ),
-                      ActionChip(
-                        label: const Text('CERT-99120481', style: TextStyle(fontSize: 11)),
-                        onPressed: () {
-                          _credentialController.text = 'CERT-99120481';
-                          _verifyCertificateCredential();
-                        },
-                      ),
                       ActionChip(
                         avatar: const Icon(Icons.warning_amber_rounded, size: 14, color: Colors.red),
                         backgroundColor: const Color(0xFFFFEBEE),
@@ -300,7 +224,11 @@ class _LedgerScreenState extends State<LedgerScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            _verificationResult!['isValid'] ? 'SERTIFIKAT ASLI & TERVERIFIKASI' : 'KREDENSIAL TIDAK DITEMUKAN',
+                            _verificationResult!['isValid']
+                                ? 'SERTIFIKAT ASLI & TERVERIFIKASI'
+                                : (_verificationResult!['isError'] == true
+                                    ? 'VERIFIKASI GAGAL'
+                                    : 'KREDENSIAL TIDAK DITEMUKAN'),
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.bold,

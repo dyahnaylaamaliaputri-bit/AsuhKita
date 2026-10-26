@@ -195,6 +195,9 @@ const executeMockQuery = (text, params = []) => {
   if (sql.includes('FROM CHILDREN') || (sql.includes('FROM CHILDREN C') && sql.includes('JOIN ORPHANAGES'))) {
     let rows = mockDb.children.map(c => ({ ...c }));
 
+    if (sql.includes('C.ID::TEXT = $1')) {
+      rows = rows.filter(c => c.id === params[0]);
+    }
 
     if (params.length > 0) {
       params.forEach(p => {
@@ -272,6 +275,38 @@ const executeMockQuery = (text, params = []) => {
     return { rows: [s], rowCount: 1 };
   }
 
+  if (sql.includes('FROM DONATIONS D') && sql.includes('CERTIFICATE_CODE = $1')) {
+    const donation = mockDb.donations.find(
+      d => d.certificate_code === params[0] ||
+        mockDb.ledger_blocks.some(
+          b => b.ref_id === d.id && b.block_type === 'DONATION' && b.hash === params[0],
+        ),
+    );
+    if (!donation) return { rows: [], rowCount: 0 };
+
+    const child = mockDb.children.find(c => c.id === donation.child_id);
+    const block = mockDb.ledger_blocks.find(
+      b => b.ref_id === donation.id && b.block_type === 'DONATION',
+    );
+    if (!block) return { rows: [], rowCount: 0 };
+
+    return {
+      rows: [{
+        certificate_code: donation.certificate_code,
+        donor_name: donation.donor_name,
+        donor_email: donation.donor_email,
+        child_alias: child?.alias,
+        orphanage_name: child?.orphanage_name,
+        package_name: donation.package_name,
+        amount_idr: donation.amount_idr,
+        created_at: donation.created_at,
+        ledger_hash: block.hash,
+        block_index: block.block_index,
+      }],
+      rowCount: 1,
+    };
+  }
+
 
   if (sql.includes('FROM DONATIONS') && (sql.includes('USER_ID =') || sql.includes('D.USER_ID ='))) {
     const userId = params[0];
@@ -288,15 +323,29 @@ const executeMockQuery = (text, params = []) => {
 
 
   if (sql.includes('INSERT INTO DONATIONS')) {
-    const d = {
-      id: generateMockId(),
-      sponsorship_id: params[0], user_id: params[1],
-      amount_original: params[2], currency: params[3],
-      rate_used: params[4], amount_idr: params[5],
-      source: params[6] || 'app', local_id: params[7],
-      notes: params[8] || '', status: 'completed',
-      created_at: new Date().toISOString(),
-    };
+    const isCertificateDonation = sql.includes('CERTIFICATE_CODE');
+    const d = isCertificateDonation
+      ? {
+          id: generateMockId(),
+          sponsorship_id: params[0], user_id: params[1],
+          child_id: params[2], package_name: params[3],
+          donor_name: params[4], donor_email: params[5],
+          amount_original: params[6], currency: params[7],
+          rate_used: params[8], amount_idr: params[9],
+          source: params[10] || 'app', local_id: params[11],
+          notes: params[12] || '', certificate_code: params[13],
+          status: 'completed',
+          created_at: new Date().toISOString(),
+        }
+      : {
+          id: generateMockId(),
+          sponsorship_id: params[0], user_id: params[1],
+          amount_original: params[2], currency: params[3],
+          rate_used: params[4], amount_idr: params[5],
+          source: params[6] || 'app', local_id: params[7],
+          notes: params[8] || '', status: 'completed',
+          created_at: new Date().toISOString(),
+        };
     mockDb.donations.push(d);
     return { rows: [d], rowCount: 1 };
   }

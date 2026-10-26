@@ -26,7 +26,7 @@ class LocalDatabase {
 
     final db = await openDatabase(
       path,
-      version: 5,
+      version: 6,
       onCreate: (db, version) async {
         await _createTables(db);
         await _seedDefaultAuthUsers(db);
@@ -101,7 +101,12 @@ class LocalDatabase {
         amount_idr REAL,
         frequency TEXT,
         created_at TEXT,
-        is_synced INTEGER DEFAULT 0
+        is_synced INTEGER DEFAULT 0,
+        local_id TEXT,
+        package_name TEXT,
+        donor_name TEXT,
+        donor_email TEXT,
+        notes TEXT
       )
     ''');
 
@@ -174,6 +179,21 @@ class LocalDatabase {
     } catch (_) {}
     try {
       await db.execute('ALTER TABLE cached_donations ADD COLUMN donor_email TEXT');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE offline_donations_queue ADD COLUMN local_id TEXT');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE offline_donations_queue ADD COLUMN package_name TEXT');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE offline_donations_queue ADD COLUMN donor_name TEXT');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE offline_donations_queue ADD COLUMN donor_email TEXT');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE offline_donations_queue ADD COLUMN notes TEXT');
     } catch (_) {}
 
 
@@ -500,6 +520,10 @@ class LocalDatabase {
     required double rateUsed,
     required double amountIdr,
     required String frequency,
+    String? packageName,
+    String? donorName,
+    String? donorEmail,
+    String? notes,
   }) async {
     final db = await database;
     return await db.insert('offline_donations_queue', {
@@ -512,6 +536,11 @@ class LocalDatabase {
       'frequency': frequency,
       'created_at': DateTime.now().toIso8601String(),
       'is_synced': 0,
+      'local_id': 'offline_${DateTime.now().microsecondsSinceEpoch}',
+      'package_name': packageName,
+      'donor_name': donorName,
+      'donor_email': donorEmail,
+      'notes': notes,
     });
   }
 

@@ -5,6 +5,7 @@
 const { query } = require('../config/database');
 const { addBlock } = require('../blockchain/hash_chain');
 const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 
 
 
@@ -111,19 +112,56 @@ const createDonation = async (req, res, next) => {
   try {
     const {
       sponsorship_id,
+      child_id,
+      package_name,
+      donor_name,
+      donor_email,
       amount_original,
       currency = 'IDR',
       local_id,
       notes = '',
     } = req.body;
 
-    if (!amount_original || amount_original <= 0) {
+    const parsedAmount = Number(amount_original);
+    if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
       return res.status(400).json({
         success: false,
         message: 'Nominal donasi harus lebih dari 0.',
         error: 'INVALID_AMOUNT',
       });
     }
+
+    if (
+      !child_id ||
+      typeof package_name !== 'string' ||
+      package_name.trim().length === 0 ||
+      typeof donor_name !== 'string' ||
+      donor_name.trim().length === 0 ||
+      typeof donor_email !== 'string' ||
+      !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(donor_email.trim())
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Data anak, paket, nama, dan email donatur wajib diisi.',
+        error: 'MISSING_FIELDS',
+      });
+    }
+
+    const childResult = await query(
+      `SELECT c.id, c.alias, o.name AS orphanage_name
+       FROM children c
+       JOIN orphanages o ON o.id = c.orphanage_id
+       WHERE c.id::text = $1`,
+      [child_id.toString()]
+    );
+    if (childResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Anak asuh tidak ditemukan.',
+        error: 'CHILD_NOT_FOUND',
+      });
+    }
+    const child = childResult.rows[0];
 
     const validCurrencies = ['IDR', 'USD', 'SGD', 'EUR', 'SAR'];
     if (!validCurrencies.includes(currency)) {
@@ -168,24 +206,31 @@ const createDonation = async (req, res, next) => {
       }
     }
 
-    const amountIdr = Math.round(parseFloat(amount_original) * rateUsed);
+    const amountIdr = Math.round(parsedAmount * rateUsed);
+    const certificateCode = `CERT-${crypto.randomBytes(8).toString('hex').toUpperCase()}`;
 
 
     const donationResult = await query(
       `INSERT INTO donations
-         (sponsorship_id, user_id, amount_original, currency, rate_used, amount_idr, source, local_id, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         (sponsorship_id, user_id, child_id, package_name, donor_name, donor_email,
+          amount_original, currency, rate_used, amount_idr, source, local_id, notes, certificate_code)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
        RETURNING *`,
       [
         sponsorship_id || null,
         req.user.id,
-        parseFloat(amount_original),
+        child.id,
+        package_name.trim(),
+        donor_name.trim(),
+        donor_email.trim().toLowerCase(),
+        parsedAmount,
         currency,
         rateUsed,
         amountIdr,
         'app',
         local_id || uuidv4(),
         notes,
+        certificateCode,
       ]
     );
 
@@ -196,9 +241,15 @@ const createDonation = async (req, res, next) => {
     const ledgerBlock = await addBlock('DONATION', donation.id, {
       donation_id: donation.id,
       user_id: req.user.id,
+      donor_name: donation.donor_name,
+      donor_email: donation.donor_email,
+      child_id: donation.child_id,
+      child_alias: child.alias,
+      package_name: donation.package_name,
+      certificate_code: certificateCode,
       amount_idr: amountIdr,
       currency,
-      amount_original: parseFloat(amount_original),
+      amount_original: parsedAmount,
       source: 'app',
     });
 
@@ -207,13 +258,15 @@ const createDonation = async (req, res, next) => {
       message: 'Donasi berhasil dicatat! Terima kasih atas kepedulianmu.',
       data: {
         donation,
+        certificate_code: certificateCode,
+        block_hash: ledgerBlock.hash,
         ledger_block: {
           block_index: ledgerBlock.block_index,
           hash: ledgerBlock.hash,
           block_type: ledgerBlock.block_type,
         },
         summary: {
-          amount_original: parseFloat(amount_original),
+          amount_original: parsedAmount,
           currency,
           rate_used: rateUsed,
           amount_idr: amountIdr,
@@ -226,7 +279,59 @@ const createDonation = async (req, res, next) => {
   }
 };
 
+const verifyDonationCertificate = async (req, res, next) => {
+  try {
+    const credential = req.params.code.trim();
+    const code = /^CERT-/i.test(credential)
+      ? credential.toUpperCase()
+      : credential.toLowerCase();
+    const providedHash = req.query.hash?.toString().trim().toLowerCase();
+    const result = await query(
+      `SELECT d.certificate_code, d.donor_name, d.donor_email,
+              c.alias AS child_alias, o.name AS orphanage_name,
+              d.package_name, d.amount_idr, d.created_at,
+              lb.hash AS ledger_hash, lb.block_index
+       FROM donations d
+       JOIN ledger_blocks lb
+         ON lb.ref_id = d.id AND lb.block_type = 'DONATION'
+       LEFT JOIN children c ON c.id = d.child_id
+       LEFT JOIN orphanages o ON o.id = c.orphanage_id
+       WHERE d.certificate_code = $1 OR lb.hash = $1
+       ORDER BY lb.block_index DESC
+       LIMIT 1`,
+      [code]
+    );
+    const certificate = result.rows[0];
+    const isValid = Boolean(
+      certificate &&
+      (!providedHash || certificate.ledger_hash.toLowerCase() === providedHash)
+    );
 
+    return res.status(200).json({
+      success: true,
+      data: isValid
+        ? {
+            valid: true,
+            certificate: {
+              certCode: certificate.certificate_code,
+              donor: certificate.donor_name,
+              child: certificate.child_alias || 'Anak Asuh',
+              orphanage: certificate.orphanage_name || 'Panti Asuhan',
+              amount: `Rp ${Number(certificate.amount_idr).toLocaleString('id-ID')} (${certificate.package_name})`,
+              timestamp: certificate.created_at,
+              hash: certificate.ledger_hash,
+              blockIndex: certificate.block_index,
+            },
+          }
+        : {
+            valid: false,
+            message: 'Kode sertifikat tidak ditemukan atau hash tidak cocok.',
+          },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
 
 
 
@@ -374,4 +479,11 @@ const getMySponsorships = async (req, res, next) => {
   }
 };
 
-module.exports = { createSponsorship, createDonation, getDonationHistory, syncOfflineDonations, getMySponsorships };
+module.exports = {
+  createSponsorship,
+  createDonation,
+  verifyDonationCertificate,
+  getDonationHistory,
+  syncOfflineDonations,
+  getMySponsorships,
+};

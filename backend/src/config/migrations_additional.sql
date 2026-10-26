@@ -45,8 +45,16 @@ CREATE TABLE IF NOT EXISTS certificates (
 CREATE INDEX IF NOT EXISTS idx_certificates_code ON certificates(verification_code);
 CREATE INDEX IF NOT EXISTS idx_certificates_donor ON certificates(donor_id);
 
+ALTER TABLE donations
+  ADD COLUMN IF NOT EXISTS child_id UUID REFERENCES children(id),
+  ADD COLUMN IF NOT EXISTS package_name VARCHAR(100),
+  ADD COLUMN IF NOT EXISTS donor_name VARCHAR(100),
+  ADD COLUMN IF NOT EXISTS donor_email VARCHAR(150),
+  ADD COLUMN IF NOT EXISTS certificate_code VARCHAR(32);
 
-
+CREATE UNIQUE INDEX IF NOT EXISTS idx_donations_certificate_code
+  ON donations(certificate_code)
+  WHERE certificate_code IS NOT NULL;
 
 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
