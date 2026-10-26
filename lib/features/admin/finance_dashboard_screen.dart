@@ -310,9 +310,16 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text('Kas Saldo Panti Asuhan (Real-Time)', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                            const Expanded(
+                              child: Text(
+                                'Kas Saldo Panti Asuhan (Real-Time)',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(color: Colors.white70, fontSize: 13),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
@@ -410,7 +417,14 @@ class _FinanceDashboardScreenState extends State<FinanceDashboardScreen> {
                             icon: _isGeneratingAiReport
                                 ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                                 : const Icon(Icons.summarize, size: 16),
-                            label: const Text('Buat Narasi Laporan Akuntansi dengan AI', style: TextStyle(fontSize: 13)),
+                            label: const Flexible(
+                              child: Text(
+                                'Buat Narasi Laporan Akuntansi dengan AI',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(fontSize: 13),
+                              ),
+                            ),
                             style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
                           ),
                         ),

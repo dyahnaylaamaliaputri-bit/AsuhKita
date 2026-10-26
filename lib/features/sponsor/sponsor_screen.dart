@@ -221,9 +221,13 @@ class _SponsorScreenState extends State<SponsorScreen> {
                   children: [
                     Icon(Icons.auto_awesome, color: AppColors.primary, size: 24),
                     SizedBox(width: 8),
-                    Text(
-                      'AI Smart Profiling Donatur',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                    Expanded(
+                      child: Text(
+                        'AI Smart Profiling Donatur',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ],
                 ),
@@ -312,23 +316,33 @@ class _SponsorScreenState extends State<SponsorScreen> {
                 const SizedBox(height: 10),
                 SizedBox(
                   width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      _executeAiProfiling(
-                        ageRange: selectedAgeRange,
-                        priorityNeed: selectedPriorityNeed,
-                        budgetRange: selectedBudgetRange,
-                        prioritizeUnfulfilled: prioritizeUnfulfilled,
-                      );
-                    },
-                    icon: const Icon(Icons.psychology, size: 20),
-                    label: const Text('Proses AI Profiling & Tampilkan Hasil'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  child: SafeArea(
+                    top: false,
+                    minimum: const EdgeInsets.only(bottom: 12),
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        _executeAiProfiling(
+                          ageRange: selectedAgeRange,
+                          priorityNeed: selectedPriorityNeed,
+                          budgetRange: selectedBudgetRange,
+                          prioritizeUnfulfilled: prioritizeUnfulfilled,
+                        );
+                      },
+                      icon: const Icon(Icons.psychology, size: 20),
+                      label: const Flexible(
+                        child: Text(
+                          'Proses AI Profiling & Tampilkan Hasil',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
                     ),
                   ),
                 ),
@@ -750,18 +764,22 @@ class _SponsorScreenState extends State<SponsorScreen> {
                                                 ),
                                               ),
                                               const SizedBox(width: 8),
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                                decoration: BoxDecoration(
-                                                  color: AppColors.surfaceLight,
-                                                  borderRadius: BorderRadius.circular(8),
-                                                ),
-                                                child: Text(
-                                                  child['need_category'] ?? child['urgentNeeds'] ?? '',
-                                                  style: const TextStyle(
-                                                    fontSize: 11,
-                                                    color: AppColors.primaryDark,
-                                                    fontWeight: FontWeight.bold,
+                                              Flexible(
+                                                child: Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                  decoration: BoxDecoration(
+                                                    color: AppColors.surfaceLight,
+                                                    borderRadius: BorderRadius.circular(8),
+                                                  ),
+                                                  child: Text(
+                                                    child['need_category'] ?? child['urgentNeeds'] ?? '',
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    style: const TextStyle(
+                                                      fontSize: 11,
+                                                      color: AppColors.primaryDark,
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
                                                   ),
                                                 ),
                                               ),

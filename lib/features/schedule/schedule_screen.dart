@@ -692,6 +692,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                           if (isAdmin) ...[
                             DropdownButtonFormField<String>(
                               initialValue: _reportCategory,
+                              isExpanded: true,
                               decoration: InputDecoration(
                                 labelText: 'Jenis Laporan Keuangan',
                                 prefixIcon: const Icon(
@@ -724,6 +725,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                             const SizedBox(height: 16),
                             DropdownButtonFormField<String>(
                               initialValue: _reportTarget,
+                              isExpanded: true,
                               decoration: InputDecoration(
                                 labelText: 'Target Divisi / Anak Asuh',
                                 prefixIcon: const Icon(
