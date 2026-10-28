@@ -214,6 +214,10 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     final cityCtrl = TextEditingController(text: 'Peduli Anak Lombok');
     String selectedGender = 'Laki-laki';
     String? base64Image;
+    String? nameError;
+    String? ageError;
+    String? storyError;
+    String? formGeneralError;
 
 
     final availableCategories = [
@@ -327,24 +331,43 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                   const SizedBox(height: 16),
                   TextField(
                     controller: nameCtrl,
+                    onChanged: (v) {
+                      if (nameError != null || formGeneralError != null) {
+                        setModalState(() {
+                          nameError = null;
+                          formGeneralError = null;
+                        });
+                      }
+                    },
                     decoration: InputDecoration(
                       labelText: 'Nama Samaran Anak *',
                       hintText: 'Contoh: Arfa / Ayra / Rangga',
-                      helperText: 'Sesuai Child Protection Policy, gunakan nama samaran (alias)',
+                      helperText: nameError == null ? 'Sesuai Child Protection Policy, gunakan nama samaran (alias)' : null,
+                      errorText: nameError,
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                       focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
                     ),
                   ),
                   const SizedBox(height: 12),
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
                         child: TextField(
                           controller: ageCtrl,
                           keyboardType: TextInputType.number,
+                          onChanged: (v) {
+                            if (ageError != null || formGeneralError != null) {
+                              setModalState(() {
+                                ageError = null;
+                                formGeneralError = null;
+                              });
+                            }
+                          },
                           decoration: InputDecoration(
                             labelText: 'Usia (Tahun) *',
                             hintText: 'Contoh: 8',
+                            errorText: ageError,
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                             focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
                           ),
@@ -501,9 +524,18 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                   TextField(
                     controller: storyCtrl,
                     maxLines: 3,
+                    onChanged: (v) {
+                      if (storyError != null || formGeneralError != null) {
+                        setModalState(() {
+                          storyError = null;
+                          formGeneralError = null;
+                        });
+                      }
+                    },
                     decoration: InputDecoration(
                       labelText: 'Cerita Singkat / Latar Belakang Anak *',
                       hintText: 'Tuliskan latar belakang, kondisi, dan cerita anak asuh...',
+                      errorText: storyError,
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                       focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary, width: 2)),
                     ),
@@ -538,6 +570,30 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                     ),
                   ),
                   const SizedBox(height: 20),
+                  if (formGeneralError != null) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.red.shade300),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.error_outline, color: Colors.redAccent, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              formGeneralError!,
+                              style: const TextStyle(fontSize: 12, color: Colors.redAccent, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   SizedBox(
                     width: double.infinity,
                     height: 50,
@@ -549,52 +605,53 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                       onPressed: () async {
-
                               final name = nameCtrl.text.trim();
                               final ageStr = ageCtrl.text.trim();
                               final age = int.tryParse(ageStr);
                               final story = storyCtrl.text.trim();
 
+                              bool hasError = false;
+                              String? newNameError;
+                              String? newAgeError;
+                              String? newStoryError;
+                              String? newGeneralError;
+
                               if (name.isEmpty) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Nama samaran anak wajib diisi!'),
-                                    backgroundColor: Colors.redAccent,
-                                  ),
-                                );
-                                return;
+                                newNameError = 'Nama samaran anak wajib diisi!';
+                                hasError = true;
+                                newGeneralError ??= newNameError;
                               }
 
-                              if (age == null || age <= 0) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Usia anak wajib diisi dengan angka valid (> 0)!'),
-                                    backgroundColor: Colors.redAccent,
-                                  ),
-                                );
-                                return;
+                              if (ageStr.isEmpty) {
+                                newAgeError = 'Usia anak wajib diisi!';
+                                hasError = true;
+                                newGeneralError ??= newAgeError;
+                              } else if (age == null || age <= 0) {
+                                newAgeError = 'Usia harus angka valid (> 0)!';
+                                hasError = true;
+                                newGeneralError ??= newAgeError;
                               }
 
                               if (selectedNeeds.isEmpty) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Paling sedikit 1 kategori kebutuhan wajib dipilih!'),
-                                    backgroundColor: Colors.redAccent,
-                                  ),
-                                );
-                                return;
+                                newGeneralError ??= 'Paling sedikit 1 kategori kebutuhan wajib dipilih!';
+                                hasError = true;
                               }
 
                               if (story.isEmpty) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Cerita singkat anak wajib diisi!'),
-                                    backgroundColor: Colors.redAccent,
-                                  ),
-                                );
-                                return;
+                                newStoryError = 'Cerita singkat anak wajib diisi!';
+                                hasError = true;
+                                newGeneralError ??= newStoryError;
                               }
 
+                              if (hasError) {
+                                setModalState(() {
+                                  nameError = newNameError;
+                                  ageError = newAgeError;
+                                  storyError = newStoryError;
+                                  formGeneralError = newGeneralError;
+                                });
+                                return;
+                              }
 
                               if (ctx.mounted) {
                                 Navigator.pop(ctx);

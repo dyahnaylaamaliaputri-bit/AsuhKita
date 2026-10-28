@@ -15,6 +15,46 @@ import '../../core/dio_client.dart';
 import '../../data/local_db.dart';
 import '../auth/auth_provider.dart';
 import '../sponsor/sponsor_screen.dart';
+Widget buildChildAvatar(
+  String? avatarUrl, {
+  double radius = 24,
+  Color? backgroundColor,
+  double? iconSize,
+}) {
+  final url = (avatarUrl ?? '').trim();
+  final bg = backgroundColor ?? AppColors.surfaceLight;
+  final iSize = iconSize ?? (radius * 1.1);
+
+  if (url.startsWith('data:image')) {
+    try {
+      final bytes = base64Decode(url.split(',').last);
+      return CircleAvatar(
+        radius: radius,
+        backgroundColor: bg,
+        backgroundImage: MemoryImage(bytes),
+      );
+    } catch (_) {}
+  }
+  if (url.startsWith('assets/')) {
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: bg,
+      backgroundImage: AssetImage(url),
+    );
+  }
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: bg,
+      backgroundImage: NetworkImage(url),
+    );
+  }
+  return CircleAvatar(
+    radius: radius,
+    backgroundColor: bg,
+    child: Icon(Icons.face, size: iSize, color: AppColors.primary),
+  );
+}
 
 class FamilyRoomScreen extends StatefulWidget {
   const FamilyRoomScreen({super.key});
@@ -59,7 +99,6 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
     setState(() => _isLoading = true);
 
     try {
-
       final auth = Provider.of<AuthProvider>(context, listen: false);
       final userEmail = auth.userEmail.toLowerCase().trim();
       final userName = auth.userName.toLowerCase().trim();
@@ -81,7 +120,6 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
         }
       }
 
-
       List<Map<String, dynamic>> allCatalog = [];
       try {
         final res = await DioClient().dio.get('/children');
@@ -97,18 +135,14 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
         }
       } catch (_) {}
 
-
-      if (allCatalog.isEmpty) {
-        final cached = await LocalDatabase().getCachedChildren();
-        final newKids = await LocalDatabase().getNewChildren();
-        allCatalog = [...cached, ...newKids];
-      }
-
+      final cached = await LocalDatabase().getCachedChildren();
+      final newKids = await LocalDatabase().getNewChildren();
+      final combinedCatalog = <Map<String, dynamic>>[...allCatalog, ...cached, ...newKids];
 
       List<Map<String, dynamic>> mySponsoredChildren = [];
       if (sponsoredAliases.isNotEmpty) {
         final seen = <String>{};
-        for (var child in allCatalog) {
+        for (var child in combinedCatalog) {
           final name = (child['alias'] ?? child['name'] ?? '').toString().trim();
           if (name.isNotEmpty && sponsoredAliases.contains(name.toLowerCase())) {
             if (!seen.contains(name.toLowerCase())) {
@@ -118,27 +152,26 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
           }
         }
 
-
         for (var alias in sponsoredAliases) {
           if (!seen.contains(alias)) {
             seen.add(alias);
+            final matched = combinedCatalog.firstWhere(
+              (c) => (c['alias'] ?? c['name'] ?? '').toString().trim().toLowerCase() == alias,
+              orElse: () => <String, dynamic>{},
+            );
             final titleCase = alias.length > 1 ? '${alias[0].toUpperCase()}${alias.substring(1)}' : alias;
             mySponsoredChildren.add({
-              'alias': titleCase,
-              'orphanage_city': 'PeduliAnak',
-              'need_category': 'Pendidikan',
-              'avatar': '',
+              'alias': matched['alias'] ?? matched['name'] ?? titleCase,
+              'orphanage_city': matched['orphanage_city'] ?? matched['city'] ?? 'PeduliAnak',
+              'need_category': matched['need_category'] ?? matched['urgent_needs'] ?? 'Pendidikan',
+              'avatar': matched['avatar'] ?? matched['photo'] ?? '',
             });
           }
         }
       }
 
-
-
-      final rawList = auth.isAdmin
-          ? allCatalog
-          : (mySponsoredChildren.isNotEmpty ? mySponsoredChildren : allCatalog);
-
+      // Donor only sees children they donated to; Admin sees all children.
+      final rawList = auth.isAdmin ? combinedCatalog : mySponsoredChildren;
 
       final Map<String, Map<String, dynamic>> uniqueMap = {};
       for (var c in rawList) {
@@ -151,7 +184,6 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
         }
       }
       _children = uniqueMap.values.toList();
-
 
       _lastMessages = {};
       for (var child in _children) {
@@ -321,12 +353,7 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
                                           : [Colors.grey.shade300, Colors.grey.shade400],
                                     ),
                                   ),
-                                  child: CircleAvatar(
-                                    radius: 24,
-                                    backgroundColor: Colors.white,
-                                    backgroundImage: avatar.startsWith('http') ? NetworkImage(avatar) : null,
-                                    child: avatar.startsWith('http') ? null : const Icon(Icons.face, size: 24, color: AppColors.primary),
-                                  ),
+                                  child: buildChildAvatar(avatar, radius: 24, backgroundColor: Colors.white),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
@@ -589,12 +616,7 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
 
             Stack(
               children: [
-                CircleAvatar(
-                  radius: 27,
-                  backgroundColor: AppColors.surfaceLight,
-                  backgroundImage: avatar.startsWith('http') ? NetworkImage(avatar) : null,
-                  child: avatar.startsWith('http') ? null : const Icon(Icons.face, color: AppColors.primary, size: 28),
-                ),
+                buildChildAvatar(avatar, radius: 27),
                 Positioned(
                   bottom: 0,
                   right: 0,
@@ -913,12 +935,7 @@ class _ChatRoomScreenState extends State<_ChatRoomScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    CircleAvatar(
-                      radius: 65,
-                      backgroundColor: AppColors.surfaceLight,
-                      backgroundImage: widget.childAvatar.startsWith('http') ? NetworkImage(widget.childAvatar) : null,
-                      child: widget.childAvatar.startsWith('http') ? null : const Icon(Icons.face, size: 55, color: AppColors.primary),
-                    ),
+                    buildChildAvatar(widget.childAvatar, radius: 65, iconSize: 55),
                     const SizedBox(height: 18),
                     Text(
                       widget.childAlias,
@@ -991,12 +1008,7 @@ class _ChatRoomScreenState extends State<_ChatRoomScreen> {
           children: [
             Stack(
               children: [
-                CircleAvatar(
-                  radius: 19,
-                  backgroundColor: AppColors.surfaceLight,
-                  backgroundImage: widget.childAvatar.startsWith('http') ? NetworkImage(widget.childAvatar) : null,
-                  child: widget.childAvatar.startsWith('http') ? null : const Icon(Icons.face, size: 20, color: AppColors.primary),
-                ),
+                buildChildAvatar(widget.childAvatar, radius: 19, iconSize: 20),
                 Positioned(
                   bottom: 0,
                   right: 0,
@@ -1083,16 +1095,7 @@ class _ChatRoomScreenState extends State<_ChatRoomScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
                                     if (!isDonor) ...[
-                                      CircleAvatar(
-                                        radius: 14,
-                                        backgroundColor: AppColors.surfaceLight,
-                                        backgroundImage: widget.childAvatar.startsWith('http')
-                                            ? NetworkImage(widget.childAvatar)
-                                            : null,
-                                        child: widget.childAvatar.startsWith('http')
-                                            ? null
-                                            : const Icon(Icons.face, size: 14, color: AppColors.primary),
-                                      ),
+                                      buildChildAvatar(widget.childAvatar, radius: 14, iconSize: 14),
                                       const SizedBox(width: 6),
                                     ],
                                     Flexible(
@@ -1205,12 +1208,7 @@ class _ChatRoomScreenState extends State<_ChatRoomScreen> {
                 end: Alignment.bottomRight,
               ),
             ),
-            child: CircleAvatar(
-              radius: 46,
-              backgroundColor: Colors.white,
-              backgroundImage: widget.childAvatar.startsWith('http') ? NetworkImage(widget.childAvatar) : null,
-              child: widget.childAvatar.startsWith('http') ? null : const Icon(Icons.face, size: 48, color: AppColors.primary),
-            ),
+            child: buildChildAvatar(widget.childAvatar, radius: 46, backgroundColor: Colors.white, iconSize: 48),
           ),
           const SizedBox(height: 14),
           Text(
