@@ -533,6 +533,37 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
 
   Future<void> _finalizeDonationAndShowCertificate(double amountInput) async {
     if (!_validateDonationInput()) return;
+
+    // Verifikasi Biometrik (Sidik Jari / Face Unlock) untuk keamanan otorisasi transaksi
+    try {
+      final canBio = await _localAuth.canCheckBiometrics || await _localAuth.isDeviceSupported();
+      if (canBio) {
+        final didAuth = await _localAuth.authenticate(
+          localizedReason: 'Pindai sidik jari atau biometrik untuk otorisasi donasi sebesar ${_formatRupiah(_calculatedIdr)}',
+          options: const AuthenticationOptions(
+            biometricOnly: false,
+            stickyAuth: false,
+            useErrorDialogs: true,
+          ),
+        ).timeout(const Duration(seconds: 15), onTimeout: () => false);
+
+        if (!didAuth) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Otorisasi biometrik dibatalkan. Transaksi belum diproses.'),
+                backgroundColor: Colors.orange,
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
+          return;
+        }
+      }
+    } catch (_) {
+      // Jika biometrik gagal pada level hardware/device, tetap lanjutkan transaksi agar tidak menggantung
+    }
+
     setState(() => _isProcessing = true);
 
 
@@ -604,23 +635,25 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
       'status': 'Terverifikasi di Ledger Blockchain',
     });
 
-    // Cache child locally so it is guaranteed present in Ruang Kasih, Detail Anak, and Profil
+    // Simpan anak asuh secara langsung tanpa menghapus data anak lainnya di SQLite
     try {
-      await LocalDatabase().cacheChildren([{
+      await LocalDatabase().insertChild({
         'id': childId,
         'alias': childAlias,
         'name': childAlias,
         'age': widget.childData['age'] ?? 10,
+        'urgent_needs': needCategory,
         'need_category': needCategory,
-        'story_summary': widget.childData['story'] ?? widget.childData['story_summary'] ?? 'Anak asuh berprestasi dan semangat belajar.',
+        'story': widget.childData['story'] ?? widget.childData['story_summary'] ?? 'Anak asuh berprestasi dan semangat belajar.',
         'avatar': childAvatar,
+        'photo': childAvatar,
         'status': 'Aktif Didampingi',
         'orphanage_name': widget.childData['orphanage_name'] ?? 'Panti Asuhan Peduli Anak',
         'orphanage_city': childCity,
         'dream': widget.childData['dream'] ?? '',
         'hobby': widget.childData['hobby'] ?? '',
         'target': widget.childData['target'] ?? 1000000.0,
-      }]);
+      });
     } catch (_) {}
 
     try {
