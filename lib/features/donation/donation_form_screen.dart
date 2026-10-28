@@ -172,6 +172,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
 
   Future<void> _processDonation() async {
     if (!_validateDonationInput()) return;
+    setState(() => _isProcessing = true);
     final amountInput = double.tryParse(_amountController.text.replaceAll(',', '.')) ?? 0.0;
 
 
@@ -218,6 +219,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
         }
 
         if (collectedSoFar >= categoryBudget) {
+          setState(() => _isProcessing = false);
           if (mounted) {
             showDialog(
               context: context,
@@ -249,6 +251,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
     } catch (_) {}
 
 
+    setState(() => _isProcessing = false);
     _showPaymentQrDialog(amountInput);
   }
 
@@ -530,16 +533,6 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
 
   Future<void> _finalizeDonationAndShowCertificate(double amountInput) async {
     if (!_validateDonationInput()) return;
-    try {
-      final canBio = await _localAuth.canCheckBiometrics || await _localAuth.isDeviceSupported();
-      if (canBio) {
-        await _localAuth.authenticate(
-          localizedReason: 'Konfirmasi otorisasi donasi sebesar ${_formatRupiah(_calculatedIdr)}',
-          biometricOnly: true,
-        );
-      }
-    } catch (_) {}
-
     setState(() => _isProcessing = true);
 
 
