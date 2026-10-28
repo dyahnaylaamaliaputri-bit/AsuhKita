@@ -14,6 +14,7 @@ import '../../core/app_colors.dart';
 import '../../core/dio_client.dart';
 import '../../data/local_db.dart';
 import '../auth/auth_provider.dart';
+import '../home/home_screen.dart';
 import '../sponsor/sponsor_screen.dart';
 Widget buildChildAvatar(
   String? avatarUrl, {
@@ -83,11 +84,13 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
   @override
   void initState() {
     super.initState();
+    HomeScreen.refreshNotifier.addListener(_loadChildrenAndMessages);
     _loadChildrenAndMessages();
   }
 
   @override
   void dispose() {
+    HomeScreen.refreshNotifier.removeListener(_loadChildrenAndMessages);
     _searchController.dispose();
     super.dispose();
   }
@@ -112,7 +115,7 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
           final isMatch = (userEmail.isNotEmpty && dEmail == userEmail) ||
               (userName.isNotEmpty && (dName == userName || dName == userEmail));
           if (isMatch) {
-            final alias = (d['child_alias'] ?? '').toString().trim();
+            final alias = (d['child_alias'] ?? d['child_id'] ?? '').toString().trim();
             if (alias.isNotEmpty) {
               sponsoredAliases.add(alias.toLowerCase());
             }
@@ -144,7 +147,8 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
         final seen = <String>{};
         for (var child in combinedCatalog) {
           final name = (child['alias'] ?? child['name'] ?? '').toString().trim();
-          if (name.isNotEmpty && sponsoredAliases.contains(name.toLowerCase())) {
+          final id = (child['id'] ?? '').toString().trim();
+          if (name.isNotEmpty && (sponsoredAliases.contains(name.toLowerCase()) || (id.isNotEmpty && sponsoredAliases.contains(id.toLowerCase())))) {
             if (!seen.contains(name.toLowerCase())) {
               seen.add(name.toLowerCase());
               mySponsoredChildren.add(child);
@@ -159,12 +163,18 @@ class _FamilyRoomScreenState extends State<FamilyRoomScreen> {
               (c) => (c['alias'] ?? c['name'] ?? '').toString().trim().toLowerCase() == alias,
               orElse: () => <String, dynamic>{},
             );
+            final matchedDonation = localDonations.firstWhere(
+              (d) => (d['child_alias'] ?? d['child_id'] ?? '').toString().trim().toLowerCase() == alias,
+              orElse: () => <String, dynamic>{},
+            );
             final titleCase = alias.length > 1 ? '${alias[0].toUpperCase()}${alias.substring(1)}' : alias;
+            final avatar = (matched['avatar'] ?? matched['photo'] ?? matchedDonation['child_avatar'] ?? '').toString();
             mySponsoredChildren.add({
               'alias': matched['alias'] ?? matched['name'] ?? titleCase,
-              'orphanage_city': matched['orphanage_city'] ?? matched['city'] ?? 'PeduliAnak',
-              'need_category': matched['need_category'] ?? matched['urgent_needs'] ?? 'Pendidikan',
-              'avatar': matched['avatar'] ?? matched['photo'] ?? '',
+              'name': matched['alias'] ?? matched['name'] ?? titleCase,
+              'orphanage_city': matched['orphanage_city'] ?? matched['city'] ?? matchedDonation['child_city'] ?? 'Peduli Anak, Lombok',
+              'need_category': matched['need_category'] ?? matched['urgent_needs'] ?? matchedDonation['need_category'] ?? 'Pendidikan',
+              'avatar': avatar,
             });
           }
         }

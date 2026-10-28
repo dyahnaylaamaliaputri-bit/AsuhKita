@@ -193,6 +193,15 @@ class LocalDatabase {
       await db.execute('ALTER TABLE cached_donations ADD COLUMN donor_email TEXT');
     } catch (_) {}
     try {
+      await db.execute('ALTER TABLE cached_donations ADD COLUMN child_id TEXT');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE cached_donations ADD COLUMN child_avatar TEXT');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE cached_donations ADD COLUMN child_city TEXT');
+    } catch (_) {}
+    try {
       await db.execute('ALTER TABLE offline_donations_queue ADD COLUMN local_id TEXT');
     } catch (_) {}
     try {
@@ -525,6 +534,9 @@ class LocalDatabase {
       'donor_name': donation['donor_name']?.toString() ?? '',
       'donor_email': donation['donor_email']?.toString() ?? '',
       'need_category': donation['need_category']?.toString() ?? '',
+      'child_id': donation['child_id']?.toString() ?? '',
+      'child_avatar': donation['child_avatar']?.toString() ?? '',
+      'child_city': donation['child_city']?.toString() ?? '',
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 

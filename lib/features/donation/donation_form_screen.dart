@@ -9,10 +9,13 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:provider/provider.dart';
 import '../../core/app_colors.dart';
 import '../../core/dio_client.dart';
 import '../../data/local_db.dart';
+import '../auth/auth_provider.dart';
 import '../home/home_screen.dart';
+import '../profile/profile_screen.dart';
 import '../sponsor/sponsor_screen.dart';
 import '../../services/exchange_rate_service.dart';
 
@@ -90,7 +93,19 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
   @override
   void initState() {
     super.initState();
-
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        try {
+          final auth = Provider.of<AuthProvider>(context, listen: false);
+          if (_donorNameController.text.isEmpty && auth.userName.isNotEmpty) {
+            _donorNameController.text = auth.userName;
+          }
+          if (_donorEmailController.text.isEmpty && auth.userEmail.isNotEmpty) {
+            _donorEmailController.text = auth.userEmail;
+          }
+        } catch (_) {}
+      }
+    });
     _fetchRealTimeRates();
   }
 
@@ -530,13 +545,28 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
 
     String donorName = _donorNameController.text.trim();
     String donorEmail = _donorEmailController.text.trim();
+    if (!mounted) return;
+    try {
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+      if (donorEmail.isEmpty && auth.userEmail.isNotEmpty) {
+        donorEmail = auth.userEmail.trim();
+      }
+      if (donorName.isEmpty && auth.userName.isNotEmpty) {
+        donorName = auth.userName.trim();
+      }
+    } catch (_) {}
+
+    final childAlias = (widget.childData['alias'] ?? widget.childData['name'] ?? 'Anak Asuh').toString().trim();
+    final childId = (widget.childData['id'] ?? 'child_${DateTime.now().millisecondsSinceEpoch}').toString();
+    final childAvatar = (widget.childData['avatar'] ?? widget.childData['photo'] ?? '').toString().trim();
+    final childCity = (widget.childData['orphanage_city'] ?? widget.childData['city'] ?? 'Peduli Anak, Lombok').toString().trim();
 
     final needCategory = (widget.packageData['name'] ?? widget.childData['need_category'] ?? widget.childData['urgentNeeds'] ?? 'Pendidikan').toString();
 
     final donationPayload = {
-      'child_id': widget.childData['id'],
-      'child_alias': widget.childData['alias'],
-      'package_id': widget.packageData['id'],
+      'child_id': childId,
+      'child_alias': childAlias,
+      'package_id': widget.packageData['id']?.toString() ?? 'pkg_1',
       'donor_name': donorName,
       'donor_email': donorEmail,
       'donor_phone': _donorPhoneController.text.trim(),
@@ -579,8 +609,8 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
       // Backend unavailable / local network offline: save to SQLite queue for background sync
       try {
         await LocalDatabase().queueOfflineDonation(
-          childId: widget.childData['id'].toString(),
-          packageId: widget.packageData['id'].toString(),
+          childId: childId,
+          packageId: widget.packageData['id']?.toString() ?? 'pkg_1',
           amountOriginal: amountInput,
           currency: _selectedCurrency,
           rateUsed: _exchangeRates[_selectedCurrency] ?? 1.0,
@@ -597,7 +627,10 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
     await LocalDatabase().insertDonation({
       'id': onlineDonation?['id']?.toString() ?? 'don_$timestamp',
       'sponsorship_id': 'sp_$timestamp',
-      'child_alias': widget.childData['alias'],
+      'child_id': childId,
+      'child_alias': childAlias,
+      'child_avatar': childAvatar,
+      'child_city': childCity,
       'donor_name': donorName,
       'donor_email': donorEmail,
       'need_category': needCategory,
@@ -609,6 +642,25 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
       'status': 'Terverifikasi di Ledger Blockchain',
     });
 
+    // Cache child locally so it is guaranteed present in Ruang Kasih, Detail Anak, and Profil
+    try {
+      await LocalDatabase().cacheChildren([{
+        'id': childId,
+        'alias': childAlias,
+        'name': childAlias,
+        'age': widget.childData['age'] ?? 10,
+        'need_category': needCategory,
+        'story_summary': widget.childData['story'] ?? widget.childData['story_summary'] ?? 'Anak asuh berprestasi dan semangat belajar.',
+        'avatar': childAvatar,
+        'status': 'Aktif Didampingi',
+        'orphanage_name': widget.childData['orphanage_name'] ?? 'Panti Asuhan Peduli Anak',
+        'orphanage_city': childCity,
+        'dream': widget.childData['dream'] ?? '',
+        'hobby': widget.childData['hobby'] ?? '',
+        'target': widget.childData['target'] ?? 1000000.0,
+      }]);
+    } catch (_) {}
+
     try {
       final prefs = await SharedPreferences.getInstance();
       final currentSponsored = prefs.getInt('asuhkita_user_sponsored_count') ?? 0;
@@ -617,6 +669,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
 
     HomeScreen.refreshNotifier.value++;
     SponsorScreen.refreshNotifier.value++;
+    ProfileScreen.refreshNotifier.value++;
 
     setState(() => _isProcessing = false);
 
@@ -822,7 +875,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
                   child: TextButton(
                     onPressed: () {
                       Navigator.pop(ctx);
-                      Navigator.pop(context);
+                      Navigator.pop(context, true);
                     },
                     child: const Text('Kembali ke Dashboard'),
                   ),
@@ -867,7 +920,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Sponsorship untuk ${widget.childData['alias']}',
+                            'Sponsorship untuk ${widget.childData['alias'] ?? widget.childData['name'] ?? 'Anak Asuh'}',
                             style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 4),

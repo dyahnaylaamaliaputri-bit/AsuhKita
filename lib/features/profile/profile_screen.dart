@@ -13,10 +13,13 @@ import '../../core/app_colors.dart';
 import '../../core/dio_client.dart';
 import '../../data/local_db.dart';
 import '../admin/admin_panel_screen.dart';
+import '../home/home_screen.dart';
+import '../sponsor/child_detail_screen.dart';
 import '../sponsor/sponsor_screen.dart';
 import '../steps_game/steps_and_game_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
+  static final ValueNotifier<int> refreshNotifier = ValueNotifier<int>(0);
   const ProfileScreen({super.key});
 
   @override
@@ -31,11 +34,93 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Uint8List? _imageBytes;
   bool _isEditing = false;
   int _kebaikanPoints = 0;
+  List<Map<String, dynamic>> _mySponsoredChildren = [];
 
   @override
   void initState() {
     super.initState();
+    ProfileScreen.refreshNotifier.addListener(_loadSponsoredChildren);
+    HomeScreen.refreshNotifier.addListener(_loadSponsoredChildren);
     _loadProfileData();
+    _loadSponsoredChildren();
+  }
+
+  @override
+  void dispose() {
+    ProfileScreen.refreshNotifier.removeListener(_loadSponsoredChildren);
+    HomeScreen.refreshNotifier.removeListener(_loadSponsoredChildren);
+    _nameController.dispose();
+    _phoneController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadSponsoredChildren() async {
+    try {
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+      final userEmail = auth.userEmail.toLowerCase().trim();
+      final userName = auth.userName.toLowerCase().trim();
+
+      final localDb = LocalDatabase();
+      final localDonations = await localDb.getCachedDonations();
+      final sponsoredAliases = <String>{};
+      if (userEmail.isNotEmpty || userName.isNotEmpty) {
+        for (var d in localDonations) {
+          final dEmail = (d['donor_email'] ?? '').toString().toLowerCase().trim();
+          final dName = (d['donor_name'] ?? '').toString().toLowerCase().trim();
+          final isMatch = (userEmail.isNotEmpty && dEmail == userEmail) ||
+              (userName.isNotEmpty && (dName == userName || dName == userEmail));
+          if (isMatch) {
+            final alias = (d['child_alias'] ?? d['child_id'] ?? '').toString().trim();
+            if (alias.isNotEmpty) {
+              sponsoredAliases.add(alias.toLowerCase());
+            }
+          }
+        }
+      }
+
+      final cachedKids = await localDb.getCachedChildren();
+      final newKids = await localDb.getNewChildren();
+      final all = [...cachedKids, ...newKids];
+
+      final myKids = <Map<String, dynamic>>[];
+      final seen = <String>{};
+      for (var k in all) {
+        final name = (k['alias'] ?? k['name'] ?? '').toString().toLowerCase();
+        final id = (k['id'] ?? '').toString().toLowerCase();
+        if ((sponsoredAliases.contains(name) || (id.isNotEmpty && sponsoredAliases.contains(id))) && !seen.contains(name)) {
+          seen.add(name);
+          myKids.add(k);
+        }
+      }
+
+      for (var alias in sponsoredAliases) {
+        if (!seen.contains(alias)) {
+          seen.add(alias);
+          final matchedDonation = localDonations.firstWhere(
+            (d) => (d['child_alias'] ?? d['child_id'] ?? '').toString().trim().toLowerCase() == alias,
+            orElse: () => <String, dynamic>{},
+          );
+          final capName = alias.length > 1 ? '${alias[0].toUpperCase()}${alias.substring(1)}' : alias;
+          myKids.add({
+            'id': matchedDonation['child_id'] ?? 'sp_$alias',
+            'alias': capName,
+            'name': capName,
+            'age': 10,
+            'need_category': matchedDonation['need_category'] ?? 'Pendidikan',
+            'orphanage_name': 'Panti Asuhan Peduli Anak',
+            'orphanage_city': matchedDonation['child_city'] ?? 'Mataram, Lombok',
+            'story': 'Anak asuh yang gigih belajar dan bersemangat menggapai cita-cita.',
+            'avatar': matchedDonation['child_avatar'] ?? '',
+          });
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _mySponsoredChildren = myKids;
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadProfileData() async {
@@ -737,7 +822,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 20),
 
 
-              if (auth.userRole != 'admin_panti')
+              if (auth.userRole != 'admin_panti') ...[
                 Card(
                   elevation: 2,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -795,7 +880,131 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ],
                     ),
                   ),
-                )
+                ),
+                const SizedBox(height: 14),
+                Card(
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.favorite, color: AppColors.primary, size: 20),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Anak Asuh Saya (${_mySponsoredChildren.length})',
+                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                                ),
+                              ],
+                            ),
+                            if (_mySponsoredChildren.isNotEmpty)
+                              Text(
+                                '${_mySponsoredChildren.length} Aktif',
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Daftar anak asuh yang sedang Anda dampingi & dukung.',
+                          style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                        ),
+                        const Divider(height: 20),
+                        if (_mySponsoredChildren.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8.0),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    'Belum ada anak asuh yang didampingi.',
+                                    style: TextStyle(fontSize: 13, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
+                                  ),
+                                ),
+                                ElevatedButton.icon(
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (_) => const SponsorScreen()),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.volunteer_activism, size: 14),
+                                  label: const Text('Pilih Anak', style: TextStyle(fontSize: 12)),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.primary,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          SizedBox(
+                            height: 85,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: _mySponsoredChildren.length,
+                              separatorBuilder: (_, __) => const SizedBox(width: 12),
+                              itemBuilder: (ctx, idx) {
+                                final child = _mySponsoredChildren[idx];
+                                final name = (child['alias'] ?? child['name'] ?? 'Anak').toString();
+                                final avatar = (child['avatar'] ?? '').toString();
+                                return InkWell(
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (_) => ChildDetailScreen(childData: child)),
+                                    );
+                                  },
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.surfaceLight,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        CircleAvatar(
+                                          radius: 20,
+                                          backgroundColor: Colors.white,
+                                          backgroundImage: avatar.startsWith('http') ? NetworkImage(avatar) : null,
+                                          child: avatar.startsWith('http') ? null : const Icon(Icons.face, color: AppColors.primary),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Column(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                            Text(
+                                              child['need_category'] ?? 'Pendidikan',
+                                              style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ]
               else
                 Card(
                   elevation: 2,

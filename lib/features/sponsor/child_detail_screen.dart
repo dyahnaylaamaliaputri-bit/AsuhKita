@@ -8,6 +8,7 @@ import '../../data/local_db.dart';
 import '../auth/auth_provider.dart';
 import '../communication/family_room_screen.dart';
 import '../donation/donation_form_screen.dart';
+import '../home/home_screen.dart';
 import '../schedule/schedule_screen.dart';
 
 class ChildDetailScreen extends StatefulWidget {
@@ -51,12 +52,20 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
   @override
   void initState() {
     super.initState();
+    HomeScreen.refreshNotifier.addListener(_checkSponsorshipStatus);
     _checkSponsorshipStatus();
+  }
+
+  @override
+  void dispose() {
+    HomeScreen.refreshNotifier.removeListener(_checkSponsorshipStatus);
+    super.dispose();
   }
 
   Future<void> _checkSponsorshipStatus() async {
     try {
       final childAlias = (widget.childData['alias'] ?? widget.childData['name'] ?? '').toString().trim().toLowerCase();
+      final childId = (widget.childData['id'] ?? '').toString().trim().toLowerCase();
       final localDonations = await LocalDatabase().getCachedDonations();
       int total = 0;
       final matched = <Map<String, dynamic>>[];
@@ -76,7 +85,10 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
         final isMyDonation = (myEmail.isNotEmpty && dEmail == myEmail) ||
             (myName.isNotEmpty && (dName == myName || dName == myEmail));
         final dAlias = (d['child_alias'] ?? '').toString().trim().toLowerCase();
-        if (isMyDonation && dAlias == childAlias) {
+        final dChildId = (d['child_id'] ?? '').toString().trim().toLowerCase();
+        final isChildMatch = (dAlias.isNotEmpty && dAlias == childAlias) ||
+            (childId.isNotEmpty && (dChildId == childId || dAlias == childId));
+        if (isMyDonation && isChildMatch) {
           matched.add(d);
           final amt = (d['amount_idr'] is num) ? (d['amount_idr'] as num).toInt() : 0;
           total += amt;
@@ -166,8 +178,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
           child: SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: () {
-                Navigator.push(
+              onPressed: () async {
+                await Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (_) => DonationFormScreen(
@@ -176,6 +188,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                     ),
                   ),
                 );
+                await _checkSponsorshipStatus();
+                if (mounted) setState(() {});
               },
               icon: const Icon(Icons.favorite),
               label: const Text(

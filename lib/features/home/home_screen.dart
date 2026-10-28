@@ -168,7 +168,7 @@ class _HomeScreenState extends State<HomeScreen> {
           final isMatch = (userEmail.isNotEmpty && dEmail == userEmail) ||
               (userName.isNotEmpty && (dName == userName || dName == userEmail));
           if (isMatch) {
-            final alias = (d['child_alias'] ?? '').toString().trim();
+            final alias = (d['child_alias'] ?? d['child_id'] ?? '').toString().trim();
             if (alias.isNotEmpty) {
               sponsoredKidSet.add(alias.toLowerCase());
             }
@@ -658,7 +658,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final isMatch = (userEmail.isNotEmpty && dEmail == userEmail) ||
           (userName.isNotEmpty && (dName == userName || dName == userEmail));
       if (isMatch) {
-        final alias = (d['child_alias'] ?? '').toString().trim();
+        final alias = (d['child_alias'] ?? d['child_id'] ?? '').toString().trim();
         if (alias.isNotEmpty) {
           sponsoredAliases.add(alias.toLowerCase());
         }
@@ -711,7 +711,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final seen = <String>{};
     for (var k in all) {
       final name = (k['alias'] ?? k['name'] ?? '').toString().toLowerCase();
-      if (sponsoredAliases.contains(name) && !seen.contains(name)) {
+      final id = (k['id'] ?? '').toString().toLowerCase();
+      if ((sponsoredAliases.contains(name) || (id.isNotEmpty && sponsoredAliases.contains(id))) && !seen.contains(name)) {
         seen.add(name);
         myKids.add(k);
       }
@@ -720,17 +721,21 @@ class _HomeScreenState extends State<HomeScreen> {
     for (var alias in sponsoredAliases) {
       if (!seen.contains(alias)) {
         seen.add(alias);
+        final matchedDonation = localDonations.firstWhere(
+          (d) => (d['child_alias'] ?? d['child_id'] ?? '').toString().trim().toLowerCase() == alias,
+          orElse: () => <String, dynamic>{},
+        );
         final capName = alias.length > 1 ? '${alias[0].toUpperCase()}${alias.substring(1)}' : alias;
         myKids.add({
-          'id': 'sp_$alias',
+          'id': matchedDonation['child_id'] ?? 'sp_$alias',
           'alias': capName,
           'name': capName,
           'age': 10,
-          'need_category': 'Pendidikan',
+          'need_category': matchedDonation['need_category'] ?? 'Pendidikan',
           'orphanage_name': 'Panti Asuhan Peduli Anak',
-          'orphanage_city': 'Mataram, Lombok',
+          'orphanage_city': matchedDonation['child_city'] ?? 'Mataram, Lombok',
           'story': 'Anak asuh yang gigih belajar dan bersemangat menggapai cita-cita.',
-          'avatar': '',
+          'avatar': matchedDonation['child_avatar'] ?? '',
         });
       }
     }

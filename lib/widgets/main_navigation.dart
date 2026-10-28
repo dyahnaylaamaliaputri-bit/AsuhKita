@@ -23,10 +23,13 @@ class _MainNavigationState extends State<MainNavigation> {
   int _profileKeyCounter = 0;
 
   void _navigateToTab(int index) {
+    if (index == 0) {
+      HomeScreen.refreshNotifier.value++;
+    } else if (index == 2) {
+      ProfileScreen.refreshNotifier.value++;
+      _profileKeyCounter++;
+    }
     setState(() {
-      if (index == 2) {
-        _profileKeyCounter++;
-      }
       _currentIndex = index;
     });
   }
