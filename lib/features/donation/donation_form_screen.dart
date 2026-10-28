@@ -540,11 +540,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
       if (canBio) {
         final didAuth = await _localAuth.authenticate(
           localizedReason: 'Pindai sidik jari atau biometrik untuk otorisasi donasi sebesar ${_formatRupiah(_calculatedIdr)}',
-          options: const AuthenticationOptions(
-            biometricOnly: false,
-            stickyAuth: false,
-            useErrorDialogs: true,
-          ),
+          biometricOnly: true,
         ).timeout(const Duration(seconds: 15), onTimeout: () => false);
 
         if (!didAuth) {
