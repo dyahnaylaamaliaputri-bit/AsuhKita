@@ -1,5 +1,5 @@
 import 'dart:async';
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import '../ledger/ledger_screen.dart';
 import 'package:flutter/services.dart';
