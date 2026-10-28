@@ -26,7 +26,7 @@ class LocalDatabase {
 
     final db = await openDatabase(
       path,
-      version: 6,
+      version: 7,
       onCreate: (db, version) async {
         await _createTables(db);
         await _seedDefaultAuthUsers(db);
@@ -43,6 +43,27 @@ class LocalDatabase {
   }
 
   Future<void> _createTables(Database db) async {
+    // Migration checks for existing installations
+    final migrations = [
+      'ALTER TABLE cached_donations ADD COLUMN donor_name TEXT',
+      'ALTER TABLE cached_donations ADD COLUMN need_category TEXT',
+      'ALTER TABLE cached_donations ADD COLUMN donor_email TEXT',
+      'ALTER TABLE cached_donations ADD COLUMN child_id TEXT',
+      'ALTER TABLE cached_donations ADD COLUMN child_avatar TEXT',
+      'ALTER TABLE cached_donations ADD COLUMN child_city TEXT',
+      'ALTER TABLE cached_donations ADD COLUMN certificate_code TEXT',
+      'ALTER TABLE cached_donations ADD COLUMN block_hash TEXT',
+      'ALTER TABLE cached_children ADD COLUMN dream TEXT',
+      'ALTER TABLE cached_children ADD COLUMN hobby TEXT',
+      'ALTER TABLE cached_children ADD COLUMN target REAL',
+      'ALTER TABLE cached_children ADD COLUMN category_budgets TEXT',
+      'ALTER TABLE new_children ADD COLUMN category_budgets TEXT',
+    ];
+    for (final sql in migrations) {
+      try {
+        await db.execute(sql);
+      } catch (_) {}
+    }
 
     await db.execute('''
       CREATE TABLE IF NOT EXISTS auth_users (

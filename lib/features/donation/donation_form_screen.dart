@@ -1,3 +1,4 @@
+import 'dart:async';
 ﻿import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import '../ledger/ledger_screen.dart';
@@ -609,7 +610,7 @@ class _DonationFormScreenState extends State<DonationFormScreen> {
     String blockHash = fallbackHash;
 
         // Kirim ke backend secara non-blocking — donasi tetap berhasil meski backend offline
-    DioClient().dio.post('/donations', data: donationPayload).catchError((_) => null);
+    unawaited(DioClient().dio.post('/donations', data: donationPayload).then((_) {}, onError: (_) {}));
 
     await LocalDatabase().insertDonation({
       'id': 'don_$timestamp',
