@@ -428,11 +428,67 @@ class _SponsorScreenState extends State<SponsorScreen> {
 
     scoredList.sort((a, b) => (b['ai_match_score'] as int).compareTo(a['ai_match_score'] as int));
 
+    // Filter: hanya tampilkan anak yang benar-benar cocok (skor > 72)
+    final matchedList = scoredList.where((c) => (c['ai_match_score'] as int) > 72).toList();
+
+    if (matchedList.isEmpty) {
+      // Tidak ada anak yang sesuai kriteria
+      setState(() {
+        _children = [];
+      });
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(
+            children: [
+              Icon(Icons.search_off, color: Colors.grey, size: 26),
+              SizedBox(width: 8),
+              Expanded(child: Text('Hasil Profiling', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
+            ],
+          ),
+          content: const Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.child_care_outlined, color: Colors.grey, size: 56),
+              SizedBox(height: 12),
+              Text(
+                'Data anak tidak tersedia',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Tidak ada anak asuh yang sesuai dengan kriteria profiling Anda saat ini. Coba ubah preferensi usia, kebutuhan, atau anggaran.',
+                style: TextStyle(fontSize: 13, color: Colors.grey, height: 1.4),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Tutup'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _showAiProfilingModal();
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+              child: const Text('Ubah Kriteria'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     setState(() {
-      _children = scoredList;
+      _children = matchedList;
     });
 
-    final topMatch = scoredList.first;
+    final topMatch = matchedList.first;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -455,13 +511,13 @@ class _SponsorScreenState extends State<SponsorScreen> {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
-                'Kecocokan Tertinggi: ' + topMatch['ai_match_score'].toString() + '% Cocok ✨',
+                'Kecocokan Tertinggi: ${topMatch['ai_match_score']}% Cocok ✨',
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF8B6914)),
               ),
             ),
             const SizedBox(height: 10),
             Text(
-              'Anak Asuh: ' + (topMatch['alias'] ?? topMatch['name']).toString() + ' (' + topMatch['age'].toString() + ' tahun)',
+              'Anak Asuh: ${(topMatch['alias'] ?? topMatch['name'])} (${topMatch['age']} tahun)',
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.primary),
             ),
             const SizedBox(height: 6),

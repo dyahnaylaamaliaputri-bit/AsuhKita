@@ -137,7 +137,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Foto profil berhasil disimpan permanen! Tidak akan hilang saat logout.'),
+              content: Text('Foto profil berhasil diperbarui! 🎉'),
               backgroundColor: AppColors.primary,
             ),
           );
