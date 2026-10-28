@@ -62,19 +62,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       final localDb = LocalDatabase();
       final localDonations = await localDb.getCachedDonations();
+
+      // Map alias -> donasi pertama (untuk ambil foto, kota, dll)
+      final donationByAlias = <String, Map<String, dynamic>>{};
       final sponsoredAliases = <String>{};
-      if (userEmail.isNotEmpty || userName.isNotEmpty) {
-        for (var d in localDonations) {
-          final dEmail = (d['donor_email'] ?? '').toString().toLowerCase().trim();
-          final dName = (d['donor_name'] ?? '').toString().toLowerCase().trim();
-          final isMatch = (userEmail.isNotEmpty && dEmail == userEmail) ||
-              (userName.isNotEmpty && (dName == userName || dName == userEmail));
-          if (isMatch) {
-            final alias = (d['child_alias'] ?? d['child_id'] ?? '').toString().trim();
-            if (alias.isNotEmpty) {
-              sponsoredAliases.add(alias.toLowerCase());
-            }
-          }
+      final bothEmpty = userEmail.isEmpty && userName.isEmpty;
+
+      for (var d in localDonations) {
+        final dEmail = (d['donor_email'] ?? '').toString().toLowerCase().trim();
+        final dName = (d['donor_name'] ?? '').toString().toLowerCase().trim();
+        // Cocokkan: email sama, atau nama sama, atau keduanya kosong (single-user device)
+        final isMatch = bothEmpty ||
+            (userEmail.isNotEmpty && (dEmail == userEmail || dEmail.isEmpty)) ||
+            (userName.isNotEmpty && (dName == userName || dName == userEmail || dName.isEmpty));
+        if (isMatch) {
+          final alias = (d['child_alias'] ?? d['child_id'] ?? '').toString().trim();
+          // Skip alias generik atau kosong
+          if (alias.isEmpty) continue;
+          final aliasLc = alias.toLowerCase();
+          // Skip ID teknis yang dimulai dengan 'don_' atau 'sp_' tapi simpan jika tidak ada alias lain
+          sponsoredAliases.add(aliasLc);
+          donationByAlias.putIfAbsent(aliasLc, () => d);
         }
       }
 
@@ -84,33 +92,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
       final myKids = <Map<String, dynamic>>[];
       final seen = <String>{};
+
+      // Prioritas 1: anak yang ditemukan di cache anak
       for (var k in all) {
-        final name = (k['alias'] ?? k['name'] ?? '').toString().toLowerCase();
-        final id = (k['id'] ?? '').toString().toLowerCase();
-        if ((sponsoredAliases.contains(name) || (id.isNotEmpty && sponsoredAliases.contains(id))) && !seen.contains(name)) {
-          seen.add(name);
-          myKids.add(k);
+        final kAlias = (k['alias'] ?? k['name'] ?? '').toString().toLowerCase().trim();
+        final kId = (k['id'] ?? '').toString().toLowerCase().trim();
+        final matches = sponsoredAliases.contains(kAlias) ||
+            (kId.isNotEmpty && sponsoredAliases.contains(kId));
+        if (matches && !seen.contains(kAlias)) {
+          seen.add(kAlias);
+          // Merge foto dari donasi jika foto anak kosong
+          final mergedAvatar = (k['avatar'] ?? k['photo'] ?? '').toString().isNotEmpty
+              ? (k['avatar'] ?? k['photo'])
+              : (donationByAlias[kAlias]?['child_avatar'] ?? donationByAlias[kId]?['child_avatar'] ?? '');
+          myKids.add({...k, 'avatar': mergedAvatar});
         }
       }
 
+      // Prioritas 2: alias yang tidak ada di cache anak, buat dari data donasi
       for (var alias in sponsoredAliases) {
         if (!seen.contains(alias)) {
           seen.add(alias);
-          final matchedDonation = localDonations.firstWhere(
-            (d) => (d['child_alias'] ?? d['child_id'] ?? '').toString().trim().toLowerCase() == alias,
-            orElse: () => <String, dynamic>{},
-          );
-          final capName = alias.length > 1 ? '${alias[0].toUpperCase()}${alias.substring(1)}' : alias;
+          final don = donationByAlias[alias] ?? <String, dynamic>{};
+          // Buat nama tampil yang bagus
+          String displayName = alias;
+          // Jika alias adalah ID teknis (don_xxx / sp_xxx), gunakan nama dari donasi
+          if (alias.startsWith('don_') || alias.startsWith('sp_')) {
+            displayName = (don['child_alias'] ?? don['child_id'] ?? alias).toString();
+            if (displayName == alias) displayName = 'Anak Asuh';
+          }
+          final capName = displayName.length > 1
+              ? '${displayName[0].toUpperCase()}${displayName.substring(1)}'
+              : displayName;
           myKids.add({
-            'id': matchedDonation['child_id'] ?? 'sp_$alias',
+            'id': don['child_id'] ?? 'sp_$alias',
             'alias': capName,
             'name': capName,
-            'age': 10,
-            'need_category': matchedDonation['need_category'] ?? 'Pendidikan',
-            'orphanage_name': 'Panti Asuhan Peduli Anak',
-            'orphanage_city': matchedDonation['child_city'] ?? 'Mataram, Lombok',
+            'age': don['age'] ?? 10,
+            'need_category': don['need_category'] ?? 'Pendidikan',
+            'orphanage_name': don['orphanage_name'] ?? 'Panti Asuhan Peduli Anak',
+            'orphanage_city': don['child_city'] ?? 'Mataram, Lombok',
             'story': 'Anak asuh yang gigih belajar dan bersemangat menggapai cita-cita.',
-            'avatar': matchedDonation['child_avatar'] ?? '',
+            'avatar': don['child_avatar'] ?? '',
           });
         }
       }
@@ -690,6 +713,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                           await LocalDatabase().insertChild(newKid);
                           SponsorScreen.refreshNotifier.value++;
+                          ProfileScreen.refreshNotifier.value++;
+                          ProfileScreen.refreshNotifier.value++;
 
                           if (ctx.mounted) Navigator.pop(ctx);
                           if (!mounted || !context.mounted) return;
@@ -722,6 +747,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           };
                           await LocalDatabase().insertChild(offlineKid);
                           SponsorScreen.refreshNotifier.value++;
+                          ProfileScreen.refreshNotifier.value++;
 
                           if (ctx.mounted) Navigator.pop(ctx);
                           if (!mounted || !context.mounted) return;

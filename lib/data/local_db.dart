@@ -85,7 +85,9 @@ class LocalDatabase {
         status TEXT,
         donor_name TEXT,
         donor_email TEXT,
-        need_category TEXT
+        need_category TEXT,
+        certificate_code TEXT,
+        block_hash TEXT
       )
     ''');
 
@@ -200,6 +202,12 @@ class LocalDatabase {
     } catch (_) {}
     try {
       await db.execute('ALTER TABLE cached_donations ADD COLUMN child_city TEXT');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE cached_donations ADD COLUMN certificate_code TEXT');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE cached_donations ADD COLUMN block_hash TEXT');
     } catch (_) {}
     try {
       await db.execute('ALTER TABLE offline_donations_queue ADD COLUMN local_id TEXT');
@@ -537,6 +545,8 @@ class LocalDatabase {
       'child_id': donation['child_id']?.toString() ?? '',
       'child_avatar': donation['child_avatar']?.toString() ?? '',
       'child_city': donation['child_city']?.toString() ?? '',
+      'certificate_code': donation['certificate_code']?.toString() ?? '',
+      'block_hash': donation['block_hash']?.toString() ?? '',
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
