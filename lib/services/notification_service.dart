@@ -59,6 +59,22 @@ class NotificationService {
     }
 
     tz_data.initializeTimeZones();
+    try {
+      final offsetHours = DateTime.now().timeZoneOffset.inHours;
+      if (offsetHours == 7) {
+        tz.setLocalLocation(tz.getLocation('Asia/Jakarta'));
+      } else if (offsetHours == 8) {
+        tz.setLocalLocation(tz.getLocation('Asia/Makassar'));
+      } else if (offsetHours == 9) {
+        tz.setLocalLocation(tz.getLocation('Asia/Jayapura'));
+      } else {
+        tz.setLocalLocation(tz.getLocation('Asia/Jakarta'));
+      }
+    } catch (_) {
+      try {
+        tz.setLocalLocation(tz.getLocation('Asia/Jakarta'));
+      } catch (_) {}
+    }
 
     const AndroidInitializationSettings initAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -277,21 +293,37 @@ class NotificationService {
       scheduledDateTime,
       tz.local,
     );
-    final mode = await _getScheduleMode();
 
-    await _flutterLocalNotificationsPlugin.zonedSchedule(
-      id: id,
-      title: '📞 Pengingat Video Call AsuhKita',
-      body:
-          'Sesi video call bersama $childAlias akan segera dimulai! Silakan buka aplikasi.',
-      scheduledDate: scheduledTz,
-      notificationDetails: _notifDetails,
-      androidScheduleMode: mode,
-      payload: 'video_call_$id',
-    );
-    debugPrint(
-      '[NotificationService] Video call reminder scheduled for $scheduledTz',
-    );
+    try {
+      await _flutterLocalNotificationsPlugin.zonedSchedule(
+        id: id,
+        title: '📞 Pengingat Video Call AsuhKita',
+        body:
+            'Sesi video call bersama $childAlias akan segera dimulai! Silakan buka aplikasi.',
+        scheduledDate: scheduledTz,
+        notificationDetails: _notifDetails,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        payload: 'video_call_$id',
+      );
+      debugPrint(
+        '[NotificationService] Video call reminder scheduled (exact) for $scheduledTz',
+      );
+    } catch (e) {
+      debugPrint('[NotificationService] Exact alarm failed, falling back to inexact: $e');
+      await _flutterLocalNotificationsPlugin.zonedSchedule(
+        id: id,
+        title: '📞 Pengingat Video Call AsuhKita',
+        body:
+            'Sesi video call bersama $childAlias akan segera dimulai! Silakan buka aplikasi.',
+        scheduledDate: scheduledTz,
+        notificationDetails: _notifDetails,
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        payload: 'video_call_$id',
+      );
+      debugPrint(
+        '[NotificationService] Video call reminder scheduled (inexact) for $scheduledTz',
+      );
+    }
   }
 
   Future<void> scheduleFinanceReportReminder({
@@ -310,21 +342,37 @@ class NotificationService {
       scheduledDateTime,
       tz.local,
     );
-    final mode = await _getScheduleMode();
 
-    await _flutterLocalNotificationsPlugin.zonedSchedule(
-      id: id,
-      title: '📊 Pengingat Tenggat Laporan Keuangan',
-      body:
-          'Waktunya menyelesaikan $reportCategory ($target). Mohon rekonsiliasi data kas!',
-      scheduledDate: scheduledTz,
-      notificationDetails: _notifDetails,
-      androidScheduleMode: mode,
-      payload: 'finance_report_$id',
-    );
-    debugPrint(
-      '[NotificationService] Finance report reminder scheduled for $scheduledTz',
-    );
+    try {
+      await _flutterLocalNotificationsPlugin.zonedSchedule(
+        id: id,
+        title: '📊 Pengingat Tenggat Laporan Keuangan',
+        body:
+            'Waktunya menyelesaikan $reportCategory ($target). Mohon rekonsiliasi data kas!',
+        scheduledDate: scheduledTz,
+        notificationDetails: _notifDetails,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        payload: 'finance_report_$id',
+      );
+      debugPrint(
+        '[NotificationService] Finance report reminder scheduled (exact) for $scheduledTz',
+      );
+    } catch (e) {
+      debugPrint('[NotificationService] Exact alarm failed, falling back to inexact: $e');
+      await _flutterLocalNotificationsPlugin.zonedSchedule(
+        id: id,
+        title: '📊 Pengingat Tenggat Laporan Keuangan',
+        body:
+            'Waktunya menyelesaikan $reportCategory ($target). Mohon rekonsiliasi data kas!',
+        scheduledDate: scheduledTz,
+        notificationDetails: _notifDetails,
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        payload: 'finance_report_$id',
+      );
+      debugPrint(
+        '[NotificationService] Finance report reminder scheduled (inexact) for $scheduledTz',
+      );
+    }
   }
 
   Future<void> scheduleMonthlyDonationReminder({

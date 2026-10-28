@@ -31,14 +31,9 @@ class _MapScreenState extends State<MapScreen> {
   String _currentRegion = 'Nusa Tenggara Barat';
   String _currentCity = 'Mataram (Lombok)';
   bool _isDetecting = true;
-  bool _isLoadingRoute = false;
   bool _locationPermissionGranted = false;
 
-
   Map<String, dynamic>? _selectedOrphanage;
-  List<LatLng> _routePoints = [];
-  double _routeDistanceKm = 0.0;
-  int _routeEstimatedMinutes = 0;
 
 
   List<Map<String, dynamic>> _orphanages = [];
@@ -275,90 +270,23 @@ class _MapScreenState extends State<MapScreen> {
 
 
 
-  Future<void> _fetchOsrmRoute(Map<String, dynamic> orphanage) async {
+  void _selectOrphanage(Map<String, dynamic> orphanage) {
     setState(() {
-      _isLoadingRoute = true;
       _selectedOrphanage = orphanage;
     });
 
     final start = _userLocation;
     final end = orphanage['location'] as LatLng;
     final haversineDistMeters = _calculateDistance(start, end);
-
-    List<LatLng> polylinePoints = [];
-    double distanceKm = haversineDistMeters / 1000.0;
-    int estMinutes = max(2, (haversineDistMeters / 400).round());
+    final distanceKm = haversineDistMeters / 1000.0;
+    final estMinutes = max(2, (haversineDistMeters / 400).round());
 
     try {
+      _mapController.move(end, 15.0);
+    } catch (_) {}
 
-
-      final osrmUrl =
-          'https://router.project-osrm.org/route/v1/driving/${start.longitude},${start.latitude};${end.longitude},${end.latitude}?overview=full&geometries=geojson';
-
-      final res = await DioClient().dio.get(osrmUrl).timeout(const Duration(seconds: 5));
-
-      if (res.statusCode == 200 && res.data is Map) {
-        final routes = res.data['routes'] as List?;
-        if (routes != null && routes.isNotEmpty) {
-          final firstRoute = routes[0];
-          final geometry = firstRoute['geometry'];
-          if (geometry != null && geometry['coordinates'] is List) {
-            final coords = geometry['coordinates'] as List;
-            for (var c in coords) {
-              if (c is List && c.length >= 2) {
-                polylinePoints.add(LatLng((c[1] as num).toDouble(), (c[0] as num).toDouble()));
-              }
-            }
-          }
-          final osrmDist = (firstRoute['distance'] as num?)?.toDouble();
-          if (osrmDist != null) {
-            distanceKm = osrmDist / 1000.0;
-          }
-          final osrmDuration = (firstRoute['duration'] as num?)?.toDouble();
-          if (osrmDuration != null) {
-            estMinutes = max(1, (osrmDuration / 60).round());
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('[OSRM] Fallback to simulated polyline waypoints: $e');
-
-      final dLat = end.latitude - start.latitude;
-      final dLon = end.longitude - start.longitude;
-      polylinePoints = [
-        start,
-        LatLng(start.latitude + (dLat * 0.25), start.longitude + (dLon * 0.10)),
-        LatLng(start.latitude + (dLat * 0.45), start.longitude + (dLon * 0.50)),
-        LatLng(start.latitude + (dLat * 0.70), start.longitude + (dLon * 0.65)),
-        LatLng(start.latitude + (dLat * 0.85), start.longitude + (dLon * 0.90)),
-        end,
-      ];
-    }
-
-    if (polylinePoints.isEmpty) {
-      polylinePoints = [start, end];
-    }
-
-    if (mounted) {
-      setState(() {
-        _routePoints = polylinePoints;
-        _routeDistanceKm = distanceKm;
-        _routeEstimatedMinutes = estMinutes;
-        _isLoadingRoute = false;
-      });
-
-
-      try {
-        final centerLat = (start.latitude + end.latitude) / 2;
-        final centerLon = (start.longitude + end.longitude) / 2;
-        _mapController.move(LatLng(centerLat, centerLon), 14.0);
-      } catch (_) {}
-
-
-      _showOrphanageBottomSheet(orphanage, _routeDistanceKm, _routeEstimatedMinutes);
-    }
+    _showOrphanageBottomSheet(orphanage, distanceKm, estMinutes);
   }
-
 
   double _calculateDistance(LatLng pos1, LatLng pos2) {
     const Distance distance = Distance();
@@ -536,58 +464,31 @@ class _MapScreenState extends State<MapScreen> {
             const SizedBox(height: 20),
 
 
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      _handleCheckIn(orphanage);
-                    },
-                    icon: Icon(
-                      canCheckIn ? Icons.verified_user : Icons.pin_drop,
-                      color: canCheckIn ? Colors.green : AppColors.primary,
-                      size: 18,
-                    ),
-                    label: Text(
-                      canCheckIn ? 'Check-in Sekarang' : 'Verifikasi Check-in',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: canCheckIn ? Colors.green : AppColors.primary,
-                      ),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      side: BorderSide(color: canCheckIn ? Colors.green : AppColors.primary),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _handleCheckIn(orphanage);
+                },
+                icon: Icon(
+                  canCheckIn ? Icons.verified_user : Icons.pin_drop,
+                  size: 20,
+                ),
+                label: Text(
+                  canCheckIn ? 'Check-in Sekarang (Radius <100m)' : 'Verifikasi Check-in Kehadiran',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Navigasi OSRM aktif: Ikuti garis biru menuju ${orphanage['name']}.'),
-                          backgroundColor: Colors.blue.shade800,
-                          duration: const Duration(seconds: 3),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.navigation, size: 18),
-                    label: const Text('Ikuti Rute Biru', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue.shade700,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: canCheckIn ? Colors.green : AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-              ],
+              ),
             ),
           ],
         ),
@@ -643,16 +544,9 @@ class _MapScreenState extends State<MapScreen> {
             'Check-in kehadiran fisik hanya dapat dilakukan saat Anda berada dalam radius maksimal 100 meter dari panti asuhan.',
           ),
           actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(ctx);
-                _fetchOsrmRoute(orphanage);
-              },
-              child: const Text('Buka Rute Navigasi', style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
-            ),
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.grey.shade700, foregroundColor: Colors.white),
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
               child: const Text('Tutup'),
             ),
           ],
@@ -668,7 +562,6 @@ class _MapScreenState extends State<MapScreen> {
       _currentCity = cityName;
       _currentRegion = regionName;
       _selectedOrphanage = null;
-      _routePoints = [];
     });
 
     _fetchNearbyOrphanagesFromApi(newLocation);
@@ -754,25 +647,6 @@ class _MapScreenState extends State<MapScreen> {
               ),
 
 
-              if (_routePoints.isNotEmpty)
-                PolylineLayer(
-                  polylines: [
-
-                    Polyline(
-                      points: _routePoints,
-                      color: Colors.blue.shade900.withValues(alpha: 0.4),
-                      strokeWidth: 8.0,
-                    ),
-
-                    Polyline(
-                      points: _routePoints,
-                      color: Colors.blueAccent,
-                      strokeWidth: 5.5,
-                    ),
-                  ],
-                ),
-
-
               MarkerLayer(
                 markers: [
 
@@ -826,7 +700,7 @@ class _MapScreenState extends State<MapScreen> {
                       width: 90,
                       height: 80,
                       child: GestureDetector(
-                        onTap: () => _fetchOsrmRoute(orp),
+                        onTap: () => _selectOrphanage(orp),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -933,27 +807,6 @@ class _MapScreenState extends State<MapScreen> {
           ),
 
 
-          if (_isLoadingRoute)
-            Positioned(
-              bottom: 24,
-              left: 50,
-              right: 50,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: Colors.black87,
-                  borderRadius: BorderRadius.circular(30),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
-                    SizedBox(width: 10),
-                    Text('Menggambar rute jalan via OSRM...', style: TextStyle(color: Colors.white, fontSize: 12)),
-                  ],
-                ),
-              ),
-            ),
         ],
       ),
     );

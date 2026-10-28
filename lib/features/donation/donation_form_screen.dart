@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
-import 'package:dio/dio.dart';
 import '../ledger/ledger_screen.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';

@@ -4,7 +4,6 @@
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/app_colors.dart';
 import '../../core/dio_client.dart';
 import '../../data/local_db.dart';
@@ -154,6 +153,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       String userEmail = '';
       String userName = '';
+      if (!mounted) return;
       try {
         final auth = Provider.of<AuthProvider>(context, listen: false);
         userEmail = auth.userEmail.toLowerCase().trim();
@@ -645,13 +645,23 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _openMySponsoredChildDetail(BuildContext context) async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final userEmail = auth.userEmail.toLowerCase().trim();
+    final userName = auth.userName.toLowerCase().trim();
+
     final localDb = LocalDatabase();
     final localDonations = await localDb.getCachedDonations();
     final sponsoredAliases = <String>{};
     for (var d in localDonations) {
-      final alias = (d['child_alias'] ?? '').toString().trim();
-      if (alias.isNotEmpty) {
-        sponsoredAliases.add(alias.toLowerCase());
+      final dEmail = (d['donor_email'] ?? '').toString().toLowerCase().trim();
+      final dName = (d['donor_name'] ?? '').toString().toLowerCase().trim();
+      final isMatch = (userEmail.isNotEmpty && dEmail == userEmail) ||
+          (userName.isNotEmpty && (dName == userName || dName == userEmail));
+      if (isMatch) {
+        final alias = (d['child_alias'] ?? '').toString().trim();
+        if (alias.isNotEmpty) {
+          sponsoredAliases.add(alias.toLowerCase());
+        }
       }
     }
 

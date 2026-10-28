@@ -77,6 +77,28 @@ class _SponsorScreenState extends State<SponsorScreen> {
     });
   }
 
+  Future<List<Map<String, dynamic>>> _loadUnifiedLocalChildren() async {
+    final cached = await LocalDatabase().getCachedChildren(
+      query: _searchController.text.trim(),
+      category: _selectedCategory,
+    );
+    final newKids = await LocalDatabase().getNewChildren();
+    final map = <String, Map<String, dynamic>>{};
+    for (var c in cached) {
+      final alias = (c['alias'] ?? c['name'] ?? '').toString().toLowerCase().trim();
+      map[alias] = Map<String, dynamic>.from(c);
+    }
+    for (var n in newKids) {
+      final alias = (n['alias'] ?? n['name'] ?? '').toString().toLowerCase().trim();
+      if (map.containsKey(alias)) {
+        map[alias]!.addAll(n);
+      } else {
+        map[alias] = Map<String, dynamic>.from(n);
+      }
+    }
+    return map.values.toList();
+  }
+
   Future<void> _fetchChildren({bool? forceOffline}) async {
     setState(() => _isLoading = true);
     if (forceOffline != null) {
@@ -84,16 +106,10 @@ class _SponsorScreenState extends State<SponsorScreen> {
     }
 
     if (_forceOfflineMode) {
-
       _isOffline = true;
-      final cached = await LocalDatabase().getCachedChildren(
-        query: _searchController.text.trim(),
-        category: _selectedCategory,
-      );
-      _allChildren = cached;
+      _allChildren = await _loadUnifiedLocalChildren();
     } else {
       try {
-
         final res = await DioClient().dio.get('/children');
         List<Map<String, dynamic>> apiData = [];
         if (res.statusCode == 200) {
@@ -103,29 +119,19 @@ class _SponsorScreenState extends State<SponsorScreen> {
             apiData = List<Map<String, dynamic>>.from(res.data['data']);
           }
 
-
           if (apiData.isNotEmpty) {
             await LocalDatabase().cacheChildren(apiData);
             _allChildren = List<Map<String, dynamic>>.from(apiData);
             _isOffline = false;
           } else {
-            final cached = await LocalDatabase().getCachedChildren(
-              query: _searchController.text.trim(),
-              category: _selectedCategory,
-            );
-            _allChildren = cached;
+            _allChildren = await _loadUnifiedLocalChildren();
           }
         } else {
           throw Exception('Gagal memuat data dari server');
         }
       } catch (e) {
-
         _isOffline = true;
-        final cached = await LocalDatabase().getCachedChildren(
-          query: _searchController.text.trim(),
-          category: _selectedCategory,
-        );
-        _allChildren = cached;
+        _allChildren = await _loadUnifiedLocalChildren();
       }
     }
 
@@ -371,7 +377,6 @@ class _SponsorScreenState extends State<SponsorScreen> {
     List<Map<String, dynamic>> scoredList = [];
 
     for (var child in _allChildren) {
-      double score = 60.0;
       final age = int.tryParse((child['age'] ?? '0').toString()) ?? 0;
       final needs = (child['need_category'] ?? child['urgentNeeds'] ?? '').toString().toLowerCase();
       final target = (child['target'] is num) ? (child['target'] as num).toDouble() : 500000.0;
@@ -379,57 +384,76 @@ class _SponsorScreenState extends State<SponsorScreen> {
       final collected = _collectedPerChild[alias] ?? 0;
       final isFulfilled = collected >= target && target > 0;
 
-
-      if (ageRange == 'Balita (1-5 th)' && age >= 1 && age <= 5) {
-        score += 15;
-      } else if (ageRange == 'Sekolah (6-12 th)' && age >= 6 && age <= 12) {
-        score += 15;
-      } else if (ageRange == 'Remaja (13-18 th)' && age >= 13 && age <= 18) {
-        score += 15;
-      } else if (ageRange == 'Semua Usia') {
-        score += 10;
+      // 1. Cek Kesesuaian Usia
+      bool ageMatched = false;
+      double agePoints = 0.0;
+      if (ageRange == 'Balita (1-5 th)') {
+        ageMatched = age >= 1 && age <= 5;
+        if (ageMatched) agePoints = 35.0;
+      } else if (ageRange == 'Sekolah (6-12 th)') {
+        ageMatched = age >= 6 && age <= 12;
+        if (ageMatched) agePoints = 35.0;
+      } else if (ageRange == 'Remaja (13-18 th)') {
+        ageMatched = age >= 13 && age <= 18;
+        if (ageMatched) agePoints = 35.0;
+      } else {
+        // Semua Usia
+        ageMatched = true;
+        agePoints = 25.0;
       }
 
-
-      if (priorityNeed != 'Semua Kebutuhan' && needs.contains(priorityNeed.toLowerCase())) {
-        score += 15;
-      } else if (priorityNeed == 'Semua Kebutuhan') {
-        score += 8;
+      // Jika user memilih rentang usia spesifik dan anak TIDAK cocok, diskualifikasi anak ini!
+      if (ageRange != 'Semua Usia' && !ageMatched) {
+        continue;
       }
 
-
-      if (budgetRange == '< Rp 150rb' && target <= 200000) {
-        score += 15;
-      } else if (budgetRange == 'Rp 150rb - 350rb' && target >= 150000 && target <= 350000) {
-        score += 15;
-      } else if (budgetRange == 'Rp 350rb - 600rb' && target >= 300000 && target <= 600000) {
-        score += 15;
-      } else if (budgetRange == '> Rp 600rb' && target >= 500000) {
-        score += 15;
-      } else if (budgetRange == 'Fleksibel') {
-        score += 10;
+      // 2. Cek Kesesuaian Kebutuhan
+      double needPoints = 0.0;
+      if (priorityNeed == 'Semua Kebutuhan') {
+        needPoints = 25.0;
+      } else if (needs.contains(priorityNeed.toLowerCase())) {
+        needPoints = 30.0;
+      } else {
+        needPoints = 0.0;
       }
 
-
-      if (prioritizeUnfulfilled && !isFulfilled) {
-        score += 10;
+      // 3. Cek Kesesuaian Anggaran / Donasi
+      double budgetPoints = 0.0;
+      if (budgetRange == '< Rp 150rb') {
+        budgetPoints = target <= 150000 ? 25.0 : 0.0;
+      } else if (budgetRange == 'Rp 150rb - 350rb') {
+        budgetPoints = (target >= 150000 && target <= 350000) ? 25.0 : 0.0;
+      } else if (budgetRange == 'Rp 350rb - 600rb') {
+        budgetPoints = (target >= 300000 && target <= 600000) ? 25.0 : 0.0;
+      } else if (budgetRange == '> Rp 600rb') {
+        budgetPoints = target >= 600000 ? 25.0 : (target >= 500000 ? 10.0 : 0.0);
+      } else {
+        // Fleksibel
+        budgetPoints = 25.0;
       }
 
-      final finalScore = score.clamp(72.0, 99.0).toInt();
+      // 4. Prioritas Belum Terpenuhi
+      double unfulfilledPoints = 0.0;
+      if (prioritizeUnfulfilled) {
+        unfulfilledPoints = !isFulfilled ? 10.0 : 0.0;
+      } else {
+        unfulfilledPoints = 5.0;
+      }
 
-      final scoredChild = Map<String, dynamic>.from(child);
-      scoredChild['ai_match_score'] = finalScore;
-      scoredChild['ai_reason'] =
-          'Kecocokan ' + finalScore.toString() + '%: Usia ' + age.toString() + ' th selaras dengan kriteria, kebutuhan utama ' + (child['need_category'] ?? 'Pendidikan').toString() + ' ' +
-          (!isFulfilled ? 'masih mendesak belum terpenuhi' : 'sudah menerima dukungan') +
-          ', dan alokasi target Rp ' + ((target / 1000).toInt()).toString() + 'rb pas dengan kapasitas dana Anda.';
-      scoredList.add(scoredChild);
+      final totalScore = (agePoints + needPoints + budgetPoints + unfulfilledPoints).clamp(0.0, 99.0).toInt();
+
+      // Hanya masukkan jika skor kesesuaian minimal 70%
+      if (totalScore >= 70) {
+        final scoredChild = Map<String, dynamic>.from(child);
+        scoredChild['ai_match_score'] = totalScore;
+        scoredChild['ai_reason'] =
+            'Kecocokan $totalScore%: Usia $age th sesuai kriteria $ageRange, fokus kebutuhan ${child['need_category'] ?? 'Pendidikan'} ${!isFulfilled ? 'masih mendesak belum terpenuhi' : 'sudah menerima dukungan'}, dan target Rp ${(target / 1000).toInt()}rb selaras dengan alokasi Anda.';
+        scoredList.add(scoredChild);
+      }
     }
 
     scoredList.sort((a, b) => (b['ai_match_score'] as int).compareTo(a['ai_match_score'] as int));
-
-    // Filter: hanya tampilkan anak yang benar-benar cocok (skor > 72)
-    final matchedList = scoredList.where((c) => (c['ai_match_score'] as int) > 72).toList();
+    final matchedList = scoredList;
 
     if (matchedList.isEmpty) {
       // Tidak ada anak yang sesuai kriteria

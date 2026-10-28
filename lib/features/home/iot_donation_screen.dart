@@ -1,7 +1,9 @@
 
 
 
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/app_colors.dart';
 
 class IotDonationScreen extends StatefulWidget {
@@ -12,22 +14,62 @@ class IotDonationScreen extends StatefulWidget {
 }
 
 class _IotDonationScreenState extends State<IotDonationScreen> {
-  final List<Map<String, dynamic>> _iotEvents = [
-    {
-      'id': 'iot_01',
-      'device_name': 'Kotak Amal ESP32 Panti Kasih Ibu',
-      'nominal': 50000,
-      'timestamp': '2026-10-19 16:30',
-      'block_hash': '0000e47192837bcda12',
-    },
-    {
-      'id': 'iot_02',
-      'device_name': 'Kotak Amal ESP32 Harapan Mulia',
-      'nominal': 20000,
-      'timestamp': '2026-10-18 11:15',
-      'block_hash': '0000109fbc81293ac44',
-    },
-  ];
+  List<Map<String, dynamic>> _iotEvents = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPersistedEvents();
+  }
+
+  Future<void> _loadPersistedEvents() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonStr = prefs.getString('asuhkita_iot_events_v2');
+      if (jsonStr != null && jsonStr.isNotEmpty) {
+        final decoded = jsonDecode(jsonStr);
+        if (decoded is List) {
+          if (mounted) {
+            setState(() {
+              _iotEvents = List<Map<String, dynamic>>.from(decoded);
+            });
+          }
+          return;
+        }
+      }
+    } catch (_) {}
+
+    final defaultEvents = [
+      {
+        'id': 'iot_01',
+        'device_name': 'Kotak Amal ESP32 Panti Kasih Ibu',
+        'nominal': 50000,
+        'timestamp': '2026-10-19 16:30',
+        'block_hash': '0000e47192837bcda12',
+      },
+      {
+        'id': 'iot_02',
+        'device_name': 'Kotak Amal ESP32 Harapan Mulia',
+        'nominal': 20000,
+        'timestamp': '2026-10-18 11:15',
+        'block_hash': '0000109fbc81293ac44',
+      },
+    ];
+
+    if (mounted) {
+      setState(() {
+        _iotEvents = defaultEvents;
+      });
+    }
+    _saveEventsToStorage(defaultEvents);
+  }
+
+  Future<void> _saveEventsToStorage(List<Map<String, dynamic>> events) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('asuhkita_iot_events_v2', jsonEncode(events));
+    } catch (_) {}
+  }
 
   void _simulateIotEvent(int nominal) {
     final newEvent = {
@@ -42,9 +84,11 @@ class _IotDonationScreenState extends State<IotDonationScreen> {
       _iotEvents.insert(0, newEvent);
     });
 
+    _saveEventsToStorage(_iotEvents);
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Sensor IR ESP32 Mendeteksi Uang Masuk Rp ${nominal.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}! Blok DONASI_KOTAK dibuat di Ledger.'),
+        content: Text('Sensor IR ESP32 Mendeteksi Uang Masuk Rp ${nominal.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}! Data disimpan ke memori IoT & Ledger.'),
         backgroundColor: AppColors.primary,
       ),
     );

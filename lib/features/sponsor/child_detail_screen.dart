@@ -2,8 +2,10 @@
 
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../core/app_colors.dart';
 import '../../data/local_db.dart';
+import '../auth/auth_provider.dart';
 import '../communication/family_room_screen.dart';
 import '../donation/donation_form_screen.dart';
 import '../schedule/schedule_screen.dart';
@@ -22,6 +24,8 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
   bool _isSponsoredByMe = false;
   int _myTotalDonation = 0;
   List<Map<String, dynamic>> _myDonations = [];
+  String? _childDream;
+  String? _childHobby;
 
   final List<Map<String, dynamic>> _packages = [
     {
@@ -57,14 +61,44 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
       int total = 0;
       final matched = <Map<String, dynamic>>[];
 
+      String myEmail = '';
+      String myName = '';
+      if (!mounted) return;
+      try {
+        final auth = Provider.of<AuthProvider>(context, listen: false);
+        myEmail = auth.userEmail.toLowerCase().trim();
+        myName = auth.userName.toLowerCase().trim();
+      } catch (_) {}
+
       for (var d in localDonations) {
+        final dEmail = (d['donor_email'] ?? '').toString().toLowerCase().trim();
+        final dName = (d['donor_name'] ?? '').toString().toLowerCase().trim();
+        final isMyDonation = (myEmail.isNotEmpty && dEmail == myEmail) ||
+            (myName.isNotEmpty && (dName == myName || dName == myEmail));
         final dAlias = (d['child_alias'] ?? '').toString().trim().toLowerCase();
-        if (dAlias == childAlias) {
+        if (isMyDonation && dAlias == childAlias) {
           matched.add(d);
           final amt = (d['amount_idr'] is num) ? (d['amount_idr'] as num).toInt() : 0;
           total += amt;
         }
       }
+
+      // Sinkronkan cita-cita & hobi dari inputan admin jika belum ada di widget.childData
+      try {
+        final newKids = await LocalDatabase().getNewChildren();
+        final match = newKids.firstWhere(
+          (k) => (k['name'] ?? k['alias'] ?? '').toString().trim().toLowerCase() == childAlias,
+          orElse: () => {},
+        );
+        if (match.isNotEmpty) {
+          if (match['dream'] != null && match['dream'].toString().trim().isNotEmpty) {
+            _childDream = match['dream'].toString().trim();
+          }
+          if (match['hobby'] != null && match['hobby'].toString().trim().isNotEmpty) {
+            _childHobby = match['hobby'].toString().trim();
+          }
+        }
+      } catch (_) {}
 
       if (mounted) {
         setState(() {
@@ -88,8 +122,10 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
     final gender = child['gender'] ?? 'Laki-laki';
     final city = child['orphanage_city'] ?? child['city'] ?? 'Mataram, NTB';
     final orphanage = child['orphanage_name'] ?? 'Peduli Anak Foundation';
-    final dream = (child['dream'] != null && child['dream'].toString().trim().isNotEmpty) ? child['dream'].toString().trim() : '-';
-    final hobby = (child['hobby'] != null && child['hobby'].toString().trim().isNotEmpty) ? child['hobby'].toString().trim() : '-';
+    final rawDream = _childDream ?? child['dream']?.toString();
+    final rawHobby = _childHobby ?? child['hobby']?.toString();
+    final dream = (rawDream != null && rawDream.trim().isNotEmpty && rawDream.trim() != '-') ? rawDream.trim() : null;
+    final hobby = (rawHobby != null && rawHobby.trim().isNotEmpty && rawHobby.trim() != '-') ? rawHobby.trim() : null;
     final category = child['need_category'] ?? child['urgentNeeds'] ?? 'Pendidikan';
     final targetNum = (child['target'] is num) ? (child['target'] as num).toDouble() : 500000.0;
 
@@ -311,8 +347,10 @@ class _ChildDetailScreenState extends State<ChildDetailScreen> {
                             ],
                           ),
                           const Divider(height: 20),
-                          _buildDataRow(Icons.lightbulb_outline, 'Cita-Cita / Impian', dream),
-                          _buildDataRow(Icons.sports_soccer_outlined, 'Hobi & Minat', hobby),
+                          if (dream != null)
+                            _buildDataRow(Icons.lightbulb_outline, 'Cita-Cita / Impian', dream),
+                          if (hobby != null)
+                            _buildDataRow(Icons.sports_soccer_outlined, 'Hobi & Minat', hobby),
                           _buildDataRow(Icons.location_on_outlined, 'Lokasi Panti', city),
                         ],
                       ),

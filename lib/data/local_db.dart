@@ -172,6 +172,18 @@ class LocalDatabase {
       await db.execute('ALTER TABLE new_children ADD COLUMN category_budgets TEXT');
     } catch (_) {}
     try {
+      await db.execute('ALTER TABLE cached_children ADD COLUMN dream TEXT');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE cached_children ADD COLUMN hobby TEXT');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE cached_children ADD COLUMN target REAL');
+    } catch (_) {}
+    try {
+      await db.execute('ALTER TABLE cached_children ADD COLUMN category_budgets TEXT');
+    } catch (_) {}
+    try {
       await db.execute('ALTER TABLE cached_donations ADD COLUMN donor_name TEXT');
     } catch (_) {}
     try {
@@ -420,6 +432,10 @@ class LocalDatabase {
         'status': 'Tersedia',
         'orphanage_name': 'Peduli Anak Foundation',
         'orphanage_city': child['city']?.toString() ?? child['orphanage_city']?.toString() ?? 'PeduliAnak Lombok',
+        'dream': child['dream']?.toString() ?? '',
+        'hobby': child['hobby']?.toString() ?? '',
+        'target': child['target'] is num ? (child['target'] as num).toDouble() : 500000.0,
+        'category_budgets': child['category_budgets']?.toString() ?? child['categoryBudgets']?.toString() ?? '',
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     } catch (_) {}
   }
@@ -444,14 +460,20 @@ class LocalDatabase {
     }, where: 'id = ? OR name = ?', whereArgs: [childId, name]);
 
 
-    await db.update('cached_children', {
-      'alias': name,
-      'age': child['age'] is int ? child['age'] : int.tryParse(child['age']?.toString() ?? '0') ?? 0,
-      'need_category': child['urgentNeeds']?.toString() ?? child['urgent_needs']?.toString() ?? child['need_category']?.toString() ?? 'Pendidikan',
-      'story_summary': child['story']?.toString() ?? child['story_summary']?.toString() ?? '',
-      'avatar': child['photo']?.toString() ?? child['avatar']?.toString() ?? '',
-      'orphanage_city': child['city']?.toString() ?? child['orphanage_city']?.toString() ?? 'PeduliAnak Lombok',
-    }, where: 'id = ? OR alias = ?', whereArgs: [childId, name]);
+    try {
+      await db.update('cached_children', {
+        'alias': name,
+        'age': child['age'] is int ? child['age'] : int.tryParse(child['age']?.toString() ?? '0') ?? 0,
+        'need_category': child['urgentNeeds']?.toString() ?? child['urgent_needs']?.toString() ?? child['need_category']?.toString() ?? 'Pendidikan',
+        'story_summary': child['story']?.toString() ?? child['story_summary']?.toString() ?? '',
+        'avatar': child['photo']?.toString() ?? child['avatar']?.toString() ?? '',
+        'orphanage_city': child['city']?.toString() ?? child['orphanage_city']?.toString() ?? 'PeduliAnak Lombok',
+        'dream': child['dream']?.toString() ?? '',
+        'hobby': child['hobby']?.toString() ?? '',
+        'target': child['target'] is num ? (child['target'] as num).toDouble() : 500000.0,
+        'category_budgets': child['category_budgets']?.toString() ?? child['categoryBudgets']?.toString() ?? '',
+      }, where: 'id = ? OR alias = ?', whereArgs: [childId, name]);
+    } catch (_) {}
   }
 
   Future<void> deleteChild(String childId, [String? childName]) async {
